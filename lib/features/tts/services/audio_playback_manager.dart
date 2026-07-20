@@ -44,6 +44,7 @@ class AudioPlaybackManager implements PlaybackController {
         );
       }
       await _player.stop();
+      await _player.setReleaseMode(ReleaseMode.stop);
       await _player.setSource(DeviceFileSource(path));
       _path = path;
     } on AppException {

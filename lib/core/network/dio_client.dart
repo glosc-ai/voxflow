@@ -33,7 +33,8 @@ class DioClient {
 
   String endpoint(String path) {
     final cleanPath = path.startsWith('/') ? path.substring(1) : path;
-    return '${settings.baseUrl}/$cleanPath';
+    final baseUrl = SettingsState.normalizeBaseUrl(settings.baseUrl);
+    return '$baseUrl/$cleanPath';
   }
 
   Future<void> testConnection() async {

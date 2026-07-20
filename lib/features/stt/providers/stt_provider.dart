@@ -103,7 +103,7 @@ class SttNotifier extends StateNotifier<SttState> {
       _elapsedTimer?.cancel();
       state = state.copyWith(phase: SttPhase.paused, clearError: true);
     } catch (error) {
-      _setFailure(error, '暂停录音失败。');
+      _setRecoverableError(error, '暂停录音失败。');
     }
   }
 
@@ -116,7 +116,7 @@ class SttNotifier extends StateNotifier<SttState> {
       state = state.copyWith(phase: SttPhase.recording, clearError: true);
       _startElapsedTimer();
     } catch (error) {
-      _setFailure(error, '继续录音失败。');
+      _setRecoverableError(error, '继续录音失败。');
     }
   }
 
@@ -129,6 +129,7 @@ class SttNotifier extends StateNotifier<SttState> {
       final file = await _recorder.stop();
       await transcribeFile(file, removeSourceAfterSuccess: true);
     } catch (error) {
+      await _recorder.cancel();
       _setFailure(error, '停止录音失败。');
     }
   }
@@ -272,6 +273,11 @@ class SttNotifier extends StateNotifier<SttState> {
       phase: SttPhase.failure,
       errorMessage: message,
     );
+  }
+
+  void _setRecoverableError(Object error, String fallback) {
+    final message = error is AppException ? error.message : fallback;
+    state = state.copyWith(errorMessage: message);
   }
 
   @override

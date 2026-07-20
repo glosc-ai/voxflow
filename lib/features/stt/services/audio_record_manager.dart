@@ -48,10 +48,31 @@ class AudioRecordManager {
     } on AppException {
       rethrow;
     } catch (_) {
+      await cancel();
       throw const AppException(
         AppErrorCode.recordingUnavailable,
         '无法开始录音，麦克风可能正被其他程序占用。',
       );
+    }
+  }
+
+  Future<void> cancel() async {
+    final path = _currentPath;
+    _currentPath = null;
+    try {
+      await _recorder.cancel();
+    } catch (_) {
+      // Continue with temporary-file cleanup.
+    }
+    if (path != null) {
+      try {
+        final file = File(path);
+        if (await file.exists()) {
+          await file.delete();
+        }
+      } catch (_) {
+        // Temporary-file cleanup is best-effort.
+      }
     }
   }
 
@@ -107,6 +128,7 @@ class AudioRecordManager {
 
   Future<void> dispose() async {
     try {
+      await cancel();
       await _recorder.dispose();
     } catch (_) {
       // Recorder disposal is best-effort during provider shutdown.
