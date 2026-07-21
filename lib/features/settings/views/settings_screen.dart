@@ -5,6 +5,7 @@ import '../../../core/constants/app_constants.dart';
 import '../../../core/errors/app_exception.dart';
 import '../models/settings_state.dart';
 import '../providers/settings_provider.dart';
+import '../widgets/masked_text_editing_controller.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -15,7 +16,7 @@ class SettingsScreen extends ConsumerStatefulWidget {
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   final _formKey = GlobalKey<FormState>();
-  late final TextEditingController _apiKeyController;
+  late final MaskedTextEditingController _apiKeyController;
   late final TextEditingController _baseUrlController;
   late String _sttModel;
   late String _ttsModel;
@@ -25,7 +26,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   void initState() {
     super.initState();
     final settings = ref.read(settingsProvider);
-    _apiKeyController = TextEditingController(text: settings.apiKey);
+    _apiKeyController = MaskedTextEditingController(text: settings.apiKey);
     _baseUrlController = TextEditingController(text: settings.baseUrl);
     _sttModel = settings.sttModel;
     _ttsModel = settings.ttsModel;
@@ -66,31 +67,35 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         style: Theme.of(context).textTheme.bodyMedium,
                       ),
                       const SizedBox(height: 24),
-                      TextFormField(
-                        key: const Key('apiKeyField'),
-                        controller: _apiKeyController,
-                        obscureText: _obscureApiKey,
-                        enableSuggestions: false,
-                        autocorrect: false,
-                        decoration: InputDecoration(
-                          labelText: 'API Key',
-                          prefixIcon: const Icon(Icons.key),
-                          suffixIcon: IconButton(
-                            tooltip: _obscureApiKey ? '显示密钥' : '隐藏密钥',
-                            onPressed: () => setState(
-                              () => _obscureApiKey = !_obscureApiKey,
-                            ),
-                            icon: Icon(
-                              _obscureApiKey
-                                  ? Icons.visibility
-                                  : Icons.visibility_off,
+                      ExcludeSemantics(
+                        child: TextFormField(
+                          key: const Key('apiKeyField'),
+                          controller: _apiKeyController,
+                          keyboardType: TextInputType.visiblePassword,
+                          enableSuggestions: false,
+                          autocorrect: false,
+                          enableInteractiveSelection: !_obscureApiKey,
+                          decoration: InputDecoration(
+                            labelText: 'API Key',
+                            prefixIcon: const Icon(Icons.key),
+                            suffixIcon: IconButton(
+                              tooltip: _obscureApiKey ? '显示密钥' : '隐藏密钥',
+                              onPressed: () => setState(() {
+                                _obscureApiKey = !_obscureApiKey;
+                                _apiKeyController.masked = _obscureApiKey;
+                              }),
+                              icon: Icon(
+                                _obscureApiKey
+                                    ? Icons.visibility
+                                    : Icons.visibility_off,
+                              ),
                             ),
                           ),
+                          validator: (value) =>
+                              value == null || value.trim().isEmpty
+                                  ? '请填写 API Key'
+                                  : null,
                         ),
-                        validator: (value) =>
-                            value == null || value.trim().isEmpty
-                                ? '请填写 API Key'
-                                : null,
                       ),
                       const SizedBox(height: 16),
                       TextFormField(

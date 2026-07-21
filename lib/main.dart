@@ -1,19 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/foundation.dart';
 
-import 'app.dart';
-import 'features/settings/providers/settings_provider.dart';
+import 'bootstrap.dart';
 
-Future<void> main() async {
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  final preferences = await SharedPreferences.getInstance();
-  runApp(
-    ProviderScope(
-      overrides: [
-        sharedPreferencesProvider.overrideWithValue(preferences),
-      ],
-      child: const VoxFlowApp(),
-    ),
-  );
+  final app = defaultTargetPlatform == TargetPlatform.windows
+      ? const ExcludeSemantics(child: VoxFlowBootstrap())
+      : const VoxFlowBootstrap();
+  runApp(app);
 }

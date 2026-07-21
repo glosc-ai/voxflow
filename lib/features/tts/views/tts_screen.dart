@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/constants/app_constants.dart';
 import '../../../core/errors/app_exception.dart';
+import '../../../widgets/inline_error_banner.dart';
 import '../models/tts_state.dart';
 import '../providers/tts_provider.dart';
 
@@ -51,6 +52,10 @@ class _TtsScreenState extends ConsumerState<TtsScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                if (state.errorMessage != null) ...[
+                  InlineErrorBanner(message: state.errorMessage!),
+                  const SizedBox(height: 16),
+                ],
                 Card(
                   child: Padding(
                     padding: const EdgeInsets.all(20),

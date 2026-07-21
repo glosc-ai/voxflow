@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/errors/app_exception.dart';
+import '../../../widgets/inline_error_banner.dart';
 import '../models/stt_state.dart';
 import '../providers/stt_provider.dart';
 
@@ -75,6 +76,10 @@ class _SttScreenState extends ConsumerState<SttScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                if (state.errorMessage != null) ...[
+                  InlineErrorBanner(message: state.errorMessage!),
+                  const SizedBox(height: 16),
+                ],
                 _RecordingCard(state: state),
                 const SizedBox(height: 16),
                 _ImportCard(state: state),

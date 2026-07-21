@@ -92,7 +92,9 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                   ),
                   data: (records) {
                     if (records.isEmpty) {
-                      return const _EmptyState();
+                      return _EmptyState(
+                        isSearch: _searchController.text.trim().isNotEmpty,
+                      );
                     }
                     return ListView.separated(
                       padding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
@@ -261,17 +263,19 @@ class _HistoryCard extends StatelessWidget {
 }
 
 class _EmptyState extends StatelessWidget {
-  const _EmptyState();
+  const _EmptyState({required this.isSearch});
+
+  final bool isSearch;
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
+    return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.history_toggle_off, size: 64),
-          SizedBox(height: 16),
-          Text('暂无历史记录'),
+          const Icon(Icons.history_toggle_off, size: 64),
+          const SizedBox(height: 16),
+          Text(isSearch ? '未找到匹配的历史记录' : '暂无历史记录'),
         ],
       ),
     );

@@ -3,13 +3,20 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:voxflow/app.dart';
+import 'package:voxflow/core/network/dio_client.dart';
 import 'package:voxflow/features/history/models/history_record.dart';
 import 'package:voxflow/features/history/providers/history_provider.dart';
 import 'package:voxflow/features/history/services/history_repository.dart';
 import 'package:voxflow/features/history/views/history_screen.dart';
 import 'package:voxflow/features/settings/providers/settings_provider.dart';
+import 'package:voxflow/features/settings/models/settings_state.dart';
+import 'package:voxflow/features/settings/views/settings_screen.dart';
+import 'package:voxflow/features/settings/widgets/masked_text_editing_controller.dart';
+import 'package:voxflow/features/tts/models/tts_state.dart';
 import 'package:voxflow/features/tts/providers/tts_provider.dart';
 import 'package:voxflow/features/tts/services/audio_playback_manager.dart';
+import 'package:voxflow/features/tts/services/tts_api_service.dart';
+import 'package:voxflow/features/tts/views/tts_screen.dart';
 
 void main() {
   testWidgets('移动端使用底部导航', (tester) async {
@@ -98,7 +105,7 @@ void main() {
     await tester.enterText(find.byKey(const Key('historySearchField')), '不存在');
     await tester.testTextInput.receiveAction(TextInputAction.search);
     await tester.pumpAndSettle();
-    expect(find.text('暂无历史记录'), findsOneWidget);
+    expect(find.text('未找到匹配的历史记录'), findsOneWidget);
 
     await tester.tap(find.byTooltip('清空搜索'));
     await tester.pumpAndSettle();
@@ -109,6 +116,83 @@ void main() {
     expect(repository.records, isEmpty);
     expect(find.text('暂无历史记录'), findsOneWidget);
   });
+
+  testWidgets('API Key 自定义遮罩避免桌面 secure-text IME 崩溃', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final preferences = await SharedPreferences.getInstance();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          sharedPreferencesProvider.overrideWithValue(preferences),
+        ],
+        child: const MaterialApp(home: SettingsScreen()),
+      ),
+    );
+
+    final field = find.descendant(
+      of: find.byKey(const Key('apiKeyField')),
+      matching: find.byType(TextField),
+    );
+    final textField = tester.widget<TextField>(field);
+    expect(textField.keyboardType, TextInputType.visiblePassword);
+    expect(textField.obscureText, isFalse);
+    expect(
+      find.ancestor(of: field, matching: find.byType(ExcludeSemantics)),
+      findsOneWidget,
+    );
+
+    await tester.enterText(field, 'secret');
+    final controller = textField.controller! as MaskedTextEditingController;
+    expect(controller.text, 'secret');
+    expect(
+      controller
+          .buildTextSpan(
+            context: tester.element(field),
+            withComposing: false,
+          )
+          .toPlainText(),
+      '••••••',
+    );
+  });
+
+  testWidgets('TTS 失败原因持续显示在页面内', (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          ttsProvider.overrideWith((ref) => _FailureTtsNotifier()),
+        ],
+        child: const MaterialApp(home: TtsScreen()),
+      ),
+    );
+
+    await tester.enterText(find.byKey(const Key('ttsTextField')), 'test');
+    final synthesizeButton = find.byKey(const Key('synthesizeButton'));
+    await tester.ensureVisible(synthesizeButton);
+    await tester.pumpAndSettle();
+    await tester.tap(synthesizeButton);
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('inlineErrorMessage')), findsOneWidget);
+    expect(find.text('测试服务不可用。'), findsWidgets);
+  });
+}
+
+class _FailureTtsNotifier extends TtsNotifier {
+  _FailureTtsNotifier()
+      : super(
+          apiService: TtsApiService(DioClient(const SettingsState())),
+          playback: const _SilentPlaybackController(),
+          historyWriter: ({required text, required audioPath}) async {},
+          model: 'tts-1',
+        );
+
+  @override
+  Future<void> synthesize(String text) async {
+    state = const TtsState(
+      phase: TtsPhase.failure,
+      errorMessage: '测试服务不可用。',
+    );
+  }
 }
 
 class _SilentPlaybackController implements PlaybackController {

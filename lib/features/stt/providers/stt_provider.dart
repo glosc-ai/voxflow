@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/errors/app_exception.dart';
 import '../../../core/services/permission_service.dart';
+import '../../../core/services/platform_clock.dart';
 import '../../../core/utils/path_utils.dart';
 import '../../../core/utils/transcript_exporter.dart';
 import '../../history/models/history_record.dart';
@@ -21,6 +22,8 @@ typedef HistoryWriter = Future<void> Function({
   required String text,
   required String audioPath,
 });
+
+typedef UtcNow = Future<DateTime> Function();
 
 final permissionServiceProvider = Provider<PermissionService>((ref) {
   return const PermissionService();
@@ -61,15 +64,22 @@ class SttNotifier extends StateNotifier<SttState> {
     required AudioRecordManager recorder,
     required WhisperApiService apiService,
     required HistoryWriter historyWriter,
+    UtcNow? nowUtc,
   })  : _recorder = recorder,
         _apiService = apiService,
         _historyWriter = historyWriter,
+        _nowUtc = nowUtc ?? PlatformClock.nowUtc,
         super(const SttState());
 
   final AudioRecordManager _recorder;
   final WhisperApiService _apiService;
   final HistoryWriter _historyWriter;
+  final UtcNow _nowUtc;
+  DateTime? _recordingSegmentStartedAt;
+  Duration _recordedElapsed = Duration.zero;
   Timer? _elapsedTimer;
+  bool _clockReadInProgress = false;
+  bool _disposed = false;
 
   Future<void> startRecording() async {
     if (!state.canStart) {
@@ -79,9 +89,17 @@ class SttNotifier extends StateNotifier<SttState> {
     try {
       for (var value = 3; value > 0; value--) {
         state = state.copyWith(phase: SttPhase.countdown, countdown: value);
-        await Future<void>.delayed(const Duration(seconds: 1));
+        await _delayUsingClock(const Duration(seconds: 1));
+        if (_disposed || state.phase != SttPhase.countdown) {
+          return;
+        }
+      }
+      if (_disposed || state.phase != SttPhase.countdown) {
+        return;
       }
       await _recorder.start();
+      _recordedElapsed = Duration.zero;
+      _recordingSegmentStartedAt = await _nowUtc();
       state = state.copyWith(
         phase: SttPhase.recording,
         countdown: 0,
@@ -101,7 +119,12 @@ class SttNotifier extends StateNotifier<SttState> {
     try {
       await _recorder.pause();
       _elapsedTimer?.cancel();
-      state = state.copyWith(phase: SttPhase.paused, clearError: true);
+      await _accumulateElapsed();
+      state = state.copyWith(
+        phase: SttPhase.paused,
+        elapsed: _roundedRecordedElapsed,
+        clearError: true,
+      );
     } catch (error) {
       _setRecoverableError(error, '暂停录音失败。');
     }
@@ -113,6 +136,7 @@ class SttNotifier extends StateNotifier<SttState> {
     }
     try {
       await _recorder.resume();
+      _recordingSegmentStartedAt = await _nowUtc();
       state = state.copyWith(phase: SttPhase.recording, clearError: true);
       _startElapsedTimer();
     } catch (error) {
@@ -125,6 +149,8 @@ class SttNotifier extends StateNotifier<SttState> {
       return;
     }
     _elapsedTimer?.cancel();
+    await _accumulateElapsed();
+    state = state.copyWith(elapsed: _roundedRecordedElapsed);
     try {
       final file = await _recorder.stop();
       await transcribeFile(file, removeSourceAfterSuccess: true);
@@ -253,21 +279,77 @@ class SttNotifier extends StateNotifier<SttState> {
 
   void reset() {
     _elapsedTimer?.cancel();
+    _recordingSegmentStartedAt = null;
+    _recordedElapsed = Duration.zero;
     state = const SttState();
   }
 
   void _startElapsedTimer() {
     _elapsedTimer?.cancel();
-    _elapsedTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (state.phase == SttPhase.recording) {
-        state =
-            state.copyWith(elapsed: state.elapsed + const Duration(seconds: 1));
-      }
-    });
+    _elapsedTimer = Timer.periodic(
+      const Duration(seconds: 1),
+      (_) => unawaited(_syncElapsed()),
+    );
   }
+
+  Future<void> _syncElapsed() async {
+    if (_clockReadInProgress || _disposed || !state.isRecording) {
+      return;
+    }
+    final startedAt = _recordingSegmentStartedAt;
+    if (startedAt == null) {
+      return;
+    }
+    _clockReadInProgress = true;
+    try {
+      final now = await _nowUtc();
+      if (_disposed ||
+          !state.isRecording ||
+          startedAt != _recordingSegmentStartedAt) {
+        return;
+      }
+      var elapsed = _recordedElapsed;
+      final currentSegment = now.difference(startedAt);
+      if (!currentSegment.isNegative) {
+        elapsed += currentSegment;
+      }
+      elapsed = Duration(seconds: elapsed.inSeconds);
+      if (elapsed != state.elapsed) {
+        state = state.copyWith(elapsed: elapsed);
+      }
+    } finally {
+      _clockReadInProgress = false;
+    }
+  }
+
+  Future<void> _accumulateElapsed() async {
+    final startedAt = _recordingSegmentStartedAt;
+    _recordingSegmentStartedAt = null;
+    if (startedAt == null) {
+      return;
+    }
+    final segment = (await _nowUtc()).difference(startedAt);
+    if (!segment.isNegative) {
+      _recordedElapsed += segment;
+    }
+  }
+
+  Future<void> _delayUsingClock(Duration duration) async {
+    final deadline = (await _nowUtc()).add(duration);
+    while (!_disposed) {
+      if (!(await _nowUtc()).isBefore(deadline)) {
+        return;
+      }
+      await Future<void>.delayed(const Duration(seconds: 1));
+    }
+  }
+
+  Duration get _roundedRecordedElapsed =>
+      Duration(seconds: _recordedElapsed.inSeconds);
 
   void _setFailure(Object error, String fallback) {
     _elapsedTimer?.cancel();
+    _recordingSegmentStartedAt = null;
     final message = error is AppException ? error.message : fallback;
     state = state.copyWith(
       phase: SttPhase.failure,
@@ -282,7 +364,9 @@ class SttNotifier extends StateNotifier<SttState> {
 
   @override
   void dispose() {
+    _disposed = true;
     _elapsedTimer?.cancel();
+    _recordingSegmentStartedAt = null;
     super.dispose();
   }
 }
