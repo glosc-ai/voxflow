@@ -53,6 +53,53 @@ class DioClient {
     }
   }
 
+  Future<List<String>> fetchModelIds() async {
+    final validSettings = settings.credentialsValidated();
+    try {
+      final response =
+          await dio.get<Object?>('${validSettings.baseUrl}/models');
+      final payload = response.data;
+      if (payload is! Map) {
+        throw const AppException(
+          AppErrorCode.invalidConfiguration,
+          '模型列表响应格式不兼容。',
+        );
+      }
+      final data = payload['data'];
+      if (data is! List) {
+        throw const AppException(
+          AppErrorCode.invalidConfiguration,
+          '模型列表响应缺少 data 数组。',
+        );
+      }
+      final ids = <String>[];
+      for (final item in data) {
+        if (item is Map) {
+          final id = item['id'];
+          if (id is String && id.trim().isNotEmpty) {
+            ids.add(id.trim());
+          }
+        }
+      }
+      if (ids.isEmpty) {
+        throw const AppException(
+          AppErrorCode.invalidConfiguration,
+          '服务未返回可用模型。',
+        );
+      }
+      return ids;
+    } on DioException catch (error) {
+      throw mapException(error);
+    } on AppException {
+      rethrow;
+    } catch (_) {
+      throw const AppException(
+        AppErrorCode.unknown,
+        '无法获取模型列表，请稍后重试。',
+      );
+    }
+  }
+
   static AppException mapException(DioException error) {
     switch (error.type) {
       case DioExceptionType.connectionTimeout:

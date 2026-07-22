@@ -1,9 +1,13 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:voxflow/core/errors/app_exception.dart';
 import 'package:voxflow/core/network/dio_client.dart';
 import 'package:voxflow/features/settings/models/settings_state.dart';
+import 'package:voxflow/features/settings/models/model_catalog.dart';
 import 'package:voxflow/features/settings/services/settings_repository.dart';
 
 void main() {
@@ -67,4 +71,63 @@ void main() {
     expect(exception.code, AppErrorCode.unauthorized);
     expect(exception.message, isNot(contains('test-secret')));
   });
+
+  test('模型目录按音频能力分类、去重并排序', () {
+    final catalog = ModelCatalog.fromIds([
+      'tts-1',
+      'gpt-4o-transcribe',
+      'chat-model',
+      'whisper-1',
+      'tts-1',
+      ' gpt-4o-mini-tts ',
+    ]);
+
+    expect(catalog.stt, ['gpt-4o-transcribe', 'whisper-1']);
+    expect(catalog.tts, ['gpt-4o-mini-tts', 'tts-1']);
+    expect(catalog.all, contains('chat-model'));
+  });
+
+  test('Dio 获取模型列表并注入认证', () async {
+    final adapter = _ModelsAdapter();
+    final dio = Dio()..httpClientAdapter = adapter;
+    const settings = SettingsState(
+      apiKey: 'test-key',
+      baseUrl: 'https://proxy.example/v1',
+    );
+
+    final ids = await DioClient(settings, dio: dio).fetchModelIds();
+
+    expect(ids, ['whisper-1', 'tts-1']);
+    expect(adapter.options!.path, 'https://proxy.example/v1/models');
+    expect(adapter.options!.headers['Authorization'], 'Bearer test-key');
+  });
+}
+
+class _ModelsAdapter implements HttpClientAdapter {
+  RequestOptions? options;
+
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? requestStream,
+    Future<void>? cancelFuture,
+  ) async {
+    this.options = options;
+    return ResponseBody.fromString(
+      jsonEncode({
+        'object': 'list',
+        'data': [
+          {'id': 'whisper-1', 'object': 'model'},
+          {'id': 'tts-1', 'object': 'model'},
+        ],
+      }),
+      200,
+      headers: {
+        Headers.contentTypeHeader: ['application/json'],
+      },
+    );
+  }
+
+  @override
+  void close({bool force = false}) {}
 }

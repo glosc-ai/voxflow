@@ -10,6 +10,7 @@ import 'package:voxflow/features/history/services/history_repository.dart';
 import 'package:voxflow/features/history/views/history_screen.dart';
 import 'package:voxflow/features/settings/providers/settings_provider.dart';
 import 'package:voxflow/features/settings/models/settings_state.dart';
+import 'package:voxflow/features/settings/services/settings_repository.dart';
 import 'package:voxflow/features/settings/views/settings_screen.dart';
 import 'package:voxflow/features/settings/widgets/masked_text_editing_controller.dart';
 import 'package:voxflow/features/tts/models/tts_state.dart';
@@ -140,6 +141,10 @@ void main() {
       find.ancestor(of: field, matching: find.byType(ExcludeSemantics)),
       findsOneWidget,
     );
+    expect(
+      tester.getTopLeft(find.byKey(const Key('baseUrlField'))).dy,
+      lessThan(tester.getTopLeft(find.byKey(const Key('apiKeyField'))).dy),
+    );
 
     await tester.enterText(field, 'secret');
     final controller = textField.controller! as MaskedTextEditingController;
@@ -153,6 +158,50 @@ void main() {
           .toPlainText(),
       '••••••',
     );
+  });
+
+  testWidgets('获取模型后更新 STT 和 TTS 下拉选项', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final preferences = await SharedPreferences.getInstance();
+    final repository = SettingsRepository(preferences);
+    await repository.save(
+      const SettingsState(
+        apiKey: 'test-key',
+        baseUrl: 'https://proxy.example/v1',
+      ),
+    );
+    final notifier = SettingsNotifier(
+      repository,
+      modelLoader: (_) async => [
+        'whisper-1',
+        'gpt-4o-transcribe',
+        'tts-1',
+        'gpt-4o-mini-tts',
+        'chat-model',
+      ],
+    );
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          settingsProvider.overrideWith((ref) => notifier),
+        ],
+        child: const MaterialApp(home: SettingsScreen()),
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('fetchModelsButton')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('sttModelField')));
+    await tester.pumpAndSettle();
+    expect(find.text('gpt-4o-transcribe'), findsOneWidget);
+    expect(find.text('chat-model'), findsNothing);
+    await tester.tap(find.text('gpt-4o-transcribe'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('ttsModelField')));
+    await tester.pumpAndSettle();
+    expect(find.text('gpt-4o-mini-tts'), findsOneWidget);
   });
 
   testWidgets('TTS 失败原因持续显示在页面内', (tester) async {

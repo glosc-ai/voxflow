@@ -7,6 +7,8 @@ class SettingsState {
     this.baseUrl = AppConstants.defaultBaseUrl,
     this.sttModel = AppConstants.defaultSttModel,
     this.ttsModel = AppConstants.defaultTtsModel,
+    this.availableSttModels = const [],
+    this.availableTtsModels = const [],
     this.isBusy = false,
     this.lastConnectionSucceeded,
     this.message,
@@ -16,6 +18,8 @@ class SettingsState {
   final String baseUrl;
   final String sttModel;
   final String ttsModel;
+  final List<String> availableSttModels;
+  final List<String> availableTtsModels;
   final bool isBusy;
   final bool? lastConnectionSucceeded;
   final String? message;
@@ -27,6 +31,9 @@ class SettingsState {
     String? baseUrl,
     String? sttModel,
     String? ttsModel,
+    List<String>? availableSttModels,
+    List<String>? availableTtsModels,
+    bool clearAvailableModels = false,
     bool? isBusy,
     bool? lastConnectionSucceeded,
     bool clearConnectionResult = false,
@@ -38,6 +45,12 @@ class SettingsState {
       baseUrl: baseUrl ?? this.baseUrl,
       sttModel: sttModel ?? this.sttModel,
       ttsModel: ttsModel ?? this.ttsModel,
+      availableSttModels: clearAvailableModels
+          ? const []
+          : (availableSttModels ?? this.availableSttModels),
+      availableTtsModels: clearAvailableModels
+          ? const []
+          : (availableTtsModels ?? this.availableTtsModels),
       isBusy: isBusy ?? this.isBusy,
       lastConnectionSucceeded: clearConnectionResult
           ? null
@@ -68,6 +81,21 @@ class SettingsState {
   }
 
   SettingsState validated() {
+    final validatedCredentials = credentialsValidated();
+    if (sttModel.trim().isEmpty || ttsModel.trim().isEmpty) {
+      throw const AppException(
+        AppErrorCode.invalidConfiguration,
+        '模型名称不能为空。',
+      );
+    }
+    return validatedCredentials.copyWith(
+      sttModel: sttModel.trim(),
+      ttsModel: ttsModel.trim(),
+      clearMessage: true,
+    );
+  }
+
+  SettingsState credentialsValidated() {
     final normalizedKey = apiKey.trim();
     if (normalizedKey.isEmpty) {
       throw const AppException(
@@ -75,17 +103,9 @@ class SettingsState {
         '请先填写 API Key。',
       );
     }
-    if (sttModel.trim().isEmpty || ttsModel.trim().isEmpty) {
-      throw const AppException(
-        AppErrorCode.invalidConfiguration,
-        '模型名称不能为空。',
-      );
-    }
     return copyWith(
       apiKey: normalizedKey,
       baseUrl: normalizeBaseUrl(baseUrl),
-      sttModel: sttModel.trim(),
-      ttsModel: ttsModel.trim(),
       clearMessage: true,
     );
   }

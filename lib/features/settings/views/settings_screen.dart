@@ -42,6 +42,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final settings = ref.watch(settingsProvider);
+    final sttModels = _modelOptions(
+      settings.availableSttModels,
+      current: _sttModel,
+      fallback: AppConstants.defaultSttModel,
+    );
+    final ttsModels = _modelOptions(
+      settings.availableTtsModels,
+      current: _ttsModel,
+      fallback: AppConstants.defaultTtsModel,
+    );
     return Scaffold(
       appBar: AppBar(title: const Text('设置')),
       body: Center(
@@ -67,6 +77,25 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         style: Theme.of(context).textTheme.bodyMedium,
                       ),
                       const SizedBox(height: 24),
+                      TextFormField(
+                        key: const Key('baseUrlField'),
+                        controller: _baseUrlController,
+                        keyboardType: TextInputType.url,
+                        decoration: const InputDecoration(
+                          labelText: 'API Root',
+                          hintText: AppConstants.defaultBaseUrl,
+                          prefixIcon: Icon(Icons.link),
+                        ),
+                        validator: (value) {
+                          try {
+                            SettingsState.normalizeBaseUrl(value ?? '');
+                            return null;
+                          } on AppException catch (error) {
+                            return error.message;
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 16),
                       ExcludeSemantics(
                         child: TextFormField(
                           key: const Key('apiKeyField'),
@@ -98,52 +127,39 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         ),
                       ),
                       const SizedBox(height: 16),
-                      TextFormField(
-                        key: const Key('baseUrlField'),
-                        controller: _baseUrlController,
-                        keyboardType: TextInputType.url,
-                        decoration: const InputDecoration(
-                          labelText: 'API Root',
-                          hintText: AppConstants.defaultBaseUrl,
-                          prefixIcon: Icon(Icons.link),
-                        ),
-                        validator: (value) {
-                          try {
-                            SettingsState.normalizeBaseUrl(value ?? '');
-                            return null;
-                          } on AppException catch (error) {
-                            return error.message;
-                          }
-                        },
-                      ),
-                      const SizedBox(height: 16),
                       DropdownButtonFormField<String>(
+                        key: const Key('sttModelField'),
                         initialValue: _sttModel,
                         decoration: const InputDecoration(
                           labelText: '语音转文字模型',
                         ),
-                        items: const [
-                          DropdownMenuItem(
-                            value: AppConstants.defaultSttModel,
-                            child: Text(AppConstants.defaultSttModel),
-                          ),
-                        ],
+                        items: sttModels
+                            .map(
+                              (model) => DropdownMenuItem(
+                                value: model,
+                                child: Text(model),
+                              ),
+                            )
+                            .toList(),
                         onChanged: settings.isBusy
                             ? null
                             : (value) => _sttModel = value ?? _sttModel,
                       ),
                       const SizedBox(height: 16),
                       DropdownButtonFormField<String>(
+                        key: const Key('ttsModelField'),
                         initialValue: _ttsModel,
                         decoration: const InputDecoration(
                           labelText: '文字转语音模型',
                         ),
-                        items: const [
-                          DropdownMenuItem(
-                            value: AppConstants.defaultTtsModel,
-                            child: Text(AppConstants.defaultTtsModel),
-                          ),
-                        ],
+                        items: ttsModels
+                            .map(
+                              (model) => DropdownMenuItem(
+                                value: model,
+                                child: Text(model),
+                              ),
+                            )
+                            .toList(),
                         onChanged: settings.isBusy
                             ? null
                             : (value) => _ttsModel = value ?? _ttsModel,
@@ -171,6 +187,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         runSpacing: 12,
                         alignment: WrapAlignment.end,
                         children: [
+                          OutlinedButton.icon(
+                            key: const Key('fetchModelsButton'),
+                            onPressed: settings.isBusy ? null : _fetchModels,
+                            icon: const Icon(Icons.download),
+                            label: const Text('获取模型'),
+                          ),
                           OutlinedButton.icon(
                             onPressed: settings.isBusy
                                 ? null
@@ -205,6 +227,34 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
+  Future<void> _fetchModels() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+    try {
+      final catalog = await ref.read(settingsProvider.notifier).fetchModels(
+            apiKey: _apiKeyController.text,
+            baseUrl: _baseUrlController.text,
+          );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '已获取 ${catalog.stt.length} 个语音转文字模型、'
+              '${catalog.tts.length} 个文字转语音模型。',
+            ),
+          ),
+        );
+      }
+    } on AppException catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error.message)),
+        );
+      }
+    }
+  }
+
   Future<void> _submit({required bool testConnection}) async {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -237,4 +287,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       }
     }
   }
+}
+
+List<String> _modelOptions(
+  Iterable<String> fetched, {
+  required String current,
+  required String fallback,
+}) {
+  final models = <String>{fallback, current.trim(), ...fetched}
+    ..removeWhere((model) => model.isEmpty);
+  return models.toList();
 }
