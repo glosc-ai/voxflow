@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/errors/app_exception.dart';
+import '../../../core/logging/app_logger.dart';
 import '../../../core/network/dio_client.dart';
 import '../models/model_catalog.dart';
 import '../models/settings_state.dart';
@@ -14,6 +15,8 @@ final sharedPreferencesProvider = Provider<SharedPreferences>((ref) {
 final settingsRepositoryProvider = Provider<SettingsRepository>((ref) {
   return SettingsRepository(ref.watch(sharedPreferencesProvider));
 });
+
+final appLoggerProvider = Provider<AppLogger>((ref) => AppLogger.instance);
 
 final settingsProvider =
     StateNotifierProvider<SettingsNotifier, SettingsState>((ref) {

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/constants/app_constants.dart';
 import '../../../core/errors/app_exception.dart';
+import '../../../core/logging/diagnostic_log_exporter.dart';
 import '../models/settings_state.dart';
 import '../providers/settings_provider.dart';
 import '../widgets/masked_text_editing_controller.dart';
@@ -216,6 +217,39 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           ),
                         ],
                       ),
+                      const SizedBox(height: 28),
+                      const Divider(),
+                      const SizedBox(height: 20),
+                      Text(
+                        '诊断日志',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '记录接口路径、状态码、模型和脱敏后的服务端错误原因；'
+                        '不会记录 API Key、认证头、音频或输入文本。',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                      const SizedBox(height: 16),
+                      Wrap(
+                        spacing: 12,
+                        runSpacing: 12,
+                        alignment: WrapAlignment.end,
+                        children: [
+                          OutlinedButton.icon(
+                            key: const Key('viewLogsButton'),
+                            onPressed: _showLogs,
+                            icon: const Icon(Icons.article_outlined),
+                            label: const Text('查看日志'),
+                          ),
+                          OutlinedButton.icon(
+                            key: const Key('exportLogsButton'),
+                            onPressed: _exportLogs,
+                            icon: const Icon(Icons.save_alt),
+                            label: const Text('导出日志'),
+                          ),
+                        ],
+                      ),
                     ],
                   ),
                 ),
@@ -224,6 +258,71 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  Future<void> _showLogs() async {
+    try {
+      final contents = await ref.read(appLoggerProvider).readAll();
+      if (!mounted) {
+        return;
+      }
+      await showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('VoxFlow 诊断日志'),
+          content: SizedBox(
+            width: 760,
+            height: 420,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(12),
+                child: SelectableText(
+                  contents.trim().isEmpty ? '暂无诊断日志。' : contents,
+                  key: const Key('diagnosticLogContents'),
+                  style: const TextStyle(fontFamily: 'monospace'),
+                ),
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('关闭'),
+            ),
+          ],
+        ),
+      );
+    } on AppException catch (error) {
+      _showError(error.message);
+    }
+  }
+
+  Future<void> _exportLogs() async {
+    try {
+      final exported = await DiagnosticLogExporter(
+        ref.read(appLoggerProvider),
+      ).export();
+      if (exported && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('诊断日志已导出。')),
+        );
+      }
+    } on AppException catch (error) {
+      _showError(error.message);
+    }
+  }
+
+  void _showError(String message) {
+    if (!mounted) {
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
     );
   }
 

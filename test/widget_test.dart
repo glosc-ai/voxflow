@@ -145,6 +145,8 @@ void main() {
       tester.getTopLeft(find.byKey(const Key('baseUrlField'))).dy,
       lessThan(tester.getTopLeft(find.byKey(const Key('apiKeyField'))).dy),
     );
+    expect(find.byKey(const Key('viewLogsButton')), findsOneWidget);
+    expect(find.byKey(const Key('exportLogsButton')), findsOneWidget);
 
     await tester.enterText(field, 'secret');
     final controller = textField.controller! as MaskedTextEditingController;

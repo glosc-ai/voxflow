@@ -42,6 +42,24 @@ class PathUtils {
     }
   }
 
+  static Future<File> getLogFile() async {
+    try {
+      final support = await getApplicationSupportDirectory();
+      final directory = Directory(
+        _join([support.path, 'VoxFlow', 'logs']),
+      );
+      if (!await directory.exists()) {
+        await directory.create(recursive: true);
+      }
+      return File(_join([directory.path, 'voxflow.log']));
+    } catch (_) {
+      throw const AppException(
+        AppErrorCode.storageFailure,
+        '无法访问应用日志目录。',
+      );
+    }
+  }
+
   static Future<String> temporaryAudioPath({
     required String stem,
     required String extension,

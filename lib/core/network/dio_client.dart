@@ -1,10 +1,19 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
 
 import '../../features/settings/models/settings_state.dart';
 import '../errors/app_exception.dart';
+import '../logging/app_logger.dart';
 
 class DioClient {
-  DioClient(this.settings, {Dio? dio}) : dio = dio ?? Dio() {
+  DioClient(
+    this.settings, {
+    Dio? dio,
+    AppLogger? logger,
+  })  : dio = dio ?? Dio(),
+        logger = logger ?? AppLogger.instance {
     this.dio.options = BaseOptions(
       baseUrl: settings.baseUrl,
       connectTimeout: const Duration(seconds: 30),
@@ -19,9 +28,40 @@ class DioClient {
               if (apiKey.isNotEmpty) {
                 options.headers['Authorization'] = 'Bearer $apiKey';
               }
+              unawaited(
+                this.logger.info(
+                      'network',
+                      'request_started',
+                      fields: _requestFields(options),
+                    ),
+              );
               handler.next(options);
             },
+            onResponse: (response, handler) {
+              unawaited(
+                this.logger.info(
+                      'network',
+                      'request_completed',
+                      fields: _responseFields(response),
+                    ),
+              );
+              handler.next(response);
+            },
             onError: (error, handler) {
+              final reason = extractServerReason(error);
+              unawaited(
+                this.logger.error(
+                  'network',
+                  'request_failed',
+                  fields: {
+                    ..._requestFields(error.requestOptions),
+                    'status': error.response?.statusCode,
+                    'dio_type': error.type.name,
+                    ..._requestIdFields(error.response?.headers),
+                    if (reason != null) 'reason': reason,
+                  },
+                ),
+              );
               handler.next(error);
             },
           ),
@@ -30,6 +70,50 @@ class DioClient {
 
   final SettingsState settings;
   final Dio dio;
+  final AppLogger logger;
+
+  Map<String, Object?> _requestFields(RequestOptions options) {
+    final path = options.uri.path;
+    return {
+      'method': options.method,
+      'host': options.uri.host,
+      'path': path,
+      if (path.endsWith('/audio/speech')) 'model': settings.ttsModel,
+      if (path.endsWith('/audio/transcriptions')) 'model': settings.sttModel,
+    };
+  }
+
+  Map<String, Object?> _responseFields(Response<Object?> response) {
+    return {
+      ..._requestFields(response.requestOptions),
+      'status': response.statusCode,
+      ..._requestIdFields(response.headers),
+    };
+  }
+
+  static Map<String, Object?> _requestIdFields(Headers? headers) {
+    final id = _requestId(headers);
+    return id == null ? const {} : {'request_id': id};
+  }
+
+  static String? _requestId(Headers? headers) {
+    if (headers == null) {
+      return null;
+    }
+    for (final name in const [
+      'x-request-id',
+      'request-id',
+      'x-correlation-id',
+      'trace-id',
+      'cf-ray',
+    ]) {
+      final value = headers.value(name)?.trim();
+      if (value != null && value.isNotEmpty) {
+        return AppLogger.redact(value, maxLength: 120);
+      }
+    }
+    return null;
+  }
 
   String endpoint(String path) {
     final cleanPath = path.startsWith('/') ? path.substring(1) : path;
@@ -100,65 +184,162 @@ class DioClient {
     }
   }
 
-  static AppException mapException(DioException error) {
+  static AppException mapException(
+    DioException error, {
+    Iterable<String> sensitiveValues = const [],
+  }) {
+    final detail = extractServerReason(
+      error,
+      sensitiveValues: sensitiveValues,
+    );
     switch (error.type) {
       case DioExceptionType.connectionTimeout:
       case DioExceptionType.sendTimeout:
       case DioExceptionType.receiveTimeout:
       case DioExceptionType.transformTimeout:
-        return const AppException(
+        return AppException(
           AppErrorCode.networkTimeout,
-          '请求超时，请检查网络后重试。',
+          _withDetail('请求超时，请检查网络后重试。', detail),
         );
       case DioExceptionType.connectionError:
-        return const AppException(
+        return AppException(
           AppErrorCode.serviceUnavailable,
-          '无法连接 API 服务，请检查地址和网络。',
+          _withDetail('无法连接 API 服务，请检查地址和网络。', detail),
         );
       case DioExceptionType.cancel:
-        return const AppException(AppErrorCode.unknown, '请求已取消。');
+        return AppException(
+          AppErrorCode.unknown,
+          _withDetail('请求已取消。', detail),
+        );
       case DioExceptionType.badResponse:
         final status = error.response?.statusCode;
         if (status == 401 || status == 403) {
-          return const AppException(
+          return AppException(
             AppErrorCode.unauthorized,
-            'API Key 无效或无权访问该服务。',
+            _withDetail('API Key 无效或无权访问该服务。', detail),
           );
         }
         if (status == 413) {
-          return const AppException(
+          return AppException(
             AppErrorCode.fileTooLarge,
-            '上传文件超过服务允许的大小。',
+            _withDetail('上传文件超过服务允许的大小。', detail),
           );
         }
         if (status == 429) {
-          return const AppException(
+          return AppException(
             AppErrorCode.rateLimited,
-            '请求过于频繁或额度不足，请稍后重试。',
+            _withDetail('请求过于频繁或额度不足，请稍后重试。', detail),
           );
         }
         if (status != null && status >= 500) {
-          return const AppException(
+          return AppException(
             AppErrorCode.serviceUnavailable,
-            'API 服务暂时不可用，请稍后重试。',
+            _withDetail('API 服务暂时不可用，请稍后重试。', detail),
           );
         }
+        final baseMessage = status == 404
+            ? 'API 地址不兼容：未找到请求接口。'
+            : 'API 请求失败${status == null ? '' : '（$status）'}。';
         return AppException(
           AppErrorCode.serviceUnavailable,
-          status == 404
-              ? 'API 地址不兼容：未找到请求接口。'
-              : 'API 请求失败${status == null ? '' : '（$status）'}。',
+          _withDetail(baseMessage, detail),
         );
       case DioExceptionType.badCertificate:
-        return const AppException(
+        return AppException(
           AppErrorCode.serviceUnavailable,
-          'API 服务的 HTTPS 证书无效。',
+          _withDetail('API 服务的 HTTPS 证书无效。', detail),
         );
       case DioExceptionType.unknown:
-        return const AppException(
+        return AppException(
           AppErrorCode.unknown,
-          '请求失败，请稍后重试。',
+          _withDetail('请求失败，请稍后重试。', detail),
         );
     }
+  }
+
+  static String? extractServerReason(
+    DioException error, {
+    Iterable<String> sensitiveValues = const [],
+  }) {
+    final values = <String>[...sensitiveValues];
+    final authorization = error.requestOptions.headers['Authorization'];
+    if (authorization != null) {
+      final header = authorization.toString();
+      values.add(header);
+      if (header.toLowerCase().startsWith('bearer ')) {
+        values.add(header.substring(7));
+      }
+    }
+
+    final parts = <String>[];
+    void add(Object? value, {String? label}) {
+      if (value == null || value is Map || value is Iterable) {
+        return;
+      }
+      final text = value.toString().trim();
+      if (text.isEmpty ||
+          text.startsWith('<!DOCTYPE') ||
+          text.startsWith('<html')) {
+        return;
+      }
+      final sanitized = AppLogger.redact(
+        text,
+        sensitiveValues: values,
+        maxLength: 300,
+      );
+      final rendered = label == null ? sanitized : '$label=$sanitized';
+      if (sanitized.isNotEmpty && !parts.contains(rendered)) {
+        parts.add(rendered);
+      }
+    }
+
+    final data = _decodeErrorPayload(error.response?.data);
+    if (data is Map) {
+      final nestedError = data['error'];
+      if (nestedError is Map) {
+        add(nestedError['message']);
+        add(nestedError['detail']);
+        add(nestedError['code'], label: 'code');
+        add(nestedError['type'], label: 'type');
+      } else {
+        add(nestedError);
+      }
+      add(data['message']);
+      add(data['detail']);
+      add(data['code'], label: 'code');
+      add(data['type'], label: 'type');
+    } else {
+      add(data);
+    }
+    return parts.isEmpty ? null : parts.join('；');
+  }
+
+  static Object? _decodeErrorPayload(Object? data) {
+    if (data is List<int>) {
+      return _decodeErrorText(utf8.decode(data, allowMalformed: true));
+    }
+    if (data is String) {
+      return _decodeErrorText(data);
+    }
+    return data;
+  }
+
+  static Object? _decodeErrorText(String value) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) {
+      return null;
+    }
+    try {
+      return jsonDecode(trimmed);
+    } on FormatException {
+      return trimmed;
+    }
+  }
+
+  static String _withDetail(String message, String? detail) {
+    if (detail == null || detail.isEmpty) {
+      return message;
+    }
+    return '$message 服务返回：$detail';
   }
 }
