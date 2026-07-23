@@ -37,11 +37,41 @@ void main() {
         'input': '你好',
         'voice': 'nova',
         'speed': 1.25,
-        'response_format': 'mp3',
       });
     });
 
-    test('拒绝空文本、无效音色和越界语速', () {
+    test('Seed TTS 默认参数生成文档规定的最小请求', () {
+      const request = TtsRequest(
+        text: '你好，欢迎使用 GLOSC AI。',
+        model: 'bytedance/seed-tts-2.0',
+        voice: 'alloy',
+        speed: 1,
+      );
+
+      expect(request.validated().toJson(), {
+        'model': 'bytedance/seed-tts-2.0',
+        'input': '你好，欢迎使用 GLOSC AI。',
+        'voice': 'alloy',
+      });
+    });
+
+    test('非默认语速仍写入请求', () {
+      const request = TtsRequest(
+        text: '测试',
+        model: 'tts-1',
+        voice: 'alloy',
+        speed: 1.5,
+      );
+
+      expect(request.validated().toJson(), {
+        'model': 'tts-1',
+        'input': '测试',
+        'voice': 'alloy',
+        'speed': 1.5,
+      });
+    });
+
+    test('拒绝空文本、无效音色、越界语速和非 MP3 格式', () {
       expect(
         () => const TtsRequest(
           text: '',
@@ -57,6 +87,16 @@ void main() {
           model: 'tts-1',
           voice: 'invalid',
           speed: 5,
+        ).validated(),
+        throwsA(isA<AppException>()),
+      );
+      expect(
+        () => const TtsRequest(
+          text: '测试',
+          model: 'tts-1',
+          voice: 'alloy',
+          speed: 1,
+          responseFormat: 'wav',
         ).validated(),
         throwsA(isA<AppException>()),
       );
@@ -93,8 +133,6 @@ void main() {
       'model': 'tts-1',
       'input': '测试语音',
       'voice': 'alloy',
-      'speed': 1.0,
-      'response_format': 'mp3',
     });
   });
 

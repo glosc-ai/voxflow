@@ -42,6 +42,12 @@ class TtsRequest {
         '语速必须在 0.25 到 4.0 之间。',
       );
     }
+    if (responseFormat != 'mp3') {
+      throw const AppException(
+        AppErrorCode.invalidConfiguration,
+        '当前仅支持 MP3 输出格式。',
+      );
+    }
     if (model.trim().isEmpty) {
       throw const AppException(
         AppErrorCode.invalidConfiguration,
@@ -62,8 +68,7 @@ class TtsRequest {
       'model': model,
       'input': text,
       'voice': voice,
-      'speed': speed,
-      'response_format': responseFormat,
+      if (speed != 1.0) 'speed': speed,
     };
   }
 }
