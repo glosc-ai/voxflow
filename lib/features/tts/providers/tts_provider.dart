@@ -58,7 +58,11 @@ class TtsNotifier extends StateNotifier<TtsState> {
         _playback = playback,
         _historyWriter = historyWriter,
         _model = model,
-        super(const TtsState()) {
+        super(
+          TtsState(
+            voice: AppConstants.defaultTtsVoiceForModel(model),
+          ),
+        ) {
     _positionSubscription = _playback.positionChanges.listen((position) {
       state = state.copyWith(position: position);
     });
@@ -81,8 +85,13 @@ class TtsNotifier extends StateNotifier<TtsState> {
   late final StreamSubscription<Duration> _durationSubscription;
   late final StreamSubscription<void> _completionSubscription;
 
+  List<String> get availableVoices => AppConstants.ttsVoicesForModel(_model);
+
+  bool get usesSeedTtsSpeakerIds =>
+      _model.trim().toLowerCase() == AppConstants.seedTtsModel;
+
   void setVoice(String voice) {
-    if (AppConstants.voices.contains(voice) && !state.isGenerating) {
+    if (availableVoices.contains(voice) && !state.isGenerating) {
       state = state.copyWith(voice: voice, clearError: true);
     }
   }

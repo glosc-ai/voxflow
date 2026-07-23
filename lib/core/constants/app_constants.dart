@@ -5,6 +5,7 @@ class AppConstants {
   static const defaultBaseUrl = 'https://api.openai.com/v1';
   static const defaultSttModel = 'whisper-1';
   static const defaultTtsModel = 'tts-1';
+  static const seedTtsModel = 'bytedance/seed-tts-2.0';
   static const navigationBreakpoint = 720.0;
   static const maxTranscriptionBytes = 25 * 1024 * 1024;
   static const maxTtsCharacters = 4096;
@@ -27,4 +28,16 @@ class AppConstants {
     'nova',
     'shimmer',
   ];
+
+  static const seedTtsVoices = <String>[
+    'zh_female_cancan_uranus_bigtts',
+  ];
+
+  static List<String> ttsVoicesForModel(String model) {
+    return model.trim().toLowerCase() == seedTtsModel ? seedTtsVoices : voices;
+  }
+
+  static String defaultTtsVoiceForModel(String model) {
+    return ttsVoicesForModel(model).first;
+  }
 }

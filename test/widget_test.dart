@@ -226,6 +226,27 @@ void main() {
     expect(find.byKey(const Key('inlineErrorMessage')), findsOneWidget);
     expect(find.text('测试服务不可用。'), findsWidgets);
   });
+
+  testWidgets('Seed TTS 使用模型专属火山 Speaker ID', (tester) async {
+    final notifier = TtsNotifier(
+      apiService: TtsApiService(DioClient(const SettingsState())),
+      playback: const _SilentPlaybackController(),
+      historyWriter: ({required text, required audioPath}) async {},
+      model: 'bytedance/seed-tts-2.0',
+    );
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          ttsProvider.overrideWith((ref) => notifier),
+        ],
+        child: const MaterialApp(home: TtsScreen()),
+      ),
+    );
+
+    expect(find.text('zh_female_cancan_uranus_bigtts'), findsOneWidget);
+    expect(find.text('Seed TTS 使用火山模型专属 Speaker ID。'), findsOneWidget);
+    expect(find.text('alloy'), findsNothing);
+  });
 }
 
 class _FailureTtsNotifier extends TtsNotifier {

@@ -30,10 +30,17 @@ class TtsRequest {
         '文字不能超过 4096 个字符。',
       );
     }
-    if (!AppConstants.voices.contains(voice)) {
+    final normalizedModel = model.trim();
+    if (normalizedModel.isEmpty) {
       throw const AppException(
         AppErrorCode.invalidConfiguration,
-        '请选择有效的音色。',
+        'TTS 模型不能为空。',
+      );
+    }
+    if (!AppConstants.ttsVoicesForModel(normalizedModel).contains(voice)) {
+      throw const AppException(
+        AppErrorCode.invalidConfiguration,
+        '所选音色不适用于当前 TTS 模型。',
       );
     }
     if (speed < 0.25 || speed > 4.0) {
@@ -48,15 +55,9 @@ class TtsRequest {
         '当前仅支持 MP3 输出格式。',
       );
     }
-    if (model.trim().isEmpty) {
-      throw const AppException(
-        AppErrorCode.invalidConfiguration,
-        'TTS 模型不能为空。',
-      );
-    }
     return TtsRequest(
       text: normalizedText,
-      model: model.trim(),
+      model: normalizedModel,
       voice: voice,
       speed: speed,
       responseFormat: responseFormat,

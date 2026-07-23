@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:voxflow/core/constants/app_constants.dart';
 import 'package:voxflow/core/errors/app_exception.dart';
 import 'package:voxflow/core/network/dio_client.dart';
 import 'package:voxflow/features/settings/models/settings_state.dart';
@@ -44,14 +45,14 @@ void main() {
       const request = TtsRequest(
         text: '你好，欢迎使用 GLOSC AI。',
         model: 'bytedance/seed-tts-2.0',
-        voice: 'alloy',
+        voice: 'zh_female_cancan_uranus_bigtts',
         speed: 1,
       );
 
       expect(request.validated().toJson(), {
         'model': 'bytedance/seed-tts-2.0',
         'input': '你好，欢迎使用 GLOSC AI。',
-        'voice': 'alloy',
+        'voice': 'zh_female_cancan_uranus_bigtts',
       });
     });
 
@@ -72,6 +73,15 @@ void main() {
     });
 
     test('拒绝空文本、无效音色、越界语速和非 MP3 格式', () {
+      expect(
+        () => const TtsRequest(
+          text: '测试',
+          model: 'bytedance/seed-tts-2.0',
+          voice: 'alloy',
+          speed: 1,
+        ).validated(),
+        throwsA(isA<AppException>()),
+      );
       expect(
         () => const TtsRequest(
           text: '',
@@ -169,6 +179,33 @@ void main() {
     playback.complete();
     await Future<void>.delayed(Duration.zero);
     expect(notifier.state.phase, TtsPhase.completed);
+  });
+
+  test('Seed TTS Notifier 默认使用模型专属 Speaker ID', () async {
+    final directory =
+        await Directory.systemTemp.createTemp('voxflow_seed_tts_state_');
+    addTearDown(() => directory.delete(recursive: true));
+    final audioFile = File(
+      '${directory.path}${Platform.pathSeparator}generated.mp3',
+    );
+    await audioFile.writeAsBytes([1, 2, 3]);
+    final playback = _FakePlayback();
+    addTearDown(playback.dispose);
+    final notifier = TtsNotifier(
+      apiService: _FakeTtsService(audioFile),
+      playback: playback,
+      historyWriter: ({required text, required audioPath}) async {},
+      model: AppConstants.seedTtsModel,
+    );
+    addTearDown(notifier.dispose);
+
+    expect(notifier.state.voice, 'zh_female_cancan_uranus_bigtts');
+    expect(notifier.availableVoices, [
+      'zh_female_cancan_uranus_bigtts',
+    ]);
+
+    notifier.setVoice('alloy');
+    expect(notifier.state.voice, 'zh_female_cancan_uranus_bigtts');
   });
 }
 

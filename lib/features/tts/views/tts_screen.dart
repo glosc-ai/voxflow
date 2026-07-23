@@ -32,6 +32,8 @@ class _TtsScreenState extends ConsumerState<TtsScreen> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(ttsProvider);
+    final notifier = ref.read(ttsProvider.notifier);
+    final voiceOptions = notifier.availableVoices;
     ref.listen<String?>(
       ttsProvider.select((value) => value.errorMessage),
       (previous, next) {
@@ -96,9 +98,12 @@ class _TtsScreenState extends ConsumerState<TtsScreen> {
                         ),
                         const SizedBox(height: 16),
                         DropdownButtonFormField<String>(
+                          key: ValueKey('ttsVoice:${state.voice}'),
                           initialValue: state.voice,
-                          decoration: const InputDecoration(labelText: '音色'),
-                          items: AppConstants.voices
+                          decoration: const InputDecoration(
+                            labelText: '音色 / Speaker ID',
+                          ),
+                          items: voiceOptions
                               .map(
                                 (voice) => DropdownMenuItem(
                                   value: voice,
@@ -116,6 +121,13 @@ class _TtsScreenState extends ConsumerState<TtsScreen> {
                                   }
                                 },
                         ),
+                        if (notifier.usesSeedTtsSpeakerIds) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            'Seed TTS 使用火山模型专属 Speaker ID。',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ],
                         const SizedBox(height: 20),
                         Row(
                           children: [
