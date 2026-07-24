@@ -19,8 +19,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   final _formKey = GlobalKey<FormState>();
   late final MaskedTextEditingController _apiKeyController;
   late final TextEditingController _baseUrlController;
-  late String _sttModel;
-  late String _ttsModel;
+  String? _sttModel;
+  String? _ttsModel;
   bool _obscureApiKey = true;
 
   @override
@@ -47,11 +47,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       settings.availableSttModels,
       current: _sttModel,
       fallback: AppConstants.defaultSttModel,
+      fetchedFromService: settings.hasFetchedModels,
     );
     final ttsModels = _modelOptions(
       settings.availableTtsModels,
       current: _ttsModel,
       fallback: AppConstants.defaultTtsModel,
+      fetchedFromService: settings.hasFetchedModels,
     );
     return Scaffold(
       appBar: AppBar(title: const Text('设置')),
@@ -130,10 +132,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       const SizedBox(height: 16),
                       DropdownButtonFormField<String>(
                         key: const Key('sttModelField'),
-                        initialValue: _sttModel,
+                        initialValue:
+                            sttModels.contains(_sttModel) ? _sttModel : null,
                         decoration: const InputDecoration(
                           labelText: '语音转文字模型',
                         ),
+                        disabledHint:
+                            settings.hasFetchedModels && sttModels.isEmpty
+                                ? const Text('服务未提供兼容的语音转文字模型')
+                                : null,
                         items: sttModels
                             .map(
                               (model) => DropdownMenuItem(
@@ -142,17 +149,22 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               ),
                             )
                             .toList(),
-                        onChanged: settings.isBusy
+                        onChanged: settings.isBusy || sttModels.isEmpty
                             ? null
-                            : (value) => _sttModel = value ?? _sttModel,
+                            : (value) => _sttModel = value,
                       ),
                       const SizedBox(height: 16),
                       DropdownButtonFormField<String>(
                         key: const Key('ttsModelField'),
-                        initialValue: _ttsModel,
+                        initialValue:
+                            ttsModels.contains(_ttsModel) ? _ttsModel : null,
                         decoration: const InputDecoration(
                           labelText: '文字转语音模型',
                         ),
+                        disabledHint:
+                            settings.hasFetchedModels && ttsModels.isEmpty
+                                ? const Text('服务未提供兼容的文字转语音模型')
+                                : null,
                         items: ttsModels
                             .map(
                               (model) => DropdownMenuItem(
@@ -161,9 +173,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               ),
                             )
                             .toList(),
-                        onChanged: settings.isBusy
+                        onChanged: settings.isBusy || ttsModels.isEmpty
                             ? null
-                            : (value) => _ttsModel = value ?? _ttsModel,
+                            : (value) => _ttsModel = value,
                       ),
                       if (settings.lastConnectionSucceeded != null) ...[
                         const SizedBox(height: 16),
@@ -336,6 +348,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             baseUrl: _baseUrlController.text,
           );
       if (mounted) {
+        setState(() {
+          _sttModel = _selectionAfterFetch(catalog.stt, _sttModel);
+          _ttsModel = _selectionAfterFetch(catalog.tts, _ttsModel);
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
@@ -364,14 +380,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ? await notifier.testConnection(
               apiKey: _apiKeyController.text,
               baseUrl: _baseUrlController.text,
-              sttModel: _sttModel,
-              ttsModel: _ttsModel,
+              sttModel: _sttModel ?? '',
+              ttsModel: _ttsModel ?? '',
             )
           : await notifier.save(
               apiKey: _apiKeyController.text,
               baseUrl: _baseUrlController.text,
-              sttModel: _sttModel,
-              ttsModel: _ttsModel,
+              sttModel: _sttModel ?? '',
+              ttsModel: _ttsModel ?? '',
             );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -390,10 +406,29 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
 List<String> _modelOptions(
   Iterable<String> fetched, {
-  required String current,
+  required String? current,
   required String fallback,
+  required bool fetchedFromService,
 }) {
-  final models = <String>{fallback, current.trim(), ...fetched}
+  final fetchedModels = fetched
+      .map((model) => model.trim())
+      .where((model) => model.isNotEmpty)
+      .toSet();
+  if (fetchedFromService) {
+    return fetchedModels.toList();
+  }
+  final models = <String>{fallback, current?.trim() ?? ''}
     ..removeWhere((model) => model.isEmpty);
   return models.toList();
+}
+
+String? _selectionAfterFetch(Iterable<String> models, String? current) {
+  final available = models.toList(growable: false);
+  if (available.isEmpty) {
+    return null;
+  }
+  final normalizedCurrent = current?.trim();
+  return available.contains(normalizedCurrent)
+      ? normalizedCurrent
+      : available.first;
 }

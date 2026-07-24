@@ -62,6 +62,7 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
       state = validated.copyWith(
         availableSttModels: state.availableSttModels,
         availableTtsModels: state.availableTtsModels,
+        hasFetchedModels: state.hasFetchedModels,
         isBusy: false,
         message: '设置已保存。',
       );
@@ -102,6 +103,7 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
       state = validated.copyWith(
         availableSttModels: state.availableSttModels,
         availableTtsModels: state.availableTtsModels,
+        hasFetchedModels: state.hasFetchedModels,
         isBusy: false,
         lastConnectionSucceeded: true,
         message: '连接成功，设置已保存。',
@@ -157,6 +159,7 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
       state = state.copyWith(
         availableSttModels: catalog.stt,
         availableTtsModels: catalog.tts,
+        hasFetchedModels: true,
         isBusy: false,
         lastConnectionSucceeded: true,
         message: summary,

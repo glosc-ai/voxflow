@@ -175,9 +175,7 @@ void main() {
     final notifier = SettingsNotifier(
       repository,
       modelLoader: (_) async => [
-        'whisper-1',
         'gpt-4o-transcribe',
-        'tts-1',
         'gpt-4o-mini-tts',
         'chat-model',
       ],
@@ -194,16 +192,23 @@ void main() {
     await tester.tap(find.byKey(const Key('fetchModelsButton')));
     await tester.pumpAndSettle();
 
+    expect(find.text('whisper-1'), findsNothing);
+    expect(find.text('tts-1'), findsNothing);
+    expect(find.text('gpt-4o-transcribe'), findsOneWidget);
+    expect(find.text('gpt-4o-mini-tts'), findsOneWidget);
+
     await tester.tap(find.byKey(const Key('sttModelField')));
     await tester.pumpAndSettle();
-    expect(find.text('gpt-4o-transcribe'), findsOneWidget);
+    expect(find.text('gpt-4o-transcribe'), findsWidgets);
+    expect(find.text('whisper-1'), findsNothing);
     expect(find.text('chat-model'), findsNothing);
-    await tester.tap(find.text('gpt-4o-transcribe'));
+    await tester.tap(find.text('gpt-4o-transcribe').last);
     await tester.pumpAndSettle();
 
     await tester.tap(find.byKey(const Key('ttsModelField')));
     await tester.pumpAndSettle();
-    expect(find.text('gpt-4o-mini-tts'), findsOneWidget);
+    expect(find.text('gpt-4o-mini-tts'), findsWidgets);
+    expect(find.text('tts-1'), findsNothing);
   });
 
   testWidgets('TTS 失败原因持续显示在页面内', (tester) async {

@@ -9,6 +9,7 @@ class SettingsState {
     this.ttsModel = AppConstants.defaultTtsModel,
     this.availableSttModels = const [],
     this.availableTtsModels = const [],
+    this.hasFetchedModels = false,
     this.isBusy = false,
     this.lastConnectionSucceeded,
     this.message,
@@ -20,6 +21,7 @@ class SettingsState {
   final String ttsModel;
   final List<String> availableSttModels;
   final List<String> availableTtsModels;
+  final bool hasFetchedModels;
   final bool isBusy;
   final bool? lastConnectionSucceeded;
   final String? message;
@@ -34,6 +36,7 @@ class SettingsState {
     List<String>? availableSttModels,
     List<String>? availableTtsModels,
     bool clearAvailableModels = false,
+    bool? hasFetchedModels,
     bool? isBusy,
     bool? lastConnectionSucceeded,
     bool clearConnectionResult = false,
@@ -51,6 +54,8 @@ class SettingsState {
       availableTtsModels: clearAvailableModels
           ? const []
           : (availableTtsModels ?? this.availableTtsModels),
+      hasFetchedModels: hasFetchedModels ??
+          (clearAvailableModels ? false : this.hasFetchedModels),
       isBusy: isBusy ?? this.isBusy,
       lastConnectionSucceeded: clearConnectionResult
           ? null
