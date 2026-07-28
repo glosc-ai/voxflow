@@ -24,8 +24,9 @@ final settingsProvider =
 });
 
 final dioClientProvider = Provider<DioClient>((ref) {
-  final settings = ref.watch(settingsProvider);
-  return DioClient(settings);
+  return DioClient.withSettings(
+    () => ref.read(settingsProvider),
+  );
 });
 
 typedef ModelLoader = Future<List<String>> Function(SettingsState settings);

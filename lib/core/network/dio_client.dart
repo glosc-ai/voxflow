@@ -7,15 +7,28 @@ import '../../features/settings/models/settings_state.dart';
 import '../errors/app_exception.dart';
 import '../logging/app_logger.dart';
 
+typedef SettingsReader = SettingsState Function();
+
 class DioClient {
   DioClient(
-    this.settings, {
+    SettingsState settings, {
+    Dio? dio,
+    AppLogger? logger,
+  }) : this.withSettings(
+          () => settings,
+          dio: dio,
+          logger: logger,
+        );
+
+  DioClient.withSettings(
+    this._settingsReader, {
     Dio? dio,
     AppLogger? logger,
   })  : dio = dio ?? Dio(),
         logger = logger ?? AppLogger.instance {
+    final initialSettings = settings;
     this.dio.options = BaseOptions(
-      baseUrl: settings.baseUrl,
+      baseUrl: initialSettings.baseUrl,
       connectTimeout: const Duration(seconds: 30),
       sendTimeout: const Duration(minutes: 5),
       receiveTimeout: const Duration(minutes: 5),
@@ -25,7 +38,8 @@ class DioClient {
           InterceptorsWrapper(
             onRequest: (options, handler) {
               final apiKey = settings.apiKey.trim();
-              if (apiKey.isNotEmpty) {
+              if (apiKey.isNotEmpty &&
+                  !options.headers.containsKey('Authorization')) {
                 options.headers['Authorization'] = 'Bearer $apiKey';
               }
               unawaited(
@@ -68,9 +82,13 @@ class DioClient {
         );
   }
 
-  final SettingsState settings;
+  static const _modelExtraKey = 'voxflow.request_model';
+
+  final SettingsReader _settingsReader;
   final Dio dio;
   final AppLogger logger;
+
+  SettingsState get settings => _settingsReader();
 
   Map<String, Object?> _requestFields(RequestOptions options) {
     final path = options.uri.path;
@@ -78,8 +96,13 @@ class DioClient {
       'method': options.method,
       'host': options.uri.host,
       'path': path,
-      if (path.endsWith('/audio/speech')) 'model': settings.ttsModel,
-      if (path.endsWith('/audio/transcriptions')) 'model': settings.sttModel,
+      if (options.extra[_modelExtraKey] case final String model) 'model': model,
+      if (!options.extra.containsKey(_modelExtraKey) &&
+          path.endsWith('/audio/speech'))
+        'model': settings.ttsModel,
+      if (!options.extra.containsKey(_modelExtraKey) &&
+          path.endsWith('/audio/transcriptions'))
+        'model': settings.sttModel,
     };
   }
 
@@ -115,16 +138,38 @@ class DioClient {
     return null;
   }
 
-  String endpoint(String path) {
+  String endpoint(String path, {SettingsState? requestSettings}) {
     final cleanPath = path.startsWith('/') ? path.substring(1) : path;
-    final baseUrl = SettingsState.normalizeBaseUrl(settings.baseUrl);
+    final baseUrl = SettingsState.normalizeBaseUrl(
+      (requestSettings ?? settings).baseUrl,
+    );
     return '$baseUrl/$cleanPath';
+  }
+
+  Options requestOptions(
+    SettingsState requestSettings, {
+    String? model,
+    ResponseType? responseType,
+  }) {
+    final apiKey = requestSettings.apiKey.trim();
+    return Options(
+      responseType: responseType,
+      headers: {
+        if (apiKey.isNotEmpty) 'Authorization': 'Bearer $apiKey',
+      },
+      extra: {
+        if (model != null) _modelExtraKey: model,
+      },
+    );
   }
 
   Future<void> testConnection() async {
     final validSettings = settings.validated();
     try {
-      await dio.get<void>('${validSettings.baseUrl}/models');
+      await dio.get<void>(
+        '${validSettings.baseUrl}/models',
+        options: requestOptions(validSettings),
+      );
     } on DioException catch (error) {
       throw mapException(error);
     } on AppException {
@@ -140,8 +185,10 @@ class DioClient {
   Future<List<String>> fetchModelIds() async {
     final validSettings = settings.credentialsValidated();
     try {
-      final response =
-          await dio.get<Object?>('${validSettings.baseUrl}/models');
+      final response = await dio.get<Object?>(
+        '${validSettings.baseUrl}/models',
+        options: requestOptions(validSettings),
+      );
       final payload = response.data;
       if (payload is! Map) {
         throw const AppException(

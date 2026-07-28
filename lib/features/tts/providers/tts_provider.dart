@@ -40,12 +40,17 @@ final ttsHistoryWriterProvider = Provider<TtsHistoryWriter>((ref) {
 });
 
 final ttsProvider = StateNotifierProvider<TtsNotifier, TtsState>((ref) {
-  return TtsNotifier(
+  final notifier = TtsNotifier(
     apiService: ref.watch(ttsApiServiceProvider),
     playback: ref.watch(ttsPlaybackManagerProvider),
     historyWriter: ref.watch(ttsHistoryWriterProvider),
-    model: ref.watch(settingsProvider).ttsModel,
+    model: ref.read(settingsProvider).ttsModel,
   );
+  ref.listen<String>(
+    settingsProvider.select((settings) => settings.ttsModel),
+    (_, model) => notifier.updateModel(model),
+  );
+  return notifier;
 });
 
 class TtsNotifier extends StateNotifier<TtsState> {
@@ -80,7 +85,7 @@ class TtsNotifier extends StateNotifier<TtsState> {
   final TtsApiService _apiService;
   final PlaybackController _playback;
   final TtsHistoryWriter _historyWriter;
-  final String _model;
+  String _model;
   late final StreamSubscription<Duration> _positionSubscription;
   late final StreamSubscription<Duration> _durationSubscription;
   late final StreamSubscription<void> _completionSubscription;
@@ -89,6 +94,21 @@ class TtsNotifier extends StateNotifier<TtsState> {
 
   bool get usesSeedTtsSpeakerIds =>
       _model.trim().toLowerCase() == AppConstants.seedTtsModel;
+
+  void updateModel(String model) {
+    final normalized = model.trim();
+    if (normalized.isEmpty || normalized == _model) {
+      return;
+    }
+    _model = normalized;
+    final voices = availableVoices;
+    state = state.copyWith(
+      voice: voices.contains(state.voice)
+          ? state.voice
+          : AppConstants.defaultTtsVoiceForModel(_model),
+      clearError: true,
+    );
+  }
 
   void setVoice(String voice) {
     if (availableVoices.contains(voice) && !state.isGenerating) {

@@ -32,8 +32,15 @@ class WhisperApiService {
         'timestamp_granularities[]': 'segment',
       });
       final response = await _client.dio.post<Object?>(
-        _client.endpoint('audio/transcriptions'),
+        _client.endpoint(
+          'audio/transcriptions',
+          requestSettings: settings,
+        ),
         data: formData,
+        options: _client.requestOptions(
+          settings,
+          model: settings.sttModel,
+        ),
         onSendProgress: (sent, total) {
           if (total > 0) {
             onUploadProgress?.call((sent / total).clamp(0, 1));

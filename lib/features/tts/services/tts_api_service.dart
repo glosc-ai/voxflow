@@ -25,13 +25,20 @@ class TtsApiService {
   final AudioBytesWriter _writer;
 
   Future<File> synthesize(TtsRequest request) async {
-    _client.settings.validated();
+    final settings = _client.settings.validated();
     final validRequest = request.validated();
     try {
       final response = await _client.dio.post<List<int>>(
-        _client.endpoint('audio/speech'),
+        _client.endpoint(
+          'audio/speech',
+          requestSettings: settings,
+        ),
         data: validRequest.toJson(),
-        options: Options(responseType: ResponseType.bytes),
+        options: _client.requestOptions(
+          settings,
+          model: validRequest.model,
+          responseType: ResponseType.bytes,
+        ),
       );
       final bytes = response.data;
       if (bytes == null || bytes.isEmpty) {
