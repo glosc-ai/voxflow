@@ -4,6 +4,23 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+fun signingInput(name: String): String? = providers.gradleProperty(name)
+    .orElse(providers.environmentVariable(name))
+    .orNull
+    ?.trim()
+    ?.takeIf { it.isNotEmpty() }
+
+val releaseStorePath = signingInput("VOXFLOW_ANDROID_KEYSTORE_PATH")
+val releaseStorePassword = signingInput("VOXFLOW_ANDROID_KEYSTORE_PASSWORD")
+val releaseKeyAlias = signingInput("VOXFLOW_ANDROID_KEY_ALIAS")
+val releaseKeyPassword = signingInput("VOXFLOW_ANDROID_KEY_PASSWORD")
+val releaseSigningConfigured = listOf(
+    releaseStorePath,
+    releaseStorePassword,
+    releaseKeyAlias,
+    releaseKeyPassword,
+).all { it != null }
+
 android {
     namespace = "ai.glosc.voxflow"
     compileSdk = flutter.compileSdkVersion
@@ -25,12 +42,47 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        if (releaseSigningConfigured) {
+            create("release") {
+                storeFile = file(releaseStorePath!!)
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            if (releaseSigningConfigured) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
+    }
+}
+
+gradle.taskGraph.whenReady {
+    val releaseArtifactRequested = allTasks.any {
+        it.name.contains("release", ignoreCase = true) &&
+            (it.name.startsWith("assemble", ignoreCase = true) ||
+                it.name.startsWith("bundle", ignoreCase = true) ||
+                it.name.startsWith("package", ignoreCase = true) ||
+                it.name.startsWith("validateSigning", ignoreCase = true))
+    }
+    if (releaseArtifactRequested && !releaseSigningConfigured) {
+        throw GradleException(
+            "Android Release signing requires " +
+                "VOXFLOW_ANDROID_KEYSTORE_PATH, " +
+                "VOXFLOW_ANDROID_KEYSTORE_PASSWORD, " +
+                "VOXFLOW_ANDROID_KEY_ALIAS, and " +
+                "VOXFLOW_ANDROID_KEY_PASSWORD.",
+        )
+    }
+    if (releaseArtifactRequested && !file(releaseStorePath!!).isFile) {
+        throw GradleException(
+            "VOXFLOW_ANDROID_KEYSTORE_PATH does not point to a readable file.",
+        )
     }
 }
 
