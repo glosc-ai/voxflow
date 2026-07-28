@@ -11,6 +11,7 @@ import 'package:voxflow/features/history/views/history_screen.dart';
 import 'package:voxflow/features/settings/providers/settings_provider.dart';
 import 'package:voxflow/features/settings/models/settings_state.dart';
 import 'package:voxflow/features/settings/services/settings_repository.dart';
+import 'package:voxflow/features/settings/services/privacy_notice_repository.dart';
 import 'package:voxflow/features/settings/views/settings_screen.dart';
 import 'package:voxflow/features/settings/widgets/masked_text_editing_controller.dart';
 import 'package:voxflow/features/tts/models/tts_state.dart';
@@ -20,9 +21,47 @@ import 'package:voxflow/features/tts/services/tts_api_service.dart';
 import 'package:voxflow/features/tts/views/tts_screen.dart';
 
 void main() {
+  testWidgets('首次提交敏感数据前显示数据与隐私说明', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final preferences = await SharedPreferences.getInstance();
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          sharedPreferencesProvider.overrideWithValue(preferences),
+          ttsPlaybackManagerProvider.overrideWithValue(
+            const _SilentPlaybackController(),
+          ),
+          historyPlaybackManagerProvider.overrideWithValue(
+            const _SilentPlaybackController(),
+          ),
+          historyRepositoryProvider.overrideWithValue(
+            _MemoryHistoryRepository(),
+          ),
+        ],
+        child: const VoxFlowApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('数据与隐私说明'), findsOneWidget);
+    expect(find.textContaining('API Key 会以明文形式保存在本机'), findsOneWidget);
+    expect(find.textContaining('发送到你配置的 API 服务商'), findsOneWidget);
+    expect(find.textContaining('历史文本和受管音频保存在本机'), findsOneWidget);
+    expect(find.textContaining('请求时间、接口路径、模型和错误原因'), findsOneWidget);
+    expect(find.byKey(const Key('apiKeyField')), findsNothing);
+
+    await tester.tap(find.byKey(const Key('privacyNoticeAcceptButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('数据与隐私说明'), findsNothing);
+    expect(find.byType(NavigationRail), findsOneWidget);
+  });
+
   testWidgets('移动端使用底部导航', (tester) async {
     SharedPreferences.setMockInitialValues({});
     final preferences = await SharedPreferences.getInstance();
+    await PrivacyNoticeRepository(preferences).acknowledge();
     await tester.binding.setSurfaceSize(const Size(600, 900));
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
@@ -52,6 +91,7 @@ void main() {
   testWidgets('桌面端使用侧边导航', (tester) async {
     SharedPreferences.setMockInitialValues({});
     final preferences = await SharedPreferences.getInstance();
+    await PrivacyNoticeRepository(preferences).acknowledge();
     await tester.binding.setSurfaceSize(const Size(1200, 800));
     addTearDown(() => tester.binding.setSurfaceSize(null));
 

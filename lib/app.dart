@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'core/theme/app_theme.dart';
+import 'features/settings/views/privacy_notice_gate.dart';
 import 'features/shell/views/app_shell.dart';
 
 class VoxFlowApp extends StatelessWidget {
@@ -14,7 +15,7 @@ class VoxFlowApp extends StatelessWidget {
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
       themeMode: ThemeMode.system,
-      home: const AppShell(),
+      home: const PrivacyNoticeGate(child: AppShell()),
     );
   }
 }
