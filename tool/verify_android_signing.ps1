@@ -1,5 +1,6 @@
 param(
-    [string]$FlutterCommand = "flutter"
+    [string]$FlutterCommand = "flutter",
+    [switch]$SplitPerAbi
 )
 
 $ErrorActionPreference = "Stop"
@@ -32,7 +33,14 @@ function Invoke-FlutterReleaseBuild {
     $previousErrorActionPreference = $ErrorActionPreference
     $ErrorActionPreference = "Continue"
     try {
-        $output = & $FlutterCommand build apk --release --target-platform android-arm64 2>&1
+        $buildArguments = @("build", "apk", "--release")
+        if ($SplitPerAbi) {
+            $buildArguments += "--split-per-abi"
+        }
+        else {
+            $buildArguments += @("--target-platform", "android-arm64")
+        }
+        $output = & $FlutterCommand @buildArguments 2>&1
         $exitCode = $LASTEXITCODE
     }
     finally {
@@ -121,19 +129,32 @@ try {
         throw "Release build failed with complete signing inputs.`n$($signedBuild.Output)"
     }
 
-    $apk = Join-Path $repoRoot "build\app\outputs\flutter-apk\app-release.apk"
-    if (-not (Test-Path -LiteralPath $apk)) {
-        throw "Release APK was not generated."
+    $apkDirectory = Join-Path $repoRoot "build\app\outputs\flutter-apk"
+    $apkNames = if ($SplitPerAbi) {
+        @(
+            "app-armeabi-v7a-release.apk",
+            "app-arm64-v8a-release.apk",
+            "app-x86_64-release.apk"
+        )
     }
-    $verification = & $apksigner verify --print-certs $apk 2>&1
-    if ($LASTEXITCODE -ne 0) {
-        throw "Release APK signature verification failed."
+    else {
+        @("app-release.apk")
     }
-    if (($verification -join "`n") -notmatch "VoxFlow Signing Verification") {
-        throw "Release APK was not signed with the ephemeral test certificate."
+    foreach ($apkName in $apkNames) {
+        $apk = Join-Path $apkDirectory $apkName
+        if (-not (Test-Path -LiteralPath $apk)) {
+            throw "Expected Release APK was not generated: $apkName"
+        }
+        $verification = & $apksigner verify --print-certs $apk 2>&1
+        if ($LASTEXITCODE -ne 0) {
+            throw "Release APK signature verification failed: $apkName"
+        }
+        if (($verification -join "`n") -notmatch "VoxFlow Signing Verification") {
+            throw "Release APK used an unexpected certificate: $apkName"
+        }
     }
 
-    Write-Output "Android Release signing verification passed."
+    Write-Output "Android Release signing verification passed for $($apkNames.Count) APK(s)."
 }
 finally {
     foreach ($name in $signingVariables) {

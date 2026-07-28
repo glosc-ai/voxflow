@@ -1,0 +1,142 @@
+name: Android Release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-release
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build signed ABI APKs
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: android-release
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.44.2
+          cache: true
+
+      - name: Validate protected release configuration
+        shell: bash
+        env:
+          VOXFLOW_ANDROID_KEYSTORE_BASE64: ${{ secrets.VOXFLOW_ANDROID_KEYSTORE_BASE64 }}
+          VOXFLOW_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.VOXFLOW_ANDROID_KEYSTORE_PASSWORD }}
+          VOXFLOW_ANDROID_KEY_ALIAS: ${{ secrets.VOXFLOW_ANDROID_KEY_ALIAS }}
+          VOXFLOW_ANDROID_KEY_PASSWORD: ${{ secrets.VOXFLOW_ANDROID_KEY_PASSWORD }}
+          VOXFLOW_ANDROID_CERT_SHA256: ${{ vars.VOXFLOW_ANDROID_CERT_SHA256 }}
+        run: |
+          required=(
+            VOXFLOW_ANDROID_KEYSTORE_BASE64
+            VOXFLOW_ANDROID_KEYSTORE_PASSWORD
+            VOXFLOW_ANDROID_KEY_ALIAS
+            VOXFLOW_ANDROID_KEY_PASSWORD
+            VOXFLOW_ANDROID_CERT_SHA256
+          )
+          for name in "${required[@]}"; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "::error::$name is not configured for the android-release environment."
+              exit 1
+            fi
+          done
+
+      - name: Decode release keystore
+        shell: bash
+        env:
+          VOXFLOW_ANDROID_KEYSTORE_BASE64: ${{ secrets.VOXFLOW_ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          keystore_path="$RUNNER_TEMP/voxflow-release.jks"
+          printf '%s' "$VOXFLOW_ANDROID_KEYSTORE_BASE64" | base64 --decode > "$keystore_path"
+          chmod 600 "$keystore_path"
+          echo "VOXFLOW_ANDROID_KEYSTORE_PATH=$keystore_path" >> "$GITHUB_ENV"
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Run static analysis
+        run: flutter analyze
+
+      - name: Run automated tests
+        run: flutter test
+
+      - name: Build signed ABI APKs
+        env:
+          VOXFLOW_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.VOXFLOW_ANDROID_KEYSTORE_PASSWORD }}
+          VOXFLOW_ANDROID_KEY_ALIAS: ${{ secrets.VOXFLOW_ANDROID_KEY_ALIAS }}
+          VOXFLOW_ANDROID_KEY_PASSWORD: ${{ secrets.VOXFLOW_ANDROID_KEY_PASSWORD }}
+        run: flutter build apk --release --split-per-abi
+
+      - name: Verify signatures and write checksums
+        id: verify
+        shell: bash
+        env:
+          EXPECTED_CERT_SHA256: ${{ vars.VOXFLOW_ANDROID_CERT_SHA256 }}
+        run: |
+          apk_dir="$GITHUB_WORKSPACE/build/app/outputs/flutter-apk"
+          apks=(
+            "$apk_dir/app-armeabi-v7a-release.apk"
+            "$apk_dir/app-arm64-v8a-release.apk"
+            "$apk_dir/app-x86_64-release.apk"
+          )
+          apksigner="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
+          if [[ -z "$apksigner" || ! -x "$apksigner" ]]; then
+            echo "::error::apksigner was not found in the Android SDK."
+            exit 1
+          fi
+          normalize_digest() {
+            tr -d ' :\r\n' | tr '[:lower:]' '[:upper:]'
+          }
+          expected="$(printf '%s' "$EXPECTED_CERT_SHA256" | normalize_digest)"
+          for apk in "${apks[@]}"; do
+            if [[ ! -f "$apk" ]]; then
+              echo "::error::Missing expected artifact: $(basename "$apk")"
+              exit 1
+            fi
+            verification="$($apksigner verify --print-certs "$apk")"
+            actual="$(printf '%s\n' "$verification" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | normalize_digest)"
+            if [[ -z "$actual" || "$actual" != "$expected" ]]; then
+              echo "::error::Unexpected signing certificate for $(basename "$apk")."
+              exit 1
+            fi
+          done
+          sha256sum "${apks[@]}" > "$apk_dir/android-apk-sha256.txt"
+          echo "certificate_sha256=$expected" >> "$GITHUB_OUTPUT"
+
+      - name: Upload signed APKs
+        uses: actions/upload-artifact@v4
+        with:
+          name: voxflow-android-${{ github.run_number }}
+          if-no-files-found: error
+          retention-days: 30
+          path: |
+            build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
+            build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+            build/app/outputs/flutter-apk/app-x86_64-release.apk
+            build/app/outputs/flutter-apk/android-apk-sha256.txt
+
+      - name: Remove temporary signing material
+        if: always()
+        shell: bash
+        run: |
+          if [[ -n "${VOXFLOW_ANDROID_KEYSTORE_PATH:-}" ]]; then
+            rm -f -- "$VOXFLOW_ANDROID_KEYSTORE_PATH"
+          fi
