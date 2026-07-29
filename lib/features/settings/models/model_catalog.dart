@@ -1,4 +1,8 @@
 class ModelCatalog {
+  static final RegExp _asrModelToken = RegExp(
+    r'(^|[^a-z0-9])(?:seed)?asr($|[^a-z0-9])',
+  );
+
   const ModelCatalog({
     required this.all,
     required this.stt,
@@ -30,7 +34,8 @@ class ModelCatalog {
         normalized.contains('speech-to-text') ||
         normalized.contains('speech_to_text') ||
         normalized.contains('-stt') ||
-        normalized.startsWith('stt-');
+        normalized.startsWith('stt-') ||
+        _asrModelToken.hasMatch(normalized);
   }
 
   static bool _isTtsModel(String id) {

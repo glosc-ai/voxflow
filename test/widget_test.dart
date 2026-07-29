@@ -251,6 +251,41 @@ void main() {
     expect(find.text('tts-1'), findsNothing);
   });
 
+  testWidgets('火山 SeedASR 模型出现在 STT 下拉选项', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final preferences = await SharedPreferences.getInstance();
+    final repository = SettingsRepository(preferences);
+    await repository.save(
+      const SettingsState(
+        apiKey: 'test-key',
+        baseUrl: 'https://proxy.example/v1',
+      ),
+    );
+    final notifier = SettingsNotifier(
+      repository,
+      modelLoader: (_) async => [
+        'bytedance/volc.seedasr.sauc.duration',
+        'bytedance/seed-tts-2.0',
+      ],
+    );
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          settingsProvider.overrideWith((ref) => notifier),
+        ],
+        child: const MaterialApp(home: SettingsScreen()),
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('fetchModelsButton')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('bytedance/volc.seedasr.sauc.duration'),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('TTS 失败原因持续显示在页面内', (tester) async {
     await tester.pumpWidget(
       ProviderScope(
