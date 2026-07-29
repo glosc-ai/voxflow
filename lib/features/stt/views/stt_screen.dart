@@ -5,8 +5,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/errors/app_exception.dart';
 import '../../../widgets/inline_error_banner.dart';
+import '../../settings/providers/settings_provider.dart';
 import '../models/stt_state.dart';
 import '../providers/stt_provider.dart';
+import '../services/seed_asr_api_service.dart';
 
 class SttScreen extends ConsumerStatefulWidget {
   const SttScreen({super.key});
@@ -264,6 +266,9 @@ class _ImportCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final path = state.selectedFilePath;
     final fileName = path == null ? null : File(path).uri.pathSegments.last;
+    final seedAsrSelected = SeedAsrApiService.supportsModel(
+      ref.watch(settingsProvider).sttModel,
+    );
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(20),
@@ -281,7 +286,10 @@ class _ImportCard extends ConsumerWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    fileName ?? '支持 MP3、MP4、MPEG、MPGA、M4A、WAV、WEBM，最大 25 MB',
+                    fileName ??
+                        (seedAsrSelected
+                            ? 'SeedASR 仅支持 16 kHz、16-bit、单声道 PCM WAV，最大 25 MB'
+                            : '支持 MP3、MP4、MPEG、MPGA、M4A、WAV、WEBM，最大 25 MB'),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),

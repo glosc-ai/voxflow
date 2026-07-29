@@ -92,7 +92,7 @@ void main() {
 
 class _FakeRecorder implements AudioRecordManager {
   @override
-  Future<void> start() async {}
+  Future<void> start({bool requireWav = false}) async {}
 
   @override
   Future<void> pause() async {}

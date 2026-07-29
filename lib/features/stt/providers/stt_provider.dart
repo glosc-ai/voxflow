@@ -15,6 +15,7 @@ import '../../history/providers/history_provider.dart';
 import '../../settings/providers/settings_provider.dart';
 import '../models/stt_state.dart';
 import '../services/audio_record_manager.dart';
+import '../services/seed_asr_api_service.dart';
 import '../services/whisper_api_service.dart';
 
 typedef HistoryWriter = Future<void> Function({
@@ -24,6 +25,7 @@ typedef HistoryWriter = Future<void> Function({
 });
 
 typedef UtcNow = Future<DateTime> Function();
+typedef RequiresPcmWav = bool Function();
 
 final permissionServiceProvider = Provider<PermissionService>((ref) {
   return const PermissionService();
@@ -56,6 +58,9 @@ final sttProvider = StateNotifierProvider<SttNotifier, SttState>((ref) {
     recorder: ref.watch(audioRecordManagerProvider),
     apiService: ref.watch(whisperApiServiceProvider),
     historyWriter: ref.watch(historyWriterProvider),
+    requiresPcmWav: () => SeedAsrApiService.supportsModel(
+      ref.read(settingsProvider).sttModel,
+    ),
   );
 });
 
@@ -65,16 +70,19 @@ class SttNotifier extends StateNotifier<SttState> {
     required WhisperApiService apiService,
     required HistoryWriter historyWriter,
     UtcNow? nowUtc,
+    RequiresPcmWav? requiresPcmWav,
   })  : _recorder = recorder,
         _apiService = apiService,
         _historyWriter = historyWriter,
         _nowUtc = nowUtc ?? PlatformClock.nowUtc,
+        _requiresPcmWav = requiresPcmWav ?? _neverRequiresPcmWav,
         super(const SttState());
 
   final AudioRecordManager _recorder;
   final WhisperApiService _apiService;
   final HistoryWriter _historyWriter;
   final UtcNow _nowUtc;
+  final RequiresPcmWav _requiresPcmWav;
   DateTime? _recordingSegmentStartedAt;
   Duration _recordedElapsed = Duration.zero;
   Timer? _elapsedTimer;
@@ -97,7 +105,7 @@ class SttNotifier extends StateNotifier<SttState> {
       if (_disposed || state.phase != SttPhase.countdown) {
         return;
       }
-      await _recorder.start();
+      await _recorder.start(requireWav: _requiresPcmWav());
       _recordedElapsed = Duration.zero;
       _recordingSegmentStartedAt = await _nowUtc();
       state = state.copyWith(
@@ -168,7 +176,9 @@ class SttNotifier extends StateNotifier<SttState> {
       final selection = await FilePicker.platform.pickFiles(
         dialogTitle: '选择音频或视频文件',
         type: FileType.custom,
-        allowedExtensions: AppConstants.supportedImportExtensions,
+        allowedExtensions: _requiresPcmWav()
+            ? const ['wav']
+            : AppConstants.supportedImportExtensions,
         allowMultiple: false,
       );
       if (selection == null) {
@@ -370,3 +380,5 @@ class SttNotifier extends StateNotifier<SttState> {
     super.dispose();
   }
 }
+
+bool _neverRequiresPcmWav() => false;

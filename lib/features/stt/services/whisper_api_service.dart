@@ -6,23 +6,38 @@ import '../../../core/errors/app_exception.dart';
 import '../../../core/network/dio_client.dart';
 import '../models/transcription_result.dart';
 import 'audio_file_validator.dart';
+import 'seed_asr_api_service.dart';
+import 'transcription_service.dart';
 
-typedef UploadProgressCallback = void Function(double progress);
-
-class WhisperApiService {
-  const WhisperApiService(
-    this._client, {
+class WhisperApiService implements TranscriptionService {
+  WhisperApiService(
+    DioClient client, {
     AudioFileValidator validator = const AudioFileValidator(),
-  }) : _validator = validator;
+    TranscriptionService? seedAsrService,
+  })  : _client = client,
+        _validator = validator,
+        _seedAsrService = seedAsrService ??
+            SeedAsrApiService(
+              client,
+              validator: validator,
+            );
 
   final DioClient _client;
   final AudioFileValidator _validator;
+  final TranscriptionService _seedAsrService;
 
+  @override
   Future<TranscriptionResult> transcribe(
     File file, {
     UploadProgressCallback? onUploadProgress,
   }) async {
     final settings = _client.settings.validated();
+    if (SeedAsrApiService.supportsModel(settings.sttModel)) {
+      return _seedAsrService.transcribe(
+        file,
+        onUploadProgress: onUploadProgress,
+      );
+    }
     await _validator.validate(file);
     try {
       final formData = FormData.fromMap({

@@ -10,6 +10,7 @@ import 'package:voxflow/core/utils/transcript_exporter.dart';
 import 'package:voxflow/features/settings/models/settings_state.dart';
 import 'package:voxflow/features/stt/models/transcription_result.dart';
 import 'package:voxflow/features/stt/services/audio_file_validator.dart';
+import 'package:voxflow/features/stt/services/transcription_service.dart';
 import 'package:voxflow/features/stt/services/whisper_api_service.dart';
 
 void main() {
@@ -104,6 +105,50 @@ void main() {
     expect(form.files.single.key, 'file');
     expect(adapter.options!.headers['Authorization'], 'Bearer test-key');
   });
+
+  test('SeedASR 使用专属传输而不是 Whisper multipart', () async {
+    final directory =
+        await Directory.systemTemp.createTemp('voxflow_seed_asr_');
+    addTearDown(() => directory.delete(recursive: true));
+    final file = File('${directory.path}${Platform.pathSeparator}sample.wav');
+    await file.writeAsBytes([1, 2, 3]);
+    final adapter = _FakeAdapter();
+    final dio = Dio()..httpClientAdapter = adapter;
+    const settings = SettingsState(
+      apiKey: 'test-key',
+      baseUrl: 'https://one.gloscai.com/v1',
+      sttModel: 'bytedance/volc.seedasr.sauc.duration',
+      ttsModel: 'bytedance/seed-tts-2.0',
+    );
+    final seedAsr = _FakeTranscriptionService();
+    final service = WhisperApiService(
+      DioClient(settings, dio: dio),
+      seedAsrService: seedAsr,
+    );
+
+    final result = await service.transcribe(file);
+
+    expect(result.text, 'seed-asr-result');
+    expect(seedAsr.calls, 1);
+    expect(adapter.options, isNull);
+  });
+}
+
+class _FakeTranscriptionService implements TranscriptionService {
+  int calls = 0;
+
+  @override
+  Future<TranscriptionResult> transcribe(
+    File file, {
+    UploadProgressCallback? onUploadProgress,
+  }) async {
+    calls++;
+    onUploadProgress?.call(1);
+    return const TranscriptionResult(
+      text: 'seed-asr-result',
+      segments: [],
+    );
+  }
 }
 
 class _FakeAdapter implements HttpClientAdapter {

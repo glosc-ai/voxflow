@@ -17,7 +17,7 @@ class AudioRecordManager {
   final PermissionService _permissionService;
   String? _currentPath;
 
-  Future<void> start() async {
+  Future<void> start({bool requireWav = false}) async {
     try {
       await _permissionService.ensureMicrophoneAccess();
       if (!await _recorder.hasPermission()) {
@@ -27,6 +27,12 @@ class AudioRecordManager {
         );
       }
       final supportsWav = await _recorder.isEncoderSupported(AudioEncoder.wav);
+      if (requireWav && !supportsWav) {
+        throw const AppException(
+          AppErrorCode.recordingUnavailable,
+          '当前 SeedASR 模型要求 16 kHz、16-bit、单声道 PCM WAV，但此设备不支持 WAV 录音。',
+        );
+      }
       final encoder = supportsWav ? AudioEncoder.wav : AudioEncoder.aacLc;
       final extension = supportsWav ? 'wav' : 'm4a';
       final path = await PathUtils.temporaryAudioPath(
