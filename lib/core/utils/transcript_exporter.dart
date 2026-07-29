@@ -11,6 +11,18 @@ class TranscriptExporter {
 
   static String toText(String text) => text.trim();
 
+  static String ensureExtension(String filePath, String extension) {
+    final normalizedExtension =
+        extension.startsWith('.') ? extension.substring(1) : extension;
+    if (normalizedExtension.isEmpty) {
+      return filePath;
+    }
+    final suffix = '.$normalizedExtension';
+    return filePath.toLowerCase().endsWith(suffix.toLowerCase())
+        ? filePath
+        : '$filePath$suffix';
+  }
+
   static String toSrt(TranscriptionResult result) {
     if (!result.hasSegments) {
       throw const AppException(
@@ -47,7 +59,8 @@ class TranscriptExporter {
         return false;
       }
       if (!Platform.isAndroid) {
-        await File(path).writeAsBytes(bytes, flush: true);
+        final outputPath = ensureExtension(path, extension);
+        await File(outputPath).writeAsBytes(bytes, flush: true);
       }
       return true;
     } catch (_) {

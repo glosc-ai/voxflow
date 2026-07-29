@@ -41,6 +41,20 @@ void main() {
         throwsA(isA<AppException>()),
       );
     });
+
+    test('Windows 导出路径缺少扩展名时补齐目标格式', () {
+      expect(
+        TranscriptExporter.ensureExtension(r'C:\exports\transcript', 'txt'),
+        r'C:\exports\transcript.txt',
+      );
+      expect(
+        TranscriptExporter.ensureExtension(
+          r'C:\exports\transcript.TXT',
+          'txt',
+        ),
+        r'C:\exports\transcript.TXT',
+      );
+    });
   });
 
   group('AudioFileValidator', () {
