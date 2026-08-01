@@ -28,6 +28,8 @@ class TranscriptExporter {
       throw const AppException(
         AppErrorCode.invalidFile,
         '当前转录没有时间戳片段，无法导出 SRT。',
+        englishMessage:
+            'This transcript has no timestamped segments and cannot be exported as SRT.',
       );
     }
     final buffer = StringBuffer();
@@ -45,11 +47,12 @@ class TranscriptExporter {
   static Future<bool> saveText({
     required String contents,
     required String extension,
+    String dialogTitle = '导出转录结果',
   }) async {
     try {
       final bytes = utf8.encode(contents);
       final path = await FilePicker.platform.saveFile(
-        dialogTitle: '导出转录结果',
+        dialogTitle: dialogTitle,
         fileName: 'voxflow_${DateTime.now().millisecondsSinceEpoch}.$extension',
         type: FileType.custom,
         allowedExtensions: [extension],
@@ -67,6 +70,8 @@ class TranscriptExporter {
       throw const AppException(
         AppErrorCode.storageFailure,
         '导出文件失败，请重新选择保存位置。',
+        englishMessage:
+            'Unable to export the file. Choose another save location.',
       );
     }
   }

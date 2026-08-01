@@ -115,6 +115,7 @@ class SeedAsrApiService implements TranscriptionService {
         throw const AppException(
           AppErrorCode.serviceUnavailable,
           'SeedASR 未返回初始化响应。',
+          englishMessage: 'SeedASR did not return an initialization response.',
         );
       }
       final initialResponse = _decodeResponse(
@@ -185,6 +186,7 @@ class SeedAsrApiService implements TranscriptionService {
         throw const AppException(
           AppErrorCode.serviceUnavailable,
           'SeedASR 未返回转写文字。',
+          englishMessage: 'SeedASR returned no transcribed text.',
         );
       }
       unawaited(
@@ -213,20 +215,36 @@ class SeedAsrApiService implements TranscriptionService {
       const error = AppException(
         AppErrorCode.networkTimeout,
         'SeedASR 请求超时，请检查网络后重试。',
+        englishMessage:
+            'The SeedASR request timed out. Check the network and try again.',
       );
       _logFailure(endpoint, model, error.message, settings.apiKey);
       throw error;
     } on SocketException catch (error) {
+      final detail = AppLogger.redact(
+        error.message,
+        sensitiveValues: [settings.apiKey],
+        maxLength: 240,
+      );
       final mapped = AppException(
         AppErrorCode.serviceUnavailable,
-        '无法连接 SeedASR 服务：${AppLogger.redact(error.message)}',
+        '无法连接 SeedASR 服务。',
+        englishMessage: 'Unable to connect to the SeedASR service.',
+        technicalDetail: detail,
       );
       _logFailure(endpoint, model, mapped.message, settings.apiKey);
       throw mapped;
     } on WebSocketException catch (error) {
+      final detail = AppLogger.redact(
+        error.message,
+        sensitiveValues: [settings.apiKey],
+        maxLength: 240,
+      );
       final mapped = AppException(
         AppErrorCode.serviceUnavailable,
-        'SeedASR WebSocket 连接失败：${AppLogger.redact(error.message)}',
+        'SeedASR WebSocket 连接失败。',
+        englishMessage: 'The SeedASR WebSocket connection failed.',
+        technicalDetail: detail,
       );
       _logFailure(endpoint, model, mapped.message, settings.apiKey);
       throw mapped;
@@ -238,7 +256,9 @@ class SeedAsrApiService implements TranscriptionService {
       );
       final mapped = AppException(
         AppErrorCode.serviceUnavailable,
-        'SeedASR 转写失败：$reason',
+        'SeedASR 转写失败。',
+        englishMessage: 'SeedASR transcription failed.',
+        technicalDetail: reason,
       );
       _logFailure(endpoint, model, mapped.message, settings.apiKey);
       throw mapped;
@@ -369,6 +389,7 @@ class SeedAsrApiService implements TranscriptionService {
       throw const AppException(
         AppErrorCode.serviceUnavailable,
         'SeedASR 返回了非二进制响应。',
+        englishMessage: 'SeedASR returned a non-binary response.',
       );
     }
     final bytes = Uint8List.fromList(raw);
@@ -376,6 +397,7 @@ class SeedAsrApiService implements TranscriptionService {
       throw const AppException(
         AppErrorCode.serviceUnavailable,
         'SeedASR 返回了无效的短响应。',
+        englishMessage: 'SeedASR returned an invalid short response.',
       );
     }
     final headerSize = (bytes[0] & 0x0f) * 4;
@@ -387,6 +409,7 @@ class SeedAsrApiService implements TranscriptionService {
       throw const AppException(
         AppErrorCode.serviceUnavailable,
         'SeedASR 响应头无效。',
+        englishMessage: 'The SeedASR response header is invalid.',
       );
     }
     var offset = headerSize;
@@ -418,7 +441,9 @@ class SeedAsrApiService implements TranscriptionService {
       );
       throw AppException(
         AppErrorCode.serviceUnavailable,
-        'SeedASR 服务错误 $errorCode${safeDetail.isEmpty ? '' : '：$safeDetail'}',
+        'SeedASR 服务错误 $errorCode。',
+        englishMessage: 'SeedASR service error $errorCode.',
+        technicalDetail: safeDetail.isEmpty ? null : safeDetail,
       );
     }
 
@@ -453,6 +478,7 @@ class SeedAsrApiService implements TranscriptionService {
       throw const AppException(
         AppErrorCode.serviceUnavailable,
         'SeedASR 响应负载不完整。',
+        englishMessage: 'The SeedASR response payload is incomplete.',
       );
     }
   }
@@ -556,6 +582,8 @@ class _PcmWavAudio {
       throw const AppException(
         AppErrorCode.invalidFile,
         'SeedASR 目前仅支持 16 kHz、16-bit、单声道 PCM WAV。请转换文件格式，或选择兼容 OpenAI 转写接口的模型。',
+        englishMessage:
+            'SeedASR currently supports only 16 kHz, 16-bit, mono PCM WAV. Convert the file or choose a model compatible with the OpenAI transcription API.',
       );
     }
   }

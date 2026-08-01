@@ -22,6 +22,7 @@ class PathUtils {
       throw const AppException(
         AppErrorCode.storageFailure,
         '无法创建应用音频目录。',
+        englishMessage: 'Unable to create the application audio directory.',
       );
     }
   }
@@ -38,6 +39,7 @@ class PathUtils {
       throw const AppException(
         AppErrorCode.storageFailure,
         '无法创建本地数据库目录。',
+        englishMessage: 'Unable to create the local database directory.',
       );
     }
   }
@@ -56,6 +58,7 @@ class PathUtils {
       throw const AppException(
         AppErrorCode.storageFailure,
         '无法访问应用日志目录。',
+        englishMessage: 'Unable to access the application log directory.',
       );
     }
   }
@@ -74,6 +77,7 @@ class PathUtils {
       throw const AppException(
         AppErrorCode.storageFailure,
         '无法访问系统临时目录。',
+        englishMessage: 'Unable to access the system temporary directory.',
       );
     }
   }
@@ -87,6 +91,7 @@ class PathUtils {
         throw const AppException(
           AppErrorCode.fileNotFound,
           '音频文件不存在。',
+          englishMessage: 'The audio file could not be found.',
         );
       }
       final directory = await getManagedAudioDirectory(category);
@@ -105,6 +110,7 @@ class PathUtils {
       throw const AppException(
         AppErrorCode.storageFailure,
         '无法保存音频文件。',
+        englishMessage: 'Unable to save the audio file.',
       );
     }
   }
@@ -131,6 +137,7 @@ class PathUtils {
       throw const AppException(
         AppErrorCode.storageFailure,
         '无法写入音频文件。',
+        englishMessage: 'Unable to write the audio file.',
       );
     }
   }

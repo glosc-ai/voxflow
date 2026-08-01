@@ -67,6 +67,8 @@ class WhisperApiService implements TranscriptionService {
         throw const AppException(
           AppErrorCode.serviceUnavailable,
           '转录服务返回了无法识别的数据。',
+          englishMessage:
+              'The transcription service returned an unrecognized response.',
         );
       }
       final json = data.map(
@@ -77,6 +79,7 @@ class WhisperApiService implements TranscriptionService {
         throw const AppException(
           AppErrorCode.serviceUnavailable,
           '转录服务未返回文字。',
+          englishMessage: 'The transcription service returned no text.',
         );
       }
       return result;
@@ -88,6 +91,7 @@ class WhisperApiService implements TranscriptionService {
       throw const AppException(
         AppErrorCode.unknown,
         '音频转录失败，请稍后重试。',
+        englishMessage: 'Audio transcription failed. Try again later.',
       );
     }
   }

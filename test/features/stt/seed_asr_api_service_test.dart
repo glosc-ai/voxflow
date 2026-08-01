@@ -147,22 +147,21 @@ void main() {
     final input = File('${directory.path}/sample.wav');
     await input.writeAsBytes(_pcmWav(dataBytes: 3200));
 
-    await expectLater(
-      service.transcribe(input),
-      throwsA(
-        isA<AppException>()
-            .having(
-              (error) => error.message,
-              'message',
-              isNot(contains(customKey)),
-            )
-            .having(
-              (error) => error.message,
-              'message',
-              contains('SeedASR'),
-            ),
-      ),
-    );
+    late AppException exception;
+    try {
+      await service.transcribe(input);
+      fail('Expected SeedASR to reject the request.');
+    } on AppException catch (error) {
+      exception = error;
+    }
+
+    expect(exception.message, isNot(contains(customKey)));
+    expect(exception.message, contains('SeedASR'));
+    expect(exception.technicalDetail, contains('[REDACTED]'));
+    expect(
+        exception.englishMessage, contains('SeedASR service error 45000001.'));
+    expect(exception.englishMessage, contains('Service response:'));
+    expect(exception.englishMessage, isNot(contains(customKey)));
   });
 
   test('SeedASR 连接超时后关闭晚完成的 WebSocket', () async {

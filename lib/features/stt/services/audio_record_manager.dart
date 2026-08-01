@@ -24,6 +24,8 @@ class AudioRecordManager {
         throw const AppException(
           AppErrorCode.permissionDenied,
           '麦克风不可用，请检查系统隐私设置。',
+          englishMessage:
+              'The microphone is unavailable. Check the system privacy settings.',
         );
       }
       final supportsWav = await _recorder.isEncoderSupported(AudioEncoder.wav);
@@ -31,6 +33,8 @@ class AudioRecordManager {
         throw const AppException(
           AppErrorCode.recordingUnavailable,
           '当前 SeedASR 模型要求 16 kHz、16-bit、单声道 PCM WAV，但此设备不支持 WAV 录音。',
+          englishMessage:
+              'The current SeedASR model requires 16 kHz, 16-bit, mono PCM WAV, but this device does not support WAV recording.',
         );
       }
       final encoder = supportsWav ? AudioEncoder.wav : AudioEncoder.aacLc;
@@ -58,6 +62,8 @@ class AudioRecordManager {
       throw const AppException(
         AppErrorCode.recordingUnavailable,
         '无法开始录音，麦克风可能正被其他程序占用。',
+        englishMessage:
+            'Unable to start recording. Another application may be using the microphone.',
       );
     }
   }
@@ -89,6 +95,7 @@ class AudioRecordManager {
       throw const AppException(
         AppErrorCode.recordingUnavailable,
         '暂停录音失败。',
+        englishMessage: 'Unable to pause recording.',
       );
     }
   }
@@ -100,6 +107,7 @@ class AudioRecordManager {
       throw const AppException(
         AppErrorCode.recordingUnavailable,
         '继续录音失败。',
+        englishMessage: 'Unable to resume recording.',
       );
     }
   }
@@ -112,6 +120,7 @@ class AudioRecordManager {
         throw const AppException(
           AppErrorCode.recordingUnavailable,
           '录音未生成有效文件。',
+          englishMessage: 'The recording did not produce a valid file.',
         );
       }
       final file = File(path);
@@ -119,6 +128,7 @@ class AudioRecordManager {
         throw const AppException(
           AppErrorCode.fileNotFound,
           '录音文件不存在。',
+          englishMessage: 'The recorded audio file could not be found.',
         );
       }
       return file;
@@ -128,6 +138,7 @@ class AudioRecordManager {
       throw const AppException(
         AppErrorCode.recordingUnavailable,
         '停止录音失败。',
+        englishMessage: 'Unable to stop recording.',
       );
     }
   }

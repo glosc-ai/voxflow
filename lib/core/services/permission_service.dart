@@ -24,6 +24,8 @@ class PermissionService {
       throw const AppException(
         AppErrorCode.permissionDenied,
         '未获得麦克风权限，请在系统设置中允许声流使用麦克风。',
+        englishMessage:
+            'Microphone access was not granted. Allow VoxFlow to use the microphone in system settings.',
       );
     } on AppException {
       rethrow;
@@ -31,6 +33,7 @@ class PermissionService {
       throw const AppException(
         AppErrorCode.permissionDenied,
         '无法检查麦克风权限，请稍后重试。',
+        englishMessage: 'Unable to check microphone access. Try again later.',
       );
     }
   }

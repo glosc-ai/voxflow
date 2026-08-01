@@ -26,6 +26,10 @@ typedef HistoryWriter = Future<void> Function({
 
 typedef UtcNow = Future<DateTime> Function();
 typedef RequiresPcmWav = bool Function();
+typedef ManagedAudioPersister = Future<File> Function(
+  File source, {
+  required String category,
+});
 
 final permissionServiceProvider = Provider<PermissionService>((ref) {
   return const PermissionService();
@@ -71,11 +75,14 @@ class SttNotifier extends StateNotifier<SttState> {
     required HistoryWriter historyWriter,
     UtcNow? nowUtc,
     RequiresPcmWav? requiresPcmWav,
+    ManagedAudioPersister? persistManagedAudio,
   })  : _recorder = recorder,
         _apiService = apiService,
         _historyWriter = historyWriter,
         _nowUtc = nowUtc ?? PlatformClock.nowUtc,
         _requiresPcmWav = requiresPcmWav ?? _neverRequiresPcmWav,
+        _persistManagedAudio =
+            persistManagedAudio ?? PathUtils.persistManagedAudio,
         super(const SttState());
 
   final AudioRecordManager _recorder;
@@ -83,6 +90,7 @@ class SttNotifier extends StateNotifier<SttState> {
   final HistoryWriter _historyWriter;
   final UtcNow _nowUtc;
   final RequiresPcmWav _requiresPcmWav;
+  final ManagedAudioPersister _persistManagedAudio;
   DateTime? _recordingSegmentStartedAt;
   Duration _recordedElapsed = Duration.zero;
   Timer? _elapsedTimer;
@@ -93,6 +101,7 @@ class SttNotifier extends StateNotifier<SttState> {
     if (!state.canStart) {
       return;
     }
+    await _discardRetainedTemporarySource();
     state = const SttState(phase: SttPhase.countdown, countdown: 3);
     try {
       for (var value = 3; value > 0; value--) {
@@ -116,7 +125,13 @@ class SttNotifier extends StateNotifier<SttState> {
       );
       _startElapsedTimer();
     } catch (error) {
-      _setFailure(error, '无法开始录音。');
+      _setFailure(
+        error,
+        const AppMessage(
+          zh: '无法开始录音。',
+          en: 'Unable to start recording.',
+        ),
+      );
     }
   }
 
@@ -134,7 +149,13 @@ class SttNotifier extends StateNotifier<SttState> {
         clearError: true,
       );
     } catch (error) {
-      _setRecoverableError(error, '暂停录音失败。');
+      _setRecoverableError(
+        error,
+        const AppMessage(
+          zh: '暂停录音失败。',
+          en: 'Unable to pause recording.',
+        ),
+      );
     }
   }
 
@@ -148,7 +169,13 @@ class SttNotifier extends StateNotifier<SttState> {
       state = state.copyWith(phase: SttPhase.recording, clearError: true);
       _startElapsedTimer();
     } catch (error) {
-      _setRecoverableError(error, '继续录音失败。');
+      _setRecoverableError(
+        error,
+        const AppMessage(
+          zh: '继续录音失败。',
+          en: 'Unable to resume recording.',
+        ),
+      );
     }
   }
 
@@ -164,17 +191,53 @@ class SttNotifier extends StateNotifier<SttState> {
       await transcribeFile(file, removeSourceAfterSuccess: true);
     } catch (error) {
       await _recorder.cancel();
-      _setFailure(error, '停止录音失败。');
+      _setFailure(
+        error,
+        const AppMessage(
+          zh: '停止录音失败。',
+          en: 'Unable to stop recording.',
+        ),
+      );
     }
   }
 
-  Future<void> pickAndTranscribe() async {
+  Future<bool> cancelRecording() async {
+    if (state.phase == SttPhase.countdown) {
+      _elapsedTimer?.cancel();
+      _recordingSegmentStartedAt = null;
+      _recordedElapsed = Duration.zero;
+      state = const SttState();
+      return true;
+    }
+    if (!state.isRecording) {
+      return true;
+    }
+    try {
+      await _recorder.cancel();
+      _elapsedTimer?.cancel();
+      _recordingSegmentStartedAt = null;
+      _recordedElapsed = Duration.zero;
+      state = const SttState();
+      return true;
+    } catch (error) {
+      _setRecoverableError(
+        error,
+        const AppMessage(
+          zh: '无法停止当前录音，请重试。',
+          en: 'Unable to stop the current recording. Try again.',
+        ),
+      );
+      return false;
+    }
+  }
+
+  Future<void> pickAndTranscribe({String dialogTitle = '选择音频或视频文件'}) async {
     if (!state.canStart) {
       return;
     }
     try {
       final selection = await FilePicker.platform.pickFiles(
-        dialogTitle: '选择音频或视频文件',
+        dialogTitle: dialogTitle,
         type: FileType.custom,
         allowedExtensions: _requiresPcmWav()
             ? const ['wav']
@@ -189,11 +252,18 @@ class SttNotifier extends StateNotifier<SttState> {
         throw const AppException(
           AppErrorCode.fileNotFound,
           '无法访问所选文件。',
+          englishMessage: 'The selected file could not be accessed.',
         );
       }
       await transcribeFile(File(path));
     } catch (error) {
-      _setFailure(error, '导入文件失败。');
+      _setFailure(
+        error,
+        const AppMessage(
+          zh: '导入文件失败。',
+          en: 'Unable to import the file.',
+        ),
+      );
     }
   }
 
@@ -202,9 +272,11 @@ class SttNotifier extends StateNotifier<SttState> {
     bool removeSourceAfterSuccess = false,
   }) async {
     File? managedFile;
+    await _discardRetainedTemporarySource(exceptPath: file.path);
     state = SttState(
       phase: SttPhase.uploading,
       selectedFilePath: file.path,
+      selectedSourceIsTemporaryRecording: removeSourceAfterSuccess,
       elapsed: state.elapsed,
     );
     try {
@@ -221,7 +293,7 @@ class SttNotifier extends StateNotifier<SttState> {
         phase: SttPhase.transcribing,
         uploadProgress: 1,
       );
-      managedFile = await PathUtils.persistManagedAudio(file, category: 'stt');
+      managedFile = await _persistManagedAudio(file, category: 'stt');
       final resultWithSource = result.copyWith(sourcePath: managedFile.path);
       await _historyWriter(
         type: HistoryType.stt,
@@ -235,6 +307,7 @@ class SttNotifier extends StateNotifier<SttState> {
         phase: SttPhase.success,
         uploadProgress: 1,
         selectedFilePath: managedFile.path,
+        selectedSourceIsTemporaryRecording: false,
         result: resultWithSource,
         editedText: result.text,
         elapsed: state.elapsed,
@@ -249,34 +322,57 @@ class SttNotifier extends StateNotifier<SttState> {
           // Best-effort cleanup for an operation that did not complete.
         }
       }
-      if (removeSourceAfterSuccess) {
-        try {
-          if (await file.exists()) {
-            await file.delete();
-          }
-        } catch (_) {
-          // Best-effort cleanup for temporary recordings.
-        }
-      }
-      _setFailure(error, '音频转录失败，请稍后重试。');
+      _setFailure(
+        error,
+        const AppMessage(
+          zh: '音频转录失败，请稍后重试。',
+          en: 'Audio transcription failed. Try again later.',
+        ),
+      );
     }
+  }
+
+  Future<void> retrySelectedSource() async {
+    if (!state.canRetrySelectedSource) {
+      return;
+    }
+    final source = File(state.selectedFilePath!);
+    if (!await source.exists()) {
+      _setFailure(
+        const AppException(
+          AppErrorCode.fileNotFound,
+          '待重试的音频文件不存在。',
+          englishMessage: 'The audio file to retry could not be found.',
+        ),
+        const AppMessage(
+          zh: '无法重试此音频。',
+          en: 'Unable to retry this audio.',
+        ),
+      );
+      return;
+    }
+    await transcribeFile(
+      source,
+      removeSourceAfterSuccess: state.selectedSourceIsTemporaryRecording,
+    );
   }
 
   void updateEditedText(String value) {
     state = state.copyWith(editedText: value);
   }
 
-  Future<bool> exportText() async {
+  Future<bool> exportText({String dialogTitle = '导出转录结果'}) async {
     if (!state.canExport) {
       return false;
     }
     return TranscriptExporter.saveText(
       contents: TranscriptExporter.toText(state.editedText),
       extension: 'txt',
+      dialogTitle: dialogTitle,
     );
   }
 
-  Future<bool> exportSrt() async {
+  Future<bool> exportSrt({String dialogTitle = '导出转录结果'}) async {
     final result = state.result;
     if (result == null) {
       return false;
@@ -284,14 +380,44 @@ class SttNotifier extends StateNotifier<SttState> {
     return TranscriptExporter.saveText(
       contents: TranscriptExporter.toSrt(result),
       extension: 'srt',
+      dialogTitle: dialogTitle,
     );
   }
 
-  void reset() {
+  Future<void> reset() async {
     _elapsedTimer?.cancel();
     _recordingSegmentStartedAt = null;
     _recordedElapsed = Duration.zero;
+    final retainedTemporaryPath = state.selectedSourceIsTemporaryRecording
+        ? state.selectedFilePath
+        : null;
     state = const SttState();
+    await _deleteTemporarySourceBestEffort(retainedTemporaryPath);
+  }
+
+  Future<void> _discardRetainedTemporarySource({String? exceptPath}) async {
+    if (!state.selectedSourceIsTemporaryRecording) {
+      return;
+    }
+    final path = state.selectedFilePath;
+    if (path == null || path == exceptPath) {
+      return;
+    }
+    await _deleteTemporarySourceBestEffort(path);
+  }
+
+  Future<void> _deleteTemporarySourceBestEffort(String? path) async {
+    if (path == null) {
+      return;
+    }
+    try {
+      final file = File(path);
+      if (await file.exists()) {
+        await file.delete();
+      }
+    } catch (_) {
+      // Replacing a failed task should continue even if temp cleanup fails.
+    }
   }
 
   void _startElapsedTimer() {
@@ -357,19 +483,19 @@ class SttNotifier extends StateNotifier<SttState> {
   Duration get _roundedRecordedElapsed =>
       Duration(seconds: _recordedElapsed.inSeconds);
 
-  void _setFailure(Object error, String fallback) {
+  void _setFailure(Object error, AppMessage fallback) {
     _elapsedTimer?.cancel();
     _recordingSegmentStartedAt = null;
-    final message = error is AppException ? error.message : fallback;
+    final message = error is AppException ? error.localizedMessage : fallback;
     state = state.copyWith(
       phase: SttPhase.failure,
-      errorMessage: message,
+      error: message,
     );
   }
 
-  void _setRecoverableError(Object error, String fallback) {
-    final message = error is AppException ? error.message : fallback;
-    state = state.copyWith(errorMessage: message);
+  void _setRecoverableError(Object error, AppMessage fallback) {
+    final message = error is AppException ? error.localizedMessage : fallback;
+    state = state.copyWith(error: message);
   }
 
   @override
