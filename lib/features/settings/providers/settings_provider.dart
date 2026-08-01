@@ -45,50 +45,68 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
     return DioClient(settings).fetchModelIds();
   }
 
-  Future<String> save({
-    required String apiKey,
-    required String baseUrl,
-    required String sttModel,
-    required String ttsModel,
-  }) async {
-    state = state.copyWith(isBusy: true, clearMessage: true);
-    try {
-      final validated = SettingsState(
-        apiKey: apiKey,
-        baseUrl: baseUrl,
-        sttModel: sttModel,
-        ttsModel: ttsModel,
-      ).validated();
-      await _repository.save(validated);
-      state = validated.copyWith(
-        availableSttModels: state.availableSttModels,
-        availableTtsModels: state.availableTtsModels,
-        hasFetchedModels: state.hasFetchedModels,
-        isBusy: false,
-        message: '设置已保存。',
-      );
-      return '设置已保存。';
-    } on AppException catch (error) {
-      state = state.copyWith(isBusy: false, message: error.message);
-      rethrow;
-    } catch (_) {
-      const error = AppException(
-        AppErrorCode.unknown,
-        '设置保存失败，请重试。',
-      );
-      state = state.copyWith(isBusy: false, message: error.message);
-      throw error;
-    }
-  }
-
-  Future<String> testConnection({
+  Future<AppMessage> save({
     required String apiKey,
     required String baseUrl,
     required String sttModel,
     required String ttsModel,
   }) async {
     state = state.copyWith(
-      isBusy: true,
+      activeOperation: SettingsOperation.saving,
+      clearMessage: true,
+    );
+    try {
+      final validated = SettingsState(
+        apiKey: apiKey,
+        baseUrl: baseUrl,
+        sttModel: sttModel,
+        ttsModel: ttsModel,
+        themePreference: state.themePreference,
+        localePreference: state.localePreference,
+      ).validated();
+      await _repository.save(validated);
+      const feedback = AppMessage(
+        zh: '设置已保存。',
+        en: 'Settings saved.',
+      );
+      state = validated.copyWith(
+        availableSttModels: state.availableSttModels,
+        availableTtsModels: state.availableTtsModels,
+        hasFetchedModels: state.hasFetchedModels,
+        clearActiveOperation: true,
+        feedback: feedback,
+      );
+      return feedback;
+    } on AppException catch (error) {
+      state = state.copyWith(
+        clearActiveOperation: true,
+        feedback: error.localizedMessage,
+      );
+      rethrow;
+    } catch (_) {
+      final error = AppException.localized(
+        AppErrorCode.unknown,
+        const AppMessage(
+          zh: '设置保存失败，请重试。',
+          en: 'Settings could not be saved. Try again.',
+        ),
+      );
+      state = state.copyWith(
+        clearActiveOperation: true,
+        feedback: error.localizedMessage,
+      );
+      throw error;
+    }
+  }
+
+  Future<AppMessage> testConnection({
+    required String apiKey,
+    required String baseUrl,
+    required String sttModel,
+    required String ttsModel,
+  }) async {
+    state = state.copyWith(
+      activeOperation: SettingsOperation.testingConnection,
       clearConnectionResult: true,
       clearMessage: true,
     );
@@ -98,34 +116,43 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
         baseUrl: baseUrl,
         sttModel: sttModel,
         ttsModel: ttsModel,
+        themePreference: state.themePreference,
+        localePreference: state.localePreference,
       ).validated();
       await DioClient(validated).testConnection();
       await _repository.save(validated);
+      const feedback = AppMessage(
+        zh: '连接成功，设置已保存。',
+        en: 'Connection succeeded and settings were saved.',
+      );
       state = validated.copyWith(
         availableSttModels: state.availableSttModels,
         availableTtsModels: state.availableTtsModels,
         hasFetchedModels: state.hasFetchedModels,
-        isBusy: false,
+        clearActiveOperation: true,
         lastConnectionSucceeded: true,
-        message: '连接成功，设置已保存。',
+        feedback: feedback,
       );
-      return '连接成功，设置已保存。';
+      return feedback;
     } on AppException catch (error) {
       state = state.copyWith(
-        isBusy: false,
+        clearActiveOperation: true,
         lastConnectionSucceeded: false,
-        message: error.message,
+        feedback: error.localizedMessage,
       );
       rethrow;
     } catch (_) {
-      const error = AppException(
+      final error = AppException.localized(
         AppErrorCode.unknown,
-        'API 连通性测试失败，请检查配置。',
+        const AppMessage(
+          zh: 'API 连通性测试失败，请检查配置。',
+          en: 'The API connection test failed. Check the configuration.',
+        ),
       );
       state = state.copyWith(
-        isBusy: false,
+        clearActiveOperation: true,
         lastConnectionSucceeded: false,
-        message: error.message,
+        feedback: error.localizedMessage,
       );
       throw error;
     }
@@ -136,7 +163,7 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
     required String baseUrl,
   }) async {
     state = state.copyWith(
-      isBusy: true,
+      activeOperation: SettingsOperation.fetchingModels,
       clearAvailableModels: true,
       clearConnectionResult: true,
       clearMessage: true,
@@ -147,43 +174,86 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
         baseUrl: baseUrl,
         sttModel: state.sttModel,
         ttsModel: state.ttsModel,
+        themePreference: state.themePreference,
+        localePreference: state.localePreference,
       ).credentialsValidated();
       final catalog = ModelCatalog.fromIds(await _modelLoader(credentials));
       if (catalog.stt.isEmpty && catalog.tts.isEmpty) {
-        throw const AppException(
+        throw AppException.localized(
           AppErrorCode.invalidConfiguration,
-          '已连接服务，但未识别到语音转文字或文字转语音模型。',
+          const AppMessage(
+            zh: '已连接服务，但未识别到语音转文字或文字转语音模型。',
+            en: 'The service connected, but no compatible speech models were found.',
+          ),
         );
       }
-      final summary = '已获取 ${catalog.stt.length} 个语音转文字模型、'
-          '${catalog.tts.length} 个文字转语音模型；选择后请保存设置。';
+      final feedback = AppMessage(
+        zh: '已获取 ${catalog.stt.length} 个语音转文字模型、'
+            '${catalog.tts.length} 个文字转语音模型；选择后请保存设置。',
+        en: 'Fetched ${catalog.stt.length} speech-to-text '
+            '${catalog.stt.length == 1 ? 'model' : 'models'} and '
+            '${catalog.tts.length} text-to-speech '
+            '${catalog.tts.length == 1 ? 'model' : 'models'}. Save settings '
+            'after choosing models.',
+      );
       state = state.copyWith(
         availableSttModels: catalog.stt,
         availableTtsModels: catalog.tts,
         hasFetchedModels: true,
-        isBusy: false,
+        clearActiveOperation: true,
         lastConnectionSucceeded: true,
-        message: summary,
+        feedback: feedback,
       );
       return catalog;
     } on AppException catch (error) {
       state = state.copyWith(
-        isBusy: false,
+        clearActiveOperation: true,
         lastConnectionSucceeded: false,
-        message: error.message,
+        feedback: error.localizedMessage,
       );
       rethrow;
     } catch (_) {
-      const error = AppException(
+      final error = AppException.localized(
         AppErrorCode.unknown,
-        '无法获取模型列表，请稍后重试。',
+        const AppMessage(
+          zh: '无法获取模型列表，请稍后重试。',
+          en: 'The model list could not be fetched. Try again later.',
+        ),
       );
       state = state.copyWith(
-        isBusy: false,
+        clearActiveOperation: true,
         lastConnectionSucceeded: false,
-        message: error.message,
+        feedback: error.localizedMessage,
       );
       throw error;
+    }
+  }
+
+  Future<void> setThemePreference(AppThemePreference preference) async {
+    if (state.themePreference == preference) {
+      return;
+    }
+    final previous = state;
+    state = state.copyWith(themePreference: preference);
+    try {
+      await _repository.save(state);
+    } catch (_) {
+      state = previous;
+      rethrow;
+    }
+  }
+
+  Future<void> setLocalePreference(AppLocalePreference preference) async {
+    if (state.localePreference == preference) {
+      return;
+    }
+    final previous = state;
+    state = state.copyWith(localePreference: preference);
+    try {
+      await _repository.save(state);
+    } catch (_) {
+      state = previous;
+      rethrow;
     }
   }
 }

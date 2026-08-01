@@ -1,8 +1,10 @@
 import 'dart:io';
+import 'dart:ui';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:voxflow/core/errors/app_exception.dart';
 import 'package:voxflow/features/settings/models/settings_state.dart';
 import 'package:voxflow/features/settings/providers/settings_provider.dart';
 import 'package:voxflow/features/settings/services/settings_repository.dart';
@@ -47,6 +49,42 @@ void main() {
 
     expect(container.read(sttProvider).editedText, '尚未导出的转录草稿');
     expect(container.read(ttsProvider).speed, 1.5);
+    expect(
+      container.read(settingsProvider).messageFor(const Locale('en')),
+      'Fetched 1 speech-to-text model and 1 text-to-speech model. '
+      'Save settings after choosing models.',
+    );
+  });
+
+  test('设置错误反馈保持双语且英文界面不显示中文服务原文', () async {
+    SharedPreferences.setMockInitialValues({});
+    final preferences = await SharedPreferences.getInstance();
+    final notifier = SettingsNotifier(
+      SettingsRepository(preferences),
+      modelLoader: (_) async => throw const AppException(
+        AppErrorCode.unauthorized,
+        '凭据无效。',
+        englishMessage: 'The credentials are invalid.',
+        technicalDetail: '服务拒绝访问',
+      ),
+    );
+
+    await expectLater(
+      notifier.fetchModels(
+        apiKey: 'test-key',
+        baseUrl: 'https://proxy.example/v1',
+      ),
+      throwsA(isA<AppException>()),
+    );
+
+    expect(
+      notifier.state.messageFor(const Locale('en')),
+      'The credentials are invalid.',
+    );
+    expect(
+      notifier.state.messageFor(const Locale('zh')),
+      '凭据无效。 服务返回：服务拒绝访问',
+    );
   });
 
   test('保存新的运行配置不会中断现有状态并更新后续任务模型', () async {

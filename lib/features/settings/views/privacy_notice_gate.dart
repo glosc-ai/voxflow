@@ -2,6 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/errors/app_exception.dart';
+import '../../../core/theme/app_spacing.dart';
+import '../../../core/theme/app_theme.dart';
+import '../../../l10n/app_localizations.dart';
+import '../../../widgets/app_section.dart';
+import '../../../widgets/app_status_banner.dart';
 import '../providers/privacy_notice_provider.dart';
 
 class PrivacyNoticeGate extends ConsumerWidget {
@@ -26,63 +31,200 @@ class _PrivacyNoticeScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('数据与隐私说明')),
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 720),
-              child: Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
+    final l10n = context.l10n;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < AppBreakpoints.compact ||
+            constraints.maxHeight < 760 ||
+            MediaQuery.textScalerOf(context).scale(1) >= 1.3;
+        final action = FilledButton.icon(
+          key: const Key('privacyNoticeAcceptButton'),
+          onPressed: () => _acknowledge(context, ref),
+          icon: const Icon(Icons.check),
+          label: Text(l10n.text(
+            zh: '我已了解并继续',
+            en: 'I understand and want to continue',
+          )),
+        );
+        return Scaffold(
+          appBar: AppBar(
+            toolbarHeight: AppTheme.responsiveAppBarHeight(
+              context,
+              largeTextMaxLines: 2,
+            ),
+            title: Text(
+              l10n.text(
+                zh: '数据与隐私说明',
+                en: 'Data and privacy',
+              ),
+              maxLines: 2,
+            ),
+          ),
+          body: SafeArea(
+            top: false,
+            child: Center(
+              child: SingleChildScrollView(
+                padding: AppLayout.pagePadding(context),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 720),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Text(
-                        '开始使用前，请了解以下数据处理方式',
-                        style: Theme.of(context).textTheme.headlineSmall,
+                      DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.primaryContainer,
+                          borderRadius: BorderRadius.circular(AppRadii.large),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(AppSpacing.lg),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Icon(
+                                Icons.privacy_tip_outlined,
+                                size: 28,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onPrimaryContainer,
+                              ),
+                              const SizedBox(width: AppSpacing.md),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      l10n.text(
+                                        zh: '开始使用前，请确认数据处理方式',
+                                        en: 'Review how your data is handled',
+                                      ),
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .titleLarge
+                                          ?.copyWith(
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .onPrimaryContainer,
+                                          ),
+                                    ),
+                                    const SizedBox(height: AppSpacing.xs),
+                                    Text(
+                                      l10n.text(
+                                        zh: 'VoxFlow 只会将内容发送到你配置的服务，并在本机保存必要的任务记录。',
+                                        en: 'VoxFlow sends content only to the service you configure and keeps necessary task records on this device.',
+                                      ),
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodyMedium
+                                          ?.copyWith(
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .onPrimaryContainer,
+                                          ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
-                      const SizedBox(height: 20),
-                      const _NoticeItem(
-                        icon: Icons.key,
-                        title: 'API Key',
-                        description:
-                            'API Key 会以明文形式保存在本机应用设置中。请仅使用可撤销、低额度的受限测试密钥。',
+                      const SizedBox(height: AppSpacing.md),
+                      AppStatusBanner(
+                        kind: AppStatusKind.warning,
+                        title: l10n.text(
+                          zh: 'API Key 本机存储提示',
+                          en: 'API key storage notice',
+                        ),
+                        message: l10n.text(
+                          zh: 'API Key 会以明文形式保存在本机应用设置中。请仅使用可撤销、低额度的受限测试密钥。',
+                          en: 'The API key is stored as plain text in local app settings. Use only a revocable, low-limit key.',
+                        ),
                       ),
-                      const _NoticeItem(
-                        icon: Icons.cloud_upload_outlined,
-                        title: '数据外发',
-                        description:
-                            '你提交的文本和音频会发送到你配置的 API 服务商，VoxFlow 不会替你选择其他服务商。',
+                      const SizedBox(height: AppSpacing.md),
+                      AppSection(
+                        title: l10n.text(
+                          zh: '数据范围',
+                          en: 'Data scope',
+                        ),
+                        description: l10n.text(
+                          zh: '以下信息帮助你判断当前配置是否符合自己的隐私要求。',
+                          en: 'Use this information to decide whether the current configuration meets your privacy requirements.',
+                        ),
+                        leading: const Icon(Icons.shield_outlined),
+                        child: Column(
+                          children: [
+                            _NoticeItem(
+                              icon: Icons.cloud_upload_outlined,
+                              title: l10n.text(
+                                zh: '数据外发',
+                                en: 'Data sent externally',
+                              ),
+                              description: l10n.text(
+                                zh: '你提交的文本和音频会发送到你配置的 API 服务商，VoxFlow 不会替你选择其他服务商。',
+                                en: 'Submitted text and audio are sent to the API provider you configure. VoxFlow does not choose another provider for you.',
+                              ),
+                            ),
+                            const Divider(height: AppSpacing.xl),
+                            _NoticeItem(
+                              icon: Icons.folder_outlined,
+                              title: l10n.text(
+                                zh: '本地历史与音频',
+                                en: 'Local history and audio',
+                              ),
+                              description: l10n.text(
+                                zh: '历史文本和受管音频保存在本机。删除历史记录时，对应的受管音频也会被删除。',
+                                en: 'History text and managed audio stay on this device. Deleting a history item also deletes its managed audio.',
+                              ),
+                            ),
+                            const Divider(height: AppSpacing.xl),
+                            _NoticeItem(
+                              icon: Icons.description_outlined,
+                              title: l10n.text(
+                                zh: '诊断日志',
+                                en: 'Diagnostic logs',
+                              ),
+                              description: l10n.text(
+                                zh: '日志会脱敏 API Key、认证头和输入正文，但仍可能包含请求时间、接口路径、模型和错误原因。',
+                                en: 'Logs redact API keys, authorization headers, and input content, but may include request times, endpoint paths, models, and error reasons.',
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                      const _NoticeItem(
-                        icon: Icons.folder_outlined,
-                        title: '本地历史与音频',
-                        description: '历史文本和受管音频保存在本机。删除历史记录时，对应的受管音频也会被删除。',
-                      ),
-                      const _NoticeItem(
-                        icon: Icons.description_outlined,
-                        title: '诊断日志',
-                        description:
-                            '日志会脱敏 API Key、认证头和输入正文，但仍可能包含请求时间、接口路径、模型和错误原因。',
-                      ),
-                      const SizedBox(height: 8),
-                      FilledButton.icon(
-                        key: const Key('privacyNoticeAcceptButton'),
-                        onPressed: () => _acknowledge(context, ref),
-                        icon: const Icon(Icons.check),
-                        label: const Text('我已了解并继续'),
-                      ),
+                      if (!compact) ...[
+                        const SizedBox(height: AppSpacing.xl),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: action,
+                        ),
+                      ],
                     ],
                   ),
                 ),
               ),
             ),
           ),
-        ),
-      ),
+          bottomNavigationBar: compact
+              ? SafeArea(
+                  top: false,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surface,
+                      border: Border(
+                        top: BorderSide(
+                          color: Theme.of(context).colorScheme.outlineVariant,
+                        ),
+                      ),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(AppSpacing.md),
+                      child: action,
+                    ),
+                  ),
+                )
+              : null,
+        );
+      },
     );
   }
 
@@ -92,7 +234,7 @@ class _PrivacyNoticeScreen extends ConsumerWidget {
     } on AppException catch (error) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(error.message)),
+          SnackBar(content: Text(context.l10n.appError(error))),
         );
       }
     }
@@ -112,20 +254,35 @@ class _NoticeItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+    final colors = Theme.of(context).colorScheme;
+    return Semantics(
+      container: true,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon),
-          const SizedBox(width: 16),
+          DecoratedBox(
+            decoration: BoxDecoration(
+              color: colors.primaryContainer,
+              borderRadius: BorderRadius.circular(AppRadii.medium),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.xs),
+              child: Icon(icon, color: colors.onPrimaryContainer, size: 20),
+            ),
+          ),
+          const SizedBox(width: AppSpacing.md),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: Theme.of(context).textTheme.titleMedium),
-                const SizedBox(height: 4),
-                Text(description),
+                Text(title, style: Theme.of(context).textTheme.titleSmall),
+                const SizedBox(height: AppSpacing.xxs),
+                Text(
+                  description,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: colors.onSurfaceVariant,
+                      ),
+                ),
               ],
             ),
           ),

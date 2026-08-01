@@ -11,12 +11,12 @@ class DiagnosticLogExporter {
 
   final AppLogger _logger;
 
-  Future<bool> export() async {
+  Future<bool> export({String dialogTitle = '导出 VoxFlow 诊断日志'}) async {
     try {
       final contents = await _logger.readAll();
       final bytes = utf8.encode(contents);
       final path = await FilePicker.platform.saveFile(
-        dialogTitle: '导出 VoxFlow 诊断日志',
+        dialogTitle: dialogTitle,
         fileName: 'voxflow_log_${DateTime.now().millisecondsSinceEpoch}.jsonl',
         type: FileType.custom,
         allowedExtensions: const ['jsonl'],
@@ -35,6 +35,8 @@ class DiagnosticLogExporter {
       throw const AppException(
         AppErrorCode.storageFailure,
         '导出诊断日志失败，请重新选择保存位置。',
+        englishMessage:
+            'Unable to export the diagnostic log. Choose another save location.',
       );
     }
   }

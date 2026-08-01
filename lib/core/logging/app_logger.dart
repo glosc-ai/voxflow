@@ -70,6 +70,7 @@ class AppLogger {
         throw const AppException(
           AppErrorCode.storageFailure,
           '无法读取诊断日志。',
+          englishMessage: 'Unable to read the diagnostic log.',
         );
       }
     });
