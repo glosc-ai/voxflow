@@ -161,7 +161,13 @@ class TtsNotifier extends StateNotifier<TtsState> {
           // Best-effort cleanup for a synthesis that did not complete.
         }
       }
-      _setFailure(error, '语音合成失败，请稍后重试。');
+      _setFailure(
+        error,
+        const AppMessage(
+          zh: '语音合成失败，请稍后重试。',
+          en: 'Speech synthesis failed. Try again later.',
+        ),
+      );
     }
   }
 
@@ -182,7 +188,13 @@ class TtsNotifier extends StateNotifier<TtsState> {
       await _playback.play();
       state = state.copyWith(phase: TtsPhase.playing, clearError: true);
     } catch (error) {
-      _setFailure(error, '播放音频失败。');
+      _setFailure(
+        error,
+        const AppMessage(
+          zh: '播放音频失败。',
+          en: 'Unable to play the audio.',
+        ),
+      );
     }
   }
 
@@ -198,7 +210,13 @@ class TtsNotifier extends StateNotifier<TtsState> {
       await _playback.seek(target);
       state = state.copyWith(position: target, clearError: true);
     } catch (error) {
-      _setFailure(error, '调整播放进度失败。');
+      _setFailure(
+        error,
+        const AppMessage(
+          zh: '调整播放进度失败。',
+          en: 'Unable to seek in the audio.',
+        ),
+      );
     }
   }
 
@@ -208,11 +226,17 @@ class TtsNotifier extends StateNotifier<TtsState> {
     try {
       await _playback.setVolume(normalized);
     } catch (error) {
-      _setFailure(error, '调整音量失败。');
+      _setFailure(
+        error,
+        const AppMessage(
+          zh: '调整音量失败。',
+          en: 'Unable to change the volume.',
+        ),
+      );
     }
   }
 
-  Future<bool> saveCopy() async {
+  Future<bool> saveCopy({String dialogTitle = '保存合成语音'}) async {
     final audioPath = state.audioPath;
     if (audioPath == null) {
       return false;
@@ -223,10 +247,11 @@ class TtsNotifier extends StateNotifier<TtsState> {
         throw const AppException(
           AppErrorCode.fileNotFound,
           '合成音频文件不存在。',
+          englishMessage: 'The generated audio file could not be found.',
         );
       }
       final path = await FilePicker.platform.saveFile(
-        dialogTitle: '保存合成语音',
+        dialogTitle: dialogTitle,
         fileName: 'voxflow_${DateTime.now().millisecondsSinceEpoch}.mp3',
         type: FileType.custom,
         allowedExtensions: const ['mp3'],
@@ -246,15 +271,16 @@ class TtsNotifier extends StateNotifier<TtsState> {
       throw const AppException(
         AppErrorCode.storageFailure,
         '保存 MP3 失败，请重新选择位置。',
+        englishMessage: 'Unable to save the MP3 file. Choose another location.',
       );
     }
   }
 
-  void _setFailure(Object error, String fallback) {
-    final message = error is AppException ? error.message : fallback;
+  void _setFailure(Object error, AppMessage fallback) {
+    final message = error is AppException ? error.localizedMessage : fallback;
     state = state.copyWith(
       phase: TtsPhase.failure,
-      errorMessage: message,
+      error: message,
     );
   }
 

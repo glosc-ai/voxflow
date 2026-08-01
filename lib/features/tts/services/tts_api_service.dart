@@ -45,6 +45,7 @@ class TtsApiService {
         throw const AppException(
           AppErrorCode.serviceUnavailable,
           '语音服务未返回音频。',
+          englishMessage: 'The speech service returned no audio.',
         );
       }
       return _writer(Uint8List.fromList(bytes));
@@ -56,6 +57,7 @@ class TtsApiService {
       throw const AppException(
         AppErrorCode.unknown,
         '语音合成失败，请稍后重试。',
+        englishMessage: 'Speech synthesis failed. Try again later.',
       );
     }
   }

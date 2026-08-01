@@ -22,12 +22,14 @@ class TtsRequest {
       throw const AppException(
         AppErrorCode.invalidConfiguration,
         '请输入要合成的文字。',
+        englishMessage: 'Enter text to synthesize.',
       );
     }
     if (normalizedText.length > AppConstants.maxTtsCharacters) {
       throw const AppException(
         AppErrorCode.invalidConfiguration,
         '文字不能超过 4096 个字符。',
+        englishMessage: 'Text must not exceed 4,096 characters.',
       );
     }
     final normalizedModel = model.trim();
@@ -35,24 +37,29 @@ class TtsRequest {
       throw const AppException(
         AppErrorCode.invalidConfiguration,
         'TTS 模型不能为空。',
+        englishMessage: 'The TTS model cannot be empty.',
       );
     }
     if (!AppConstants.ttsVoicesForModel(normalizedModel).contains(voice)) {
       throw const AppException(
         AppErrorCode.invalidConfiguration,
         '所选音色不适用于当前 TTS 模型。',
+        englishMessage:
+            'The selected voice is not available for the current TTS model.',
       );
     }
     if (speed < 0.25 || speed > 4.0) {
       throw const AppException(
         AppErrorCode.invalidConfiguration,
         '语速必须在 0.25 到 4.0 之间。',
+        englishMessage: 'Speed must be between 0.25 and 4.0.',
       );
     }
     if (responseFormat != 'mp3') {
       throw const AppException(
         AppErrorCode.invalidConfiguration,
         '当前仅支持 MP3 输出格式。',
+        englishMessage: 'Only MP3 output is currently supported.',
       );
     }
     return TtsRequest(

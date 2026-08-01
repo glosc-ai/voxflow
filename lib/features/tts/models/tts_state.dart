@@ -1,3 +1,7 @@
+import 'dart:ui' show Locale;
+
+import '../../../core/errors/app_exception.dart';
+
 enum TtsPhase {
   idle,
   generating,
@@ -17,8 +21,9 @@ class TtsState {
     this.position = Duration.zero,
     this.duration = Duration.zero,
     this.audioPath,
-    this.errorMessage,
-  });
+    this.error,
+    String? errorMessage,
+  }) : _legacyErrorMessage = errorMessage;
 
   final TtsPhase phase;
   final String voice;
@@ -27,7 +32,15 @@ class TtsState {
   final Duration position;
   final Duration duration;
   final String? audioPath;
-  final String? errorMessage;
+  final AppMessage? error;
+  final String? _legacyErrorMessage;
+
+  /// Chinese compatibility getter used by the current views.
+  String? get errorMessage =>
+      error?.resolve(const Locale('zh')) ?? _legacyErrorMessage;
+
+  String? errorMessageFor(Locale locale) =>
+      error?.resolve(locale) ?? _legacyErrorMessage;
 
   bool get hasAudio => audioPath != null;
   bool get isPlaying => phase == TtsPhase.playing;
@@ -42,9 +55,16 @@ class TtsState {
     Duration? duration,
     String? audioPath,
     bool clearAudio = false,
+    AppMessage? error,
     String? errorMessage,
     bool clearError = false,
   }) {
+    final nextError = clearError
+        ? null
+        : (error ?? (errorMessage == null ? this.error : null));
+    final nextLegacyError = clearError || error != null
+        ? null
+        : (errorMessage ?? (this.error == null ? _legacyErrorMessage : null));
     return TtsState(
       phase: phase ?? this.phase,
       voice: voice ?? this.voice,
@@ -53,7 +73,8 @@ class TtsState {
       position: position ?? this.position,
       duration: duration ?? this.duration,
       audioPath: clearAudio ? null : (audioPath ?? this.audioPath),
-      errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
+      error: nextError,
+      errorMessage: nextLegacyError,
     );
   }
 }

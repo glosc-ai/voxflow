@@ -41,6 +41,7 @@ class AudioPlaybackManager implements PlaybackController {
         throw const AppException(
           AppErrorCode.fileNotFound,
           '音频文件不存在。',
+          englishMessage: 'The audio file could not be found.',
         );
       }
       await _player.stop();
@@ -53,6 +54,7 @@ class AudioPlaybackManager implements PlaybackController {
       throw const AppException(
         AppErrorCode.playbackFailed,
         '无法加载音频文件。',
+        englishMessage: 'Unable to load the audio file.',
       );
     }
   }
@@ -63,6 +65,7 @@ class AudioPlaybackManager implements PlaybackController {
       throw const AppException(
         AppErrorCode.playbackFailed,
         '请先生成或选择音频。',
+        englishMessage: 'Generate or select audio first.',
       );
     }
     try {
@@ -71,6 +74,7 @@ class AudioPlaybackManager implements PlaybackController {
       throw const AppException(
         AppErrorCode.playbackFailed,
         '播放音频失败。',
+        englishMessage: 'Unable to play the audio.',
       );
     }
   }
@@ -83,6 +87,7 @@ class AudioPlaybackManager implements PlaybackController {
       throw const AppException(
         AppErrorCode.playbackFailed,
         '暂停播放失败。',
+        englishMessage: 'Unable to pause playback.',
       );
     }
   }
@@ -95,6 +100,7 @@ class AudioPlaybackManager implements PlaybackController {
       throw const AppException(
         AppErrorCode.playbackFailed,
         '停止播放失败。',
+        englishMessage: 'Unable to stop playback.',
       );
     }
   }
@@ -107,6 +113,7 @@ class AudioPlaybackManager implements PlaybackController {
       throw const AppException(
         AppErrorCode.playbackFailed,
         '调整播放进度失败。',
+        englishMessage: 'Unable to seek in the audio.',
       );
     }
   }
@@ -119,6 +126,7 @@ class AudioPlaybackManager implements PlaybackController {
       throw const AppException(
         AppErrorCode.playbackFailed,
         '调整音量失败。',
+        englishMessage: 'Unable to change the volume.',
       );
     }
   }

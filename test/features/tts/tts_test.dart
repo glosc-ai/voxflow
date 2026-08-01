@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
+import 'dart:ui';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -207,6 +208,26 @@ void main() {
     notifier.setVoice('alloy');
     expect(notifier.state.voice, 'zh_female_cancan_uranus_bigtts');
   });
+
+  test('未知合成错误保留中英文 fallback', () async {
+    final playback = _FakePlayback();
+    addTearDown(playback.dispose);
+    final notifier = TtsNotifier(
+      apiService: _FailingTtsService(),
+      playback: playback,
+      historyWriter: ({required text, required audioPath}) async {},
+      model: 'tts-1',
+    );
+    addTearDown(notifier.dispose);
+
+    await notifier.synthesize('测试');
+
+    expect(notifier.state.errorMessage, '语音合成失败，请稍后重试。');
+    expect(
+      notifier.state.errorMessageFor(const Locale('en')),
+      'Speech synthesis failed. Try again later.',
+    );
+  });
 }
 
 class _BytesAdapter implements HttpClientAdapter {
@@ -240,6 +261,15 @@ class _FakeTtsService extends TtsApiService {
 
   @override
   Future<File> synthesize(TtsRequest request) async => file;
+}
+
+class _FailingTtsService extends TtsApiService {
+  _FailingTtsService() : super(DioClient(_settings));
+
+  @override
+  Future<File> synthesize(TtsRequest request) async {
+    throw StateError('internal failure');
+  }
 }
 
 class _FakePlayback implements PlaybackController {
