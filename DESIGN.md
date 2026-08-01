@@ -1,9 +1,9 @@
 # VoxFlow Design System
 
-> 版本：v1.0  
-> 状态：UI 全面重构的设计基线  
-> 更新日期：2026-08-01  
-> 适用平台：Windows Desktop、Android Mobile  
+> 版本：v1.0
+> 状态：UI 全面重构的设计基线
+> 更新日期：2026-08-01
+> 适用平台：Windows Desktop、Android Mobile
 > 支持语言：简体中文、英文
 
 ## 1. 文档目的

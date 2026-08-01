@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -22,8 +24,13 @@ import 'package:voxflow/features/tts/views/tts_screen.dart';
 
 void main() {
   testWidgets('首次提交敏感数据前显示数据与隐私说明', (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.windows;
     SharedPreferences.setMockInitialValues({});
     final preferences = await SharedPreferences.getInstance();
+    await SettingsRepository(preferences).save(
+      const SettingsState(localePreference: AppLocalePreference.zhHans),
+    );
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
 
     await tester.pumpWidget(
       ProviderScope(
@@ -56,14 +63,19 @@ void main() {
 
     expect(find.text('数据与隐私说明'), findsNothing);
     expect(find.byType(NavigationRail), findsOneWidget);
+    debugDefaultTargetPlatformOverride = null;
   });
 
   testWidgets('移动端使用底部导航', (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
     SharedPreferences.setMockInitialValues({});
     final preferences = await SharedPreferences.getInstance();
     await PrivacyNoticeRepository(preferences).acknowledge();
     await tester.binding.setSurfaceSize(const Size(600, 900));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
+    addTearDown(() {
+      debugDefaultTargetPlatformOverride = null;
+      tester.binding.setSurfaceSize(null);
+    });
 
     await tester.pumpWidget(
       ProviderScope(
@@ -84,16 +96,22 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.byType(BottomNavigationBar), findsOneWidget);
+    expect(find.byKey(const Key('appBottomNavigation')), findsOneWidget);
+    expect(find.byType(BottomNavigationBar), findsNothing);
     expect(find.byType(NavigationRail), findsNothing);
+    debugDefaultTargetPlatformOverride = null;
   });
 
   testWidgets('桌面端使用侧边导航', (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.windows;
     SharedPreferences.setMockInitialValues({});
     final preferences = await SharedPreferences.getInstance();
     await PrivacyNoticeRepository(preferences).acknowledge();
     await tester.binding.setSurfaceSize(const Size(1200, 800));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
+    addTearDown(() {
+      debugDefaultTargetPlatformOverride = null;
+      tester.binding.setSurfaceSize(null);
+    });
 
     await tester.pumpWidget(
       ProviderScope(
@@ -116,6 +134,155 @@ void main() {
 
     expect(find.byType(NavigationRail), findsOneWidget);
     expect(find.byType(BottomNavigationBar), findsNothing);
+    debugDefaultTargetPlatformOverride = null;
+  });
+
+  testWidgets('AppShell 支持 Ctrl+1 至 Ctrl+4 键盘导航', (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+    SharedPreferences.setMockInitialValues({});
+    final preferences = await SharedPreferences.getInstance();
+    await PrivacyNoticeRepository(preferences).acknowledge();
+    await tester.binding.setSurfaceSize(const Size(1200, 800));
+    addTearDown(() {
+      debugDefaultTargetPlatformOverride = null;
+      tester.binding.setSurfaceSize(null);
+    });
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          sharedPreferencesProvider.overrideWithValue(preferences),
+          ttsPlaybackManagerProvider.overrideWithValue(
+            const _SilentPlaybackController(),
+          ),
+          historyPlaybackManagerProvider.overrideWithValue(
+            const _SilentPlaybackController(),
+          ),
+          historyRepositoryProvider.overrideWithValue(
+            _MemoryHistoryRepository(),
+          ),
+        ],
+        child: const VoxFlowApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(_selectedNavigationIndex(tester), 0);
+    for (final (key, expectedIndex) in [
+      (LogicalKeyboardKey.digit2, 1),
+      (LogicalKeyboardKey.digit3, 2),
+      (LogicalKeyboardKey.digit4, 3),
+      (LogicalKeyboardKey.digit1, 0),
+    ]) {
+      await _sendControlShortcut(tester, key);
+      expect(_selectedNavigationIndex(tester), expectedIndex);
+    }
+    debugDefaultTargetPlatformOverride = null;
+  });
+
+  testWidgets('浅色、深色与系统主题可切换并持久化', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final preferences = await SharedPreferences.getInstance();
+    await PrivacyNoticeRepository(preferences).acknowledge();
+    await tester.binding.setSurfaceSize(const Size(1200, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          sharedPreferencesProvider.overrideWithValue(preferences),
+          ttsPlaybackManagerProvider.overrideWithValue(
+            const _SilentPlaybackController(),
+          ),
+          historyPlaybackManagerProvider.overrideWithValue(
+            const _SilentPlaybackController(),
+          ),
+          historyRepositoryProvider.overrideWithValue(
+            _MemoryHistoryRepository(),
+          ),
+        ],
+        child: const VoxFlowApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await _sendControlShortcut(tester, LogicalKeyboardKey.digit4);
+
+    expect(_appThemeMode(tester), ThemeMode.system);
+    var current = AppThemePreference.system;
+    for (final (preference, expectedMode) in [
+      (AppThemePreference.dark, ThemeMode.dark),
+      (AppThemePreference.light, ThemeMode.light),
+      (AppThemePreference.system, ThemeMode.system),
+    ]) {
+      final themeField = find.byKey(
+        ValueKey('themeMode:${current.name}'),
+      );
+      await tester.ensureVisible(themeField);
+      await tester.pumpAndSettle();
+      await tester.tap(themeField);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(_englishThemeLabel(preference)).last);
+      await tester.pumpAndSettle();
+
+      expect(_appThemeMode(tester), expectedMode);
+      expect(
+        SettingsRepository(preferences).load().themePreference,
+        preference,
+      );
+      current = preference;
+    }
+  });
+
+  testWidgets('200% 大字体下窄屏主界面无溢出或异常', (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    SharedPreferences.setMockInitialValues({});
+    final preferences = await SharedPreferences.getInstance();
+    await PrivacyNoticeRepository(preferences).acknowledge();
+    await tester.binding.setSurfaceSize(const Size(360, 640));
+    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(() {
+      debugDefaultTargetPlatformOverride = null;
+      tester.binding.setSurfaceSize(null);
+      tester.platformDispatcher.clearTextScaleFactorTestValue();
+    });
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          sharedPreferencesProvider.overrideWithValue(preferences),
+          ttsPlaybackManagerProvider.overrideWithValue(
+            const _SilentPlaybackController(),
+          ),
+          historyPlaybackManagerProvider.overrideWithValue(
+            const _SilentPlaybackController(),
+          ),
+          historyRepositoryProvider.overrideWithValue(
+            _MemoryHistoryRepository(),
+          ),
+        ],
+        child: const VoxFlowApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('appBottomNavigation')), findsOneWidget);
+    expect(find.byType(BottomNavigationBar), findsNothing);
+    expect(tester.takeException(), isNull);
+    for (final icon in [
+      Icons.record_voice_over_outlined,
+      Icons.history_outlined,
+      Icons.settings_outlined,
+      Icons.graphic_eq_outlined,
+    ]) {
+      final destination = find.descendant(
+        of: find.byKey(const Key('appBottomNavigation')),
+        matching: find.byIcon(icon),
+      );
+      await tester.tap(destination);
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    }
+    debugDefaultTargetPlatformOverride = null;
   });
 
   testWidgets('历史记录可搜索并确认删除', (tester) async {
@@ -229,7 +396,10 @@ void main() {
       ),
     );
 
-    await tester.tap(find.byKey(const Key('fetchModelsButton')));
+    final fetchModelsButton = find.byKey(const Key('fetchModelsButton'));
+    await tester.ensureVisible(fetchModelsButton);
+    await tester.pumpAndSettle();
+    await tester.tap(fetchModelsButton);
     await tester.pumpAndSettle();
 
     expect(find.text('whisper-1'), findsNothing);
@@ -237,15 +407,24 @@ void main() {
     expect(find.text('gpt-4o-transcribe'), findsOneWidget);
     expect(find.text('gpt-4o-mini-tts'), findsOneWidget);
 
-    await tester.tap(find.byKey(const Key('sttModelField')));
+    final sttModelField = find.byKey(const Key('sttModelField'));
+    await tester.ensureVisible(sttModelField);
+    await tester.pumpAndSettle();
+    await tester.tap(sttModelField);
     await tester.pumpAndSettle();
     expect(find.text('gpt-4o-transcribe'), findsWidgets);
     expect(find.text('whisper-1'), findsNothing);
     expect(find.text('chat-model'), findsNothing);
-    await tester.tap(find.text('gpt-4o-transcribe').last);
+    final sttModelOption = find.text('gpt-4o-transcribe').last;
+    await tester.ensureVisible(sttModelOption);
+    await tester.pumpAndSettle();
+    await tester.tap(sttModelOption);
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const Key('ttsModelField')));
+    final ttsModelField = find.byKey(const Key('ttsModelField'));
+    await tester.ensureVisible(ttsModelField);
+    await tester.pumpAndSettle();
+    await tester.tap(ttsModelField);
     await tester.pumpAndSettle();
     expect(find.text('gpt-4o-mini-tts'), findsWidgets);
     expect(find.text('tts-1'), findsNothing);
@@ -277,7 +456,10 @@ void main() {
       ),
     );
 
-    await tester.tap(find.byKey(const Key('fetchModelsButton')));
+    final fetchModelsButton = find.byKey(const Key('fetchModelsButton'));
+    await tester.ensureVisible(fetchModelsButton);
+    await tester.pumpAndSettle();
+    await tester.tap(fetchModelsButton);
     await tester.pumpAndSettle();
 
     expect(
@@ -327,6 +509,34 @@ void main() {
     expect(find.text('Seed TTS 使用火山模型专属 Speaker ID。'), findsOneWidget);
     expect(find.text('alloy'), findsNothing);
   });
+}
+
+int? _selectedNavigationIndex(WidgetTester tester) {
+  return tester
+      .widget<NavigationRail>(find.byType(NavigationRail))
+      .selectedIndex;
+}
+
+ThemeMode? _appThemeMode(WidgetTester tester) {
+  return tester.widget<MaterialApp>(find.byType(MaterialApp)).themeMode;
+}
+
+String _englishThemeLabel(AppThemePreference preference) {
+  return switch (preference) {
+    AppThemePreference.system => 'Follow system',
+    AppThemePreference.light => 'Light',
+    AppThemePreference.dark => 'Dark',
+  };
+}
+
+Future<void> _sendControlShortcut(
+  WidgetTester tester,
+  LogicalKeyboardKey key,
+) async {
+  await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+  await tester.sendKeyEvent(key);
+  await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+  await tester.pumpAndSettle();
 }
 
 class _FailureTtsNotifier extends TtsNotifier {
