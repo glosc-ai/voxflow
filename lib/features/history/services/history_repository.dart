@@ -58,6 +58,7 @@ class HistoryRepository {
       throw const AppException(
         AppErrorCode.storageFailure,
         '无法打开本地历史数据库。',
+        englishMessage: 'Unable to open the local history database.',
       );
     }
   }
@@ -73,6 +74,8 @@ class HistoryRepository {
     throw const AppException(
       AppErrorCode.storageFailure,
       '当前平台不支持历史数据库。',
+      englishMessage:
+          'History storage is not supported on the current platform.',
     );
   }
 
@@ -97,6 +100,7 @@ class HistoryRepository {
       throw const AppException(
         AppErrorCode.storageFailure,
         '无法保存历史记录。',
+        englishMessage: 'Unable to save the history record.',
       );
     }
   }
@@ -119,6 +123,7 @@ class HistoryRepository {
       throw const AppException(
         AppErrorCode.storageFailure,
         '无法读取历史记录。',
+        englishMessage: 'Unable to load history.',
       );
     }
   }
@@ -137,6 +142,7 @@ class HistoryRepository {
       throw const AppException(
         AppErrorCode.storageFailure,
         '无法删除历史记录。',
+        englishMessage: 'Unable to delete the history record.',
       );
     }
   }

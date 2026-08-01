@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:ui' show Locale;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -44,8 +45,30 @@ class HistoryNotifier extends StateNotifier<AsyncValue<List<HistoryRecord>>> {
     if (query != null) {
       _query = query;
     }
-    state = const AsyncValue.loading();
-    state = await AsyncValue.guard(() => _repository.search(_query));
+    final cachedRecords = state.valueOrNull;
+    state = cachedRecords == null
+        ? const AsyncValue.loading()
+        : const AsyncValue<List<HistoryRecord>>.loading().copyWithPrevious(
+            AsyncValue.data(cachedRecords),
+          );
+    try {
+      state = AsyncValue.data(await _repository.search(_query));
+    } catch (error, stackTrace) {
+      final localizedError = error is AppException
+          ? error
+          : const AppException(
+              AppErrorCode.storageFailure,
+              '无法读取历史记录。',
+              englishMessage: 'Unable to load history.',
+            );
+      final failure = AsyncValue<List<HistoryRecord>>.error(
+        localizedError,
+        stackTrace,
+      );
+      state = cachedRecords == null
+          ? failure
+          : failure.copyWithPrevious(AsyncValue.data(cachedRecords));
+    }
   }
 
   Future<HistoryRecord> add({
@@ -70,6 +93,7 @@ class HistoryNotifier extends StateNotifier<AsyncValue<List<HistoryRecord>>> {
       throw const AppException(
         AppErrorCode.storageFailure,
         '无法保存历史记录。',
+        englishMessage: 'Unable to save the history record.',
       );
     }
   }
@@ -80,6 +104,7 @@ class HistoryNotifier extends StateNotifier<AsyncValue<List<HistoryRecord>>> {
       throw const AppException(
         AppErrorCode.storageFailure,
         '历史记录无效，无法删除。',
+        englishMessage: 'The history record is invalid and cannot be deleted.',
       );
     }
     await _repository.delete(id);
@@ -103,12 +128,21 @@ class HistoryPlaybackState {
   const HistoryPlaybackState({
     this.recordId,
     this.isPlaying = false,
-    this.errorMessage,
-  });
+    this.error,
+    String? errorMessage,
+  }) : _legacyErrorMessage = errorMessage;
 
   final int? recordId;
   final bool isPlaying;
-  final String? errorMessage;
+  final AppMessage? error;
+  final String? _legacyErrorMessage;
+
+  /// Chinese compatibility getter used by the current views.
+  String? get errorMessage =>
+      error?.resolve(const Locale('zh')) ?? _legacyErrorMessage;
+
+  String? errorMessageFor(Locale locale) =>
+      error?.resolve(locale) ?? _legacyErrorMessage;
 }
 
 class HistoryPlaybackNotifier extends StateNotifier<HistoryPlaybackState> {
@@ -137,7 +171,12 @@ class HistoryPlaybackNotifier extends StateNotifier<HistoryPlaybackState> {
     } catch (error) {
       state = HistoryPlaybackState(
         recordId: record.id,
-        errorMessage: error is AppException ? error.message : '无法播放历史音频。',
+        error: error is AppException
+            ? error.localizedMessage
+            : const AppMessage(
+                zh: '无法播放历史音频。',
+                en: 'Unable to play the history audio.',
+              ),
       );
     }
   }

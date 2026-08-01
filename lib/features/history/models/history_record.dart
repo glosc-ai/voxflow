@@ -2,8 +2,6 @@ enum HistoryType {
   stt,
   tts;
 
-  String get label => this == HistoryType.stt ? '语音转文字' : '文字转语音';
-
   static HistoryType fromStorage(String value) {
     return value == HistoryType.tts.name ? HistoryType.tts : HistoryType.stt;
   }
