@@ -178,6 +178,8 @@ class DioClient {
       throw const AppException(
         AppErrorCode.unknown,
         'API 连通性测试失败，请检查配置。',
+        englishMessage:
+            'The API connection test failed. Check the configuration.',
       );
     }
   }
@@ -194,6 +196,7 @@ class DioClient {
         throw const AppException(
           AppErrorCode.invalidConfiguration,
           '模型列表响应格式不兼容。',
+          englishMessage: 'The model-list response format is not supported.',
         );
       }
       final data = payload['data'];
@@ -201,6 +204,7 @@ class DioClient {
         throw const AppException(
           AppErrorCode.invalidConfiguration,
           '模型列表响应缺少 data 数组。',
+          englishMessage: 'The model-list response is missing the data array.',
         );
       }
       final ids = <String>[];
@@ -216,6 +220,7 @@ class DioClient {
         throw const AppException(
           AppErrorCode.invalidConfiguration,
           '服务未返回可用模型。',
+          englishMessage: 'The service returned no available models.',
         );
       }
       return ids;
@@ -227,6 +232,7 @@ class DioClient {
       throw const AppException(
         AppErrorCode.unknown,
         '无法获取模型列表，请稍后重试。',
+        englishMessage: 'Unable to load the model list. Try again later.',
       );
     }
   }
@@ -246,60 +252,90 @@ class DioClient {
       case DioExceptionType.transformTimeout:
         return AppException(
           AppErrorCode.networkTimeout,
-          _withDetail('请求超时，请检查网络后重试。', detail),
+          '请求超时，请检查网络后重试。',
+          englishMessage:
+              'The request timed out. Check the network and try again.',
+          technicalDetail: detail,
         );
       case DioExceptionType.connectionError:
         return AppException(
           AppErrorCode.serviceUnavailable,
-          _withDetail('无法连接 API 服务，请检查地址和网络。', detail),
+          '无法连接 API 服务，请检查地址和网络。',
+          englishMessage:
+              'Unable to connect to the API service. Check the address and network.',
+          technicalDetail: detail,
         );
       case DioExceptionType.cancel:
         return AppException(
           AppErrorCode.unknown,
-          _withDetail('请求已取消。', detail),
+          '请求已取消。',
+          englishMessage: 'The request was canceled.',
+          technicalDetail: detail,
         );
       case DioExceptionType.badResponse:
         final status = error.response?.statusCode;
         if (status == 401 || status == 403) {
           return AppException(
             AppErrorCode.unauthorized,
-            _withDetail('API Key 无效或无权访问该服务。', detail),
+            'API Key 无效或无权访问该服务。',
+            englishMessage:
+                'The API key is invalid or lacks access to this service.',
+            technicalDetail: detail,
           );
         }
         if (status == 413) {
           return AppException(
             AppErrorCode.fileTooLarge,
-            _withDetail('上传文件超过服务允许的大小。', detail),
+            '上传文件超过服务允许的大小。',
+            englishMessage: 'The uploaded file exceeds the service size limit.',
+            technicalDetail: detail,
           );
         }
         if (status == 429) {
           return AppException(
             AppErrorCode.rateLimited,
-            _withDetail('请求过于频繁或额度不足，请稍后重试。', detail),
+            '请求过于频繁或额度不足，请稍后重试。',
+            englishMessage:
+                'Too many requests were sent, or the quota is insufficient. Try again later.',
+            technicalDetail: detail,
           );
         }
         if (status != null && status >= 500) {
           return AppException(
             AppErrorCode.serviceUnavailable,
-            _withDetail('API 服务暂时不可用，请稍后重试。', detail),
+            'API 服务暂时不可用，请稍后重试。',
+            englishMessage:
+                'The API service is temporarily unavailable. Try again later.',
+            technicalDetail: detail,
           );
         }
         final baseMessage = status == 404
             ? 'API 地址不兼容：未找到请求接口。'
             : 'API 请求失败${status == null ? '' : '（$status）'}。';
+        final englishMessage = status == 404
+            ? 'The API address is incompatible: the requested endpoint was not found.'
+            : status == null
+                ? 'The API request failed.'
+                : 'The API request failed (status $status).';
         return AppException(
           AppErrorCode.serviceUnavailable,
-          _withDetail(baseMessage, detail),
+          baseMessage,
+          englishMessage: englishMessage,
+          technicalDetail: detail,
         );
       case DioExceptionType.badCertificate:
         return AppException(
           AppErrorCode.serviceUnavailable,
-          _withDetail('API 服务的 HTTPS 证书无效。', detail),
+          'API 服务的 HTTPS 证书无效。',
+          englishMessage: "The API service's HTTPS certificate is invalid.",
+          technicalDetail: detail,
         );
       case DioExceptionType.unknown:
         return AppException(
           AppErrorCode.unknown,
-          _withDetail('请求失败，请稍后重试。', detail),
+          '请求失败，请稍后重试。',
+          englishMessage: 'The request failed. Try again later.',
+          technicalDetail: detail,
         );
     }
   }
@@ -381,12 +417,5 @@ class DioClient {
     } on FormatException {
       return trimmed;
     }
-  }
-
-  static String _withDetail(String message, String? detail) {
-    if (detail == null || detail.isEmpty) {
-      return message;
-    }
-    return '$message 服务返回：$detail';
   }
 }

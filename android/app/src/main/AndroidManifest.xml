@@ -9,7 +9,7 @@
         android:maxSdkVersion="28" />
 
     <application
-        android:label="声流 VoxFlow"
+        android:label="@string/app_name"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
