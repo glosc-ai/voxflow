@@ -12,6 +12,89 @@
 - OpenAI 官方或 HTTPS 兼容代理的 API Root、密钥和模型设置
 - 响应式 Material 3 界面：移动端底部导航、桌面端侧边导航
 
+## 项目架构
+
+VoxFlow 采用 Feature-First 的轻量分层架构。业务模块主要按模型、状态编排、
+服务和视图拆分；Riverpod 同时负责全局状态管理与依赖装配。网络、路径、日志、
+错误处理和主题等跨功能能力集中在 `core/`。
+
+### 启动与依赖装配
+
+应用启动链如下：
+
+```text
+main.dart → VoxFlowBootstrap → ProviderScope → VoxFlowApp
+          → PrivacyNoticeGate → AppShell
+```
+
+`VoxFlowBootstrap` 会先初始化 SharedPreferences，再将其注入 Riverpod。
+`VoxFlowApp` 根据设置装配主题和语言，并在进入主界面前显示数据与隐私说明；
+`AppShell` 使用 `IndexedStack` 保存各功能页面状态，并在 Android 显示底部导航、
+在 Windows 显示 `NavigationRail`。
+
+### 目录结构
+
+```text
+lib/
+├── main.dart               # Flutter 入口与平台启动适配
+├── bootstrap.dart          # 本地设置初始化与 ProviderScope 装配
+├── app.dart                # MaterialApp、主题、语言和隐私门禁
+├── core/                   # 网络、路径、日志、错误、主题等共享基础设施
+│   ├── constants/
+│   ├── errors/
+│   ├── logging/
+│   ├── network/
+│   ├── services/
+│   ├── theme/
+│   └── utils/
+├── features/
+│   ├── shell/              # 响应式导航、快捷键与页面容器
+│   ├── settings/           # API、模型、主题、语言及隐私设置
+│   ├── stt/                # 录音、导入、转录及 TXT/SRT 导出
+│   ├── tts/                # 语音合成、播放与 MP3 保存
+│   └── history/            # SQLite 历史、搜索、重播与删除
+├── l10n/                   # 简体中文与英文文本
+└── widgets/                # 跨功能共享 UI 组件
+```
+
+每个业务功能按需使用以下子目录：
+
+- `models/`：不可变状态、请求和数据记录
+- `providers/`：Riverpod Provider、StateNotifier 和业务流程编排
+- `services/`：网络、录音、播放、文件或数据库访问
+- `views/`：页面、交互入口和状态呈现
+- `widgets/`：功能内部复用的输入控件或展示组件
+
+### 依赖与数据流
+
+```mermaid
+flowchart LR
+    View["Views / AppShell"] --> State["Riverpod Providers / StateNotifier"]
+    State --> Service["Feature Services / Repositories"]
+    Service --> Core["DioClient / 路径 / 日志 / 错误"]
+    Service --> Platform["录音 / 播放 / SharedPreferences / SQLite"]
+    Core --> Remote["OpenAI 兼容 HTTP / SeedASR WebSocket"]
+```
+
+- 设置模块通过 SharedPreferences 保存 API、模型、主题和语言配置；网络请求在发起时
+  动态读取当前配置。
+- STT 根据模型选择 Whisper/OpenAI 兼容的 HTTP multipart，或 SeedASR 二进制
+  WebSocket；TTS 通过 `/audio/speech` 获取 MP3 字节。
+- STT/TTS 仅在成功后写入历史。SQLite 保存类型、文字、音频路径和创建时间，
+  实际音频文件保存在 `path_provider` 返回的应用管理目录。
+- 页面主要通过 `ref.watch`/`ref.read` 驱动 Provider；焦点、输入控制器和启动重试等
+  局部界面状态仍由 Widget 生命周期管理。
+
+### 平台边界与测试接缝
+
+- Android 使用运行时麦克风权限、原生 `sqflite` 和底部导航。
+- Windows 跳过 Android 权限申请，使用 `sqflite_common_ffi`、桌面侧边导航及少量
+  MethodChannel 适配；录音插件仍负责检查麦克风是否可用。
+- 两个平台的临时文件、数据库和受管音频路径都由 `path_provider` 解析，不硬编码
+  系统目录。
+- 网络适配器、WebSocket 连接器、数据库工厂、时钟、录音器和播放器均保留可注入
+  接缝，自动测试可以使用伪服务和临时数据库而不调用真实 API。
+
 ## 环境
 
 - Flutter 3.x / Dart 3.x
