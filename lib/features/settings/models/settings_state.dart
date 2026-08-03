@@ -33,6 +33,7 @@ enum SettingsOperation {
   saving,
   testingConnection,
   fetchingModels,
+  resetting,
 }
 
 class SettingsState {

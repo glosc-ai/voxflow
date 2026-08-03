@@ -69,4 +69,47 @@ class SettingsRepository {
       );
     }
   }
+
+  /// Removes only VoxFlow's configurable preferences.
+  ///
+  /// Privacy acknowledgement, history, managed audio, and diagnostics use
+  /// separate storage and must not be affected by this operation.
+  Future<void> resetLocalPreferences() async {
+    final snapshot = load();
+    try {
+      final results = await Future.wait([
+        _preferences.remove(_apiKeyKey),
+        _preferences.remove(_baseUrlKey),
+        _preferences.remove(_sttModelKey),
+        _preferences.remove(_ttsModelKey),
+        _preferences.remove(_themeModeKey),
+        _preferences.remove(_localeKey),
+      ]);
+      if (results.any((success) => !success)) {
+        throw const AppException(
+          AppErrorCode.storageFailure,
+          '无法重置本机偏好，请重试。',
+          englishMessage: 'Local preferences could not be reset. Try again.',
+        );
+      }
+    } on AppException {
+      try {
+        await save(snapshot);
+      } catch (_) {
+        // Best-effort rollback keeps the original failure actionable.
+      }
+      rethrow;
+    } catch (_) {
+      try {
+        await save(snapshot);
+      } catch (_) {
+        // Best-effort rollback keeps the original failure actionable.
+      }
+      throw const AppException(
+        AppErrorCode.storageFailure,
+        '无法重置本机偏好，请重试。',
+        englishMessage: 'Local preferences could not be reset. Try again.',
+      );
+    }
+  }
 }

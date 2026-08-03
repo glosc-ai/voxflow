@@ -256,4 +256,79 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
       rethrow;
     }
   }
+
+  Future<AppMessage> resetLocalPreferences() async {
+    final previous = state;
+    state = state.copyWith(
+      activeOperation: SettingsOperation.resetting,
+      clearMessage: true,
+    );
+    try {
+      await _repository.resetLocalPreferences();
+      const feedback = AppMessage(
+        zh: '本地偏好已重置。',
+        en: 'Local preferences were reset.',
+      );
+      state = const SettingsState().copyWith(feedback: feedback);
+      return feedback;
+    } on AppException catch (error) {
+      state = previous.copyWith(
+        clearActiveOperation: true,
+        feedback: error.localizedMessage,
+      );
+      rethrow;
+    } catch (_) {
+      final error = AppException.localized(
+        AppErrorCode.storageFailure,
+        const AppMessage(
+          zh: '无法重置本机偏好，请重试。',
+          en: 'Local preferences could not be reset. Try again.',
+        ),
+      );
+      state = previous.copyWith(
+        clearActiveOperation: true,
+        feedback: error.localizedMessage,
+      );
+      throw error;
+    }
+  }
+
+  Future<void> setSttModel(String model) async {
+    await _setSpeechModel(model, isStt: true);
+  }
+
+  Future<void> setTtsModel(String model) async {
+    await _setSpeechModel(model, isStt: false);
+  }
+
+  Future<void> _setSpeechModel(
+    String model, {
+    required bool isStt,
+  }) async {
+    final normalized = model.trim();
+    if (normalized.isEmpty) {
+      throw const AppException(
+        AppErrorCode.invalidConfiguration,
+        '模型名称不能为空。',
+        englishMessage: 'The model name cannot be empty.',
+      );
+    }
+    final current = isStt ? state.sttModel : state.ttsModel;
+    if (normalized == current) {
+      return;
+    }
+
+    final previous = state;
+    state = state.copyWith(
+      sttModel: isStt ? normalized : null,
+      ttsModel: isStt ? null : normalized,
+      clearMessage: true,
+    );
+    try {
+      await _repository.save(state);
+    } catch (_) {
+      state = previous;
+      rethrow;
+    }
+  }
 }

@@ -126,6 +126,39 @@ void main() {
       'zh_female_cancan_uranus_bigtts',
     );
   });
+
+  test('重置本地偏好恢复默认状态且不清除隐私确认', () async {
+    SharedPreferences.setMockInitialValues({
+      'privacy_notice.acknowledged.v1': true,
+    });
+    final preferences = await SharedPreferences.getInstance();
+    final repository = SettingsRepository(preferences);
+    await repository.save(
+      const SettingsState(
+        apiKey: 'test-key',
+        baseUrl: 'https://proxy.example/v1',
+        sttModel: 'gpt-4o-transcribe',
+        ttsModel: 'gpt-4o-mini-tts',
+        themePreference: AppThemePreference.dark,
+        localePreference: AppLocalePreference.english,
+      ),
+    );
+    final notifier = SettingsNotifier(repository);
+    addTearDown(notifier.dispose);
+
+    final feedback = await notifier.resetLocalPreferences();
+
+    const defaults = SettingsState();
+    expect(notifier.state.apiKey, defaults.apiKey);
+    expect(notifier.state.baseUrl, defaults.baseUrl);
+    expect(notifier.state.sttModel, defaults.sttModel);
+    expect(notifier.state.ttsModel, defaults.ttsModel);
+    expect(notifier.state.themePreference, defaults.themePreference);
+    expect(notifier.state.localePreference, defaults.localePreference);
+    expect(
+        feedback.resolve(const Locale('en')), 'Local preferences were reset.');
+    expect(preferences.getBool('privacy_notice.acknowledged.v1'), isTrue);
+  });
 }
 
 class _FakeRecorder implements AudioRecordManager {

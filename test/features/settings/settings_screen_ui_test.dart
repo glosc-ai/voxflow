@@ -63,6 +63,84 @@ void main() {
       labelSize,
     );
   });
+
+  testWidgets('Windows 桌面设置确认后只重置偏好并同步表单', (tester) async {
+    SharedPreferences.setMockInitialValues({
+      'privacy_notice.acknowledged.v1': true,
+    });
+    final preferences = await SharedPreferences.getInstance();
+    final repository = SettingsRepository(preferences);
+    await repository.save(
+      const SettingsState(
+        apiKey: 'desktop-secret',
+        baseUrl: 'https://proxy.example/v1',
+        sttModel: 'gpt-4o-transcribe',
+        ttsModel: 'gpt-4o-mini-tts',
+        themePreference: AppThemePreference.dark,
+        localePreference: AppLocalePreference.english,
+      ),
+    );
+    final notifier = SettingsNotifier(repository);
+    await tester.binding.setSurfaceSize(const Size(1200, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          settingsProvider.overrideWith((ref) => notifier),
+        ],
+        child: MaterialApp(
+          locale: AppLocalizations.englishLocale,
+          supportedLocales: AppLocalizations.supportedLocales,
+          localizationsDelegates: AppLocalizations.delegates,
+          theme: AppTheme.light.copyWith(platform: TargetPlatform.windows),
+          home: const SettingsScreen(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final resetButton = find.byKey(
+      const Key('resetLocalPreferencesButton'),
+    );
+    await tester.ensureVisible(resetButton);
+    await tester.tap(resetButton);
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('resetLocalPreferencesConfirmButton')),
+      findsOneWidget,
+    );
+
+    await tester.tap(
+      find.byKey(const Key('resetLocalPreferencesConfirmButton')),
+    );
+    await tester.pumpAndSettle();
+
+    const defaults = SettingsState();
+    expect(notifier.state.apiKey, defaults.apiKey);
+    expect(notifier.state.baseUrl, defaults.baseUrl);
+    expect(notifier.state.sttModel, defaults.sttModel);
+    expect(notifier.state.ttsModel, defaults.ttsModel);
+    expect(preferences.getBool('privacy_notice.acknowledged.v1'), isTrue);
+    expect(
+      tester
+          .widget<TextFormField>(
+            find.byKey(const Key('apiKeyField')),
+          )
+          .controller
+          ?.text,
+      isEmpty,
+    );
+    expect(
+      tester
+          .widget<TextFormField>(
+            find.byKey(const Key('baseUrlField')),
+          )
+          .controller
+          ?.text,
+      defaults.baseUrl,
+    );
+  });
 }
 
 class _TestSettingsNotifier extends SettingsNotifier {

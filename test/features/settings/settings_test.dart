@@ -53,6 +53,32 @@ void main() {
     expect(restored.baseUrl, 'https://proxy.example/v1');
   });
 
+  test('重置本地偏好只移除设置键并保留隐私确认', () async {
+    SharedPreferences.setMockInitialValues({
+      'privacy_notice.acknowledged.v1': true,
+      'settings.api_key': 'test-secret',
+      'settings.base_url': 'https://proxy.example/v1',
+      'settings.stt_model': 'gpt-4o-transcribe',
+      'settings.tts_model': 'gpt-4o-mini-tts',
+      'settings.theme_mode': AppThemePreference.dark.name,
+      'settings.locale': AppLocalePreference.english.name,
+    });
+    final preferences = await SharedPreferences.getInstance();
+    final repository = SettingsRepository(preferences);
+
+    await repository.resetLocalPreferences();
+
+    final restored = repository.load();
+    const defaults = SettingsState();
+    expect(restored.apiKey, defaults.apiKey);
+    expect(restored.baseUrl, defaults.baseUrl);
+    expect(restored.sttModel, defaults.sttModel);
+    expect(restored.ttsModel, defaults.ttsModel);
+    expect(restored.themePreference, defaults.themePreference);
+    expect(restored.localePreference, defaults.localePreference);
+    expect(preferences.getBool('privacy_notice.acknowledged.v1'), isTrue);
+  });
+
   test('Dio 错误映射不包含服务端正文或密钥', () {
     final request = RequestOptions(
       path: '/models',
