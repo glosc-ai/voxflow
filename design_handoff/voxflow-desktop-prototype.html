@@ -1,0 +1,1197 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VoxFlow · 语音工作台</title>
+<script>
+  // 首帧前应用保存的主题，避免闪烁
+  try { document.documentElement.dataset.theme = localStorage.getItem('vf-theme') || 'light'; } catch (e) {}
+</script>
+<style>
+  /* ─── 令牌：唯一允许出现颜色的地方（取自 brand-spec.md / DESIGN.md）── */
+  :root {
+    --font-display: -apple-system, "Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei", "PingFang SC", "Noto Sans SC", system-ui, sans-serif;
+    --font-body:    -apple-system, "Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei", "PingFang SC", "Noto Sans SC", system-ui, sans-serif;
+    --font-mono:    ui-monospace, "Cascadia Code", "Cascadia Mono", "JetBrains Mono", Consolas, monospace;
+
+    --r-xs: 6px;
+    --r-sm: 8px;    /* 标签 / 徽章 */
+    --r-md: 13px;   /* 输入 / 按钮 / 小卡 */
+    --r-lg: 19px;   /* 标准卡 */
+    --r-xl: 28px;   /* 录音面板 / 播放条 */
+
+    --ease: .2s ease;
+  }
+  [data-theme="light"] {
+    --bg: #F8F9FA; --surface: #FFFFFF; --fg: #0F172A; --muted: #64748B; --border: #E2E8F0;
+    --accent: #5D5FEF; --success: #10B981; --danger: #EF4444; --on-accent: #FFFFFF;
+    --accent-soft: color-mix(in oklch, var(--accent) 10%, transparent);
+    --success-soft: color-mix(in oklch, var(--success) 12%, transparent);
+    --danger-soft: color-mix(in oklch, var(--danger) 10%, transparent);
+    --fg-soft: color-mix(in oklch, var(--fg) 5%, transparent);
+    --shadow-card: 0 4px 16px rgb(15 23 42 / .04);
+    --shadow-float: 0 8px 32px rgb(15 23 42 / .08);
+    --glass: color-mix(in oklch, var(--surface) 78%, transparent);
+    color-scheme: light;
+  }
+  [data-theme="dark"] {
+    --bg: #121316; --surface: #1E1F23; --fg: #F8FAFC; --muted: #94A3B8; --border: #2E3038;
+    --accent: #6366F1; --success: #34D399; --danger: #F87171; --on-accent: #F8FAFC;
+    --accent-soft: color-mix(in oklch, var(--accent) 14%, transparent);
+    --success-soft: color-mix(in oklch, var(--success) 14%, transparent);
+    --danger-soft: color-mix(in oklch, var(--danger) 14%, transparent);
+    --fg-soft: color-mix(in oklch, var(--fg) 6%, transparent);
+    --shadow-card: 0 4px 16px rgb(0 0 0 / .24);
+    --shadow-float: 0 12px 40px rgb(0 0 0 / .42);
+    --glass: color-mix(in oklch, var(--surface) 74%, transparent);
+    color-scheme: dark;
+  }
+
+  /* ─── 基础 ─── */
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg);
+    font-family: var(--font-body); font-size: 15px; line-height: 1.55;
+    -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+    transition: background var(--ease), color var(--ease);
+  }
+  svg { display: block; }
+  button { font: inherit; cursor: pointer; }
+  button:focus-visible, textarea:focus-visible {
+    outline: 2px solid color-mix(in oklch, var(--accent) 55%, transparent); outline-offset: 2px;
+  }
+  ::selection { background: var(--accent-soft); }
+
+  /* ─── App Shell：悬浮导航栏 + 内容舞台 ─── */
+  .app { display: flex; flex-direction: column; height: 100dvh; padding: 0 16px 16px; }
+  .app-row { display: flex; gap: 16px; flex: 1; min-height: 0; }
+
+  /* ─── 悬浮标题栏（Windows 窗口层） ─── */
+  .titlebar {
+    height: 52px; flex: none; display: flex; align-items: center; justify-content: space-between;
+    padding: 0 20px 0 24px; margin-bottom: 16px;
+    background: var(--glass); backdrop-filter: blur(10px) saturate(1.3);
+    border: 1px solid var(--border); border-radius: 0 0 16px 16px;
+    box-shadow: var(--shadow-card);
+  }
+  .tb-left { display: flex; align-items: center; gap: 10px; }
+  .tb-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--success); box-shadow: 0 0 8px var(--success); }
+  .tb-crumb { font-size: 13px; color: var(--muted); }
+  .tb-crumb strong { color: var(--fg); font-weight: 600; }
+  .tb-right { display: flex; align-items: center; gap: 10px; }
+  .tb-ver { font-family: var(--font-mono); font-size: 10.5px; color: var(--muted); }
+  .win-btns { display: flex; margin-left: 6px; }
+  .win-btn {
+    width: 44px; height: 32px; border: 0; background: transparent; color: var(--muted);
+    display: grid; place-items: center; border-radius: var(--r-xs);
+    transition: background var(--ease), color var(--ease);
+  }
+  .win-btn:hover { background: var(--fg-soft); color: var(--fg); }
+  .win-btn.close:hover { background: var(--danger); color: var(--on-accent); }
+  .win-btn svg { width: 12px; height: 12px; }
+  .rail {
+    flex: none; width: 240px; display: flex; flex-direction: column;
+    background: var(--glass); backdrop-filter: blur(10px) saturate(1.3);
+    border: 1px solid var(--border); border-radius: var(--r-lg);
+    box-shadow: var(--shadow-float); padding: 20px 14px 14px;
+  }
+  .rail-brand { display: flex; align-items: center; gap: 11px; padding: 0 8px; }
+  .brand-mark {
+    width: 34px; height: 34px; flex: none; border-radius: 11px;
+    background: var(--accent); color: var(--on-accent);
+    display: grid; place-items: center;
+    box-shadow: 0 6px 16px color-mix(in oklch, var(--accent) 34%, transparent);
+  }
+  .brand-name { font-family: var(--font-display); font-size: 17.5px; font-weight: 650; letter-spacing: -.02em; }
+  .brand-sub { font-family: var(--font-mono); font-size: 10px; color: var(--muted); letter-spacing: .06em; }
+
+  .api-status {
+    display: flex; align-items: center; gap: 9px; margin: 18px 4px 0; padding: 9px 12px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md);
+  }
+  .status-dot {
+    width: 8px; height: 8px; flex: none; border-radius: 50%; background: var(--success);
+    box-shadow: 0 0 0 3px var(--success-soft), 0 0 10px var(--success);
+    animation: dotPulse 2.4s ease-in-out infinite;
+  }
+  @keyframes dotPulse {
+    0%, 100% { box-shadow: 0 0 0 3px var(--success-soft), 0 0 8px var(--success); }
+    50%      { box-shadow: 0 0 0 6px var(--success-soft), 0 0 16px var(--success); }
+  }
+  .api-text { font-size: 12.5px; font-weight: 500; }
+  .api-meta { margin-left: auto; font-family: var(--font-mono); font-size: 10.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+  .rail-nav { display: flex; flex-direction: column; gap: 4px; margin-top: 20px; }
+  .nav-item {
+    display: flex; align-items: center; gap: 12px; padding: 11px 12px;
+    border: 0; border-radius: var(--r-md); background: transparent;
+    color: var(--muted); font-size: 14.5px; font-weight: 500; text-align: left;
+    transition: background var(--ease), color var(--ease);
+  }
+  .nav-item:hover { background: var(--fg-soft); color: var(--fg); }
+  .nav-item.is-active { background: var(--accent-soft); color: var(--accent); }
+  .nav-item.is-active svg { color: var(--accent); }
+  .nav-item svg { width: 19px; height: 19px; flex: none; }
+  .kbd {
+    margin-left: auto; font-family: var(--font-mono); font-size: 10.5px; color: var(--muted);
+    border: 1px solid var(--border); border-radius: 6px; padding: 1px 6px; background: var(--surface);
+  }
+  .nav-item.is-active .kbd { color: var(--accent); border-color: color-mix(in oklch, var(--accent) 35%, transparent); background: transparent; }
+
+  .rail-foot { margin-top: auto; display: flex; flex-direction: column; gap: 4px; }
+  .rail-btn {
+    display: flex; align-items: center; gap: 12px; padding: 10px 12px; width: 100%;
+    border: 0; border-radius: var(--r-md); background: transparent; color: var(--muted);
+    font-size: 13.5px; font-weight: 500; text-align: left; transition: background var(--ease), color var(--ease);
+  }
+  .rail-btn:hover { background: var(--fg-soft); color: var(--fg); }
+  .rail-btn svg { width: 18px; height: 18px; flex: none; color: var(--muted); }
+
+  .stage { flex: 1; min-width: 0; overflow-y: auto; padding: 2px clamp(12px, 4vw, 48px) 130px; scrollbar-width: thin; scrollbar-color: color-mix(in oklch, var(--muted) 35%, transparent) transparent; }
+  .stage::-webkit-scrollbar { width: 8px; }
+  .stage::-webkit-scrollbar-thumb { background: color-mix(in oklch, var(--muted) 28%, transparent); border-radius: 4px; }
+  .stage::-webkit-scrollbar-track { background: transparent; }
+  .view { display: none; max-width: 920px; margin: 0 auto; }
+  .view.is-active { display: block; animation: viewIn .26s cubic-bezier(.2, .8, .2, 1); }
+  @keyframes viewIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+  .view-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin: 8px 0 24px; flex-wrap: wrap; }
+  .eyebrow { font-family: var(--font-mono); font-size: 11px; letter-spacing: .09em; text-transform: uppercase; color: var(--accent); margin: 0 0 8px; }
+  h1 { font-family: var(--font-display); font-size: 26px; font-weight: 650; letter-spacing: -.02em; margin: 0; }
+  .head-side { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .pill {
+    display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 999px;
+    font-family: var(--font-mono); font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums;
+  }
+  .pill svg { width: 13px; height: 13px; }
+
+  /* ─── 通用按钮 ─── */
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px; padding: 12px 22px;
+    border-radius: var(--r-md); border: 1px solid transparent;
+    font-size: 14.5px; font-weight: 600; letter-spacing: -.005em;
+    transition: background var(--ease), border-color var(--ease), box-shadow var(--ease), transform .08s ease;
+  }
+  .btn:active { transform: translateY(1px); }
+  .btn svg { width: 16px; height: 16px; }
+  .btn-primary {
+    background: var(--accent); color: var(--on-accent);
+    box-shadow: 0 6px 18px color-mix(in oklch, var(--accent) 32%, transparent);
+  }
+  .btn-primary:hover { background: color-mix(in oklch, var(--accent) 86%, var(--fg)); transform: translateY(-1px); box-shadow: 0 10px 26px color-mix(in oklch, var(--accent) 38%, transparent); }
+  .btn-primary:active { transform: translateY(0); }
+  .btn-ghost { background: transparent; border-color: var(--border); color: var(--fg); font-weight: 500; }
+  .btn-ghost:hover { border-color: var(--muted); }
+  .btn-ghost.is-on { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+  .icon-btn {
+    display: inline-grid; place-items: center; width: 32px; height: 32px; flex: none;
+    border-radius: 10px; border: 1px solid transparent; background: transparent;
+    color: var(--muted); transition: background var(--ease), color var(--ease);
+  }
+  .icon-btn:hover { background: var(--fg-soft); color: var(--fg); }
+  .icon-btn.danger:hover { background: var(--danger-soft); color: var(--danger); }
+  .icon-btn svg { width: 15px; height: 15px; }
+
+  /* ─── STT · 录音核心区 ─── */
+  .recorder-card {
+    position: relative; background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--r-xl); box-shadow: var(--shadow-card);
+    padding: 46px 32px 38px; display: flex; flex-direction: column; align-items: center; text-align: center;
+  }
+  .rec-stage { position: relative; width: 120px; height: 120px; }
+  .rec-btn {
+    position: relative; z-index: 1; width: 120px; height: 120px; border-radius: 36px;
+    border: 1px solid var(--border); background: var(--bg); color: var(--accent);
+    display: grid; place-items: center; box-shadow: var(--shadow-card);
+    transition: background var(--ease), color var(--ease), border-color var(--ease), transform var(--ease);
+  }
+  .rec-btn::before { content: ""; position: absolute; inset: 9px; border-radius: 28px; border: 1px dashed var(--border); transition: border-color var(--ease); }
+  .rec-btn:hover { transform: translateY(-2px); }
+  .rec-btn:active { transform: scale(.97); }
+  .rec-btn svg { width: 42px; height: 42px; }
+  .recorder-card.is-recording .rec-btn {
+    background: var(--success-soft); color: var(--success);
+    border-color: color-mix(in oklch, var(--success) 42%, transparent);
+  }
+  .recorder-card.is-recording .rec-btn::before { border-color: color-mix(in oklch, var(--success) 35%, transparent); }
+  .aura {
+    position: absolute; inset: -16px; border-radius: 46px; pointer-events: none;
+    border: 1.5px solid var(--success); opacity: 0;
+  }
+  .recorder-card.is-recording .aura { animation: auraOut 2.1s ease-out infinite; }
+  .recorder-card.is-recording .aura.a2 { animation-delay: 1.05s; }
+  @keyframes auraOut { 0% { transform: scale(.84); opacity: .5; } 100% { transform: scale(1.24); opacity: 0; } }
+
+  .rec-timer { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 30px; letter-spacing: -.01em; margin-top: 24px; }
+  .recorder-card.is-recording .rec-timer { color: var(--success); }
+  .rec-status { color: var(--muted); font-size: 13.5px; margin-top: 6px; }
+  .rec-hint { margin-top: 16px; display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
+  .upload-zone {
+    margin-top: 22px; width: 100%; max-width: 460px; padding: 13px 18px;
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    border: 1.5px dashed var(--border); border-radius: var(--r-md);
+    background: transparent; color: var(--muted); font-size: 13px;
+    transition: border-color var(--ease), background var(--ease), color var(--ease);
+  }
+  .upload-zone:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+  .upload-zone svg { width: 16px; height: 16px; flex: none; }
+  .model-dd { position: relative; display: inline-flex; }
+  .model-trigger {
+    display: inline-flex; align-items: center; gap: 8px; max-width: 220px;
+    font-family: var(--font-mono); font-size: 11.5px; color: var(--muted);
+    background: var(--surface); border: 1px solid var(--border); border-radius: 999px;
+    padding: 6px 12px 6px 13px; transition: border-color var(--ease), color var(--ease);
+  }
+  .model-trigger:hover { border-color: var(--accent); color: var(--accent); }
+  .model-trigger svg { width: 12px; height: 12px; flex: none; transition: transform var(--ease); }
+  .model-dd.is-open .model-trigger { border-color: var(--accent); color: var(--accent); }
+  .model-dd.is-open .model-trigger svg { transform: rotate(180deg); }
+  .model-menu {
+    position: absolute; top: calc(100% + 6px); right: 0; z-index: 45;
+    min-width: max(100%, 172px); padding: 5px;
+    display: flex; flex-direction: column; gap: 2px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md);
+    box-shadow: var(--shadow-float);
+    animation: menuIn .16s cubic-bezier(.2, .8, .2, 1);
+  }
+  .model-menu[hidden] { display: none; }
+  @keyframes menuIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+  .model-opt {
+    display: flex; align-items: center; justify-content: space-between; gap: 14px;
+    padding: 7px 10px; border: 0; border-radius: var(--r-sm); background: transparent;
+    font-family: var(--font-mono); font-size: 11.5px; color: var(--muted);
+    text-align: left; white-space: nowrap; transition: background var(--ease), color var(--ease);
+  }
+  .model-opt:hover { background: var(--fg-soft); color: var(--fg); }
+  .model-opt.is-on { background: var(--accent-soft); color: var(--accent); }
+  .model-opt svg { width: 12px; height: 12px; flex: none; opacity: 0; }
+  .model-opt.is-on svg { opacity: 1; }
+
+  .key-wrap { display: flex; align-items: center; gap: 6px; }
+  .key-input {
+    width: 250px; padding: 8px 12px;
+    font-family: var(--font-mono); font-size: 12px; color: var(--fg);
+    background: var(--bg); border: 1px solid var(--border); border-radius: var(--r-md);
+    transition: border-color var(--ease);
+  }
+  .key-input::placeholder { color: var(--muted); }
+  .key-input:focus { outline: none; border-color: color-mix(in oklch, var(--accent) 45%, transparent); }
+  .live-wave { display: none; align-items: center; gap: 3px; height: 26px; margin-top: 18px; }
+  .recorder-card.is-recording .live-wave { display: flex; }
+  .live-wave i {
+    width: 3px; height: var(--h, 50%); border-radius: 2px; background: var(--success);
+    transform-origin: center; animation: waveBar .9s ease-in-out infinite alternate; animation-delay: var(--d, 0s);
+  }
+  @keyframes waveBar { from { transform: scaleY(.3); } to { transform: scaleY(1); } }
+
+  /* ─── STT · 转录结果区 ─── */
+  .result-card { margin-top: 20px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); box-shadow: var(--shadow-card); }
+  .result-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 15px 18px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+  .result-title { font-size: 14.5px; font-weight: 650; letter-spacing: -.01em; }
+  .result-meta { font-family: var(--font-mono); font-size: 11.5px; color: var(--muted); margin-left: 10px; font-variant-numeric: tabular-nums; }
+  .mini-toolbar { display: flex; align-items: center; gap: 6px; }
+  .seg { display: flex; background: var(--bg); border: 1px solid var(--border); border-radius: 999px; padding: 3px; }
+  .seg-btn { border: 0; background: transparent; color: var(--muted); font-family: var(--font-mono); font-size: 11.5px; padding: 4px 13px; border-radius: 999px; transition: all var(--ease); }
+  .seg-btn.is-on { background: var(--surface); color: var(--fg); box-shadow: var(--shadow-card); }
+  .seg-btn.is-on:hover { color: var(--fg); }
+  .seg-list { padding: 6px 18px 12px; }
+  .seg-row { display: grid; grid-template-columns: 132px 1fr; gap: 18px; padding: 13px 0; border-top: 1px solid var(--border); align-items: baseline; }
+  .seg-row:first-child { border-top: 0; }
+  .seg-time { font-family: var(--font-mono); font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .seg-text { font-size: 15px; line-height: 1.7; }
+  .empty-state { margin: 22px; padding: 20px 24px 14px; border: 1px dashed var(--border); border-radius: var(--r-md); }
+  .sk-row { display: grid; grid-template-columns: 132px 1fr; gap: 18px; align-items: center; padding: 8px 0; opacity: .5; }
+  .sk-time { font-family: var(--font-mono); font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .sk-bar { height: 10px; border-radius: 5px; background: var(--fg-soft); }
+  .empty-note { margin: 12px 0 0; text-align: center; color: var(--muted); font-size: 13px; }
+
+  /* ─── TTS · 输入 + 音色 ─── */
+  .tts-card { position: relative; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); box-shadow: var(--shadow-card); transition: border-color var(--ease); }
+  .tts-card:focus-within { border-color: color-mix(in oklch, var(--accent) 45%, transparent); }
+  .tts-card textarea {
+    width: 100%; min-height: 190px; border: 0; background: transparent; resize: vertical;
+    padding: 22px 22px 46px; font: inherit; font-size: 16px; line-height: 1.7; color: var(--fg);
+  }
+  .tts-card textarea:focus { outline: none; }
+  .tts-foot { position: absolute; left: 14px; right: 16px; bottom: 12px; display: flex; align-items: center; justify-content: space-between; pointer-events: none; }
+  .tts-foot > * { pointer-events: auto; }
+  .clear-btn { border: 0; background: transparent; color: var(--muted); font-size: 12.5px; padding: 6px 8px; border-radius: 8px; transition: all var(--ease); }
+  .clear-btn:hover { color: var(--danger); background: var(--danger-soft); }
+  .char-count {
+    font-family: var(--font-mono); font-size: 12px; font-variant-numeric: tabular-nums; font-weight: 600;
+    background: linear-gradient(92deg, var(--accent), var(--success));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+
+  .sub-label { display: flex; align-items: baseline; justify-content: space-between; margin: 28px 2px 14px; }
+  .sub-label h2 { font-size: 15px; font-weight: 650; letter-spacing: -.01em; margin: 0; }
+  .sub-label .meta { font-family: var(--font-mono); font-size: 11px; color: var(--muted); }
+  .voice-row { display: flex; gap: 12px; overflow-x: auto; padding: 2px 2px 12px; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+  .voice-card {
+    flex: none; width: 156px; text-align: left; background: var(--surface);
+    border: 1px solid var(--border); border-radius: var(--r-lg); padding: 15px 16px 14px;
+    box-shadow: var(--shadow-card); transition: border-color var(--ease), box-shadow var(--ease), transform var(--ease);
+  }
+  .voice-card:hover { transform: translateY(-2px); }
+  .voice-card.is-on { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .voice-name { display: flex; align-items: center; justify-content: space-between; font-size: 16px; font-weight: 650; letter-spacing: -.01em; }
+  .voice-check { color: var(--accent); opacity: 0; transition: opacity var(--ease); }
+  .voice-check svg { width: 15px; height: 15px; }
+  .voice-card.is-on .voice-check { opacity: 1; }
+  .voice-desc { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .voice-tags { display: flex; gap: 6px; margin-top: 11px; flex-wrap: wrap; }
+  .tag { font-size: 11px; padding: 3px 8px; border-radius: var(--r-sm); background: var(--fg-soft); color: var(--muted); }
+  .gen-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 22px; flex-wrap: wrap; }
+  .gen-meta { font-family: var(--font-mono); font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+  /* ─── TTS · 悬浮毛玻璃播放器 ─── */
+  .player-dock { position: fixed; left: 272px; right: 16px; bottom: 16px; display: flex; justify-content: center; pointer-events: none; z-index: 30; }
+  .player {
+    pointer-events: auto; display: flex; align-items: center; gap: 14px; width: min(660px, 100%);
+    background: var(--glass); backdrop-filter: blur(10px) saturate(1.4);
+    border: 1px solid var(--border); border-radius: 24px; box-shadow: var(--shadow-float);
+    padding: 12px 14px 12px 12px;
+    transform: translateY(150%); opacity: 0;
+    transition: transform .32s cubic-bezier(.2, .8, .2, 1), opacity .3s ease, background-color var(--ease), border-color var(--ease);
+  }
+  .player-dock.is-open .player { transform: none; opacity: 1; }
+  .play-btn {
+    width: 44px; height: 44px; flex: none; border: 0; border-radius: 50%;
+    background: var(--accent); color: var(--on-accent); display: grid; place-items: center;
+    box-shadow: 0 6px 16px color-mix(in oklch, var(--accent) 34%, transparent);
+    transition: background var(--ease), transform .05s ease;
+  }
+  .play-btn:active { transform: scale(.94); }
+  .play-btn svg { width: 17px; height: 17px; }
+  .play-btn .ic-pause { display: none; }
+  .player.is-playing .play-btn .ic-pause { display: block; }
+  .player.is-playing .play-btn .ic-play { display: none; }
+  .wave { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: space-between; height: 34px; }
+  .wave i {
+    flex: none; width: 3px; height: var(--h, 40%); border-radius: 2px;
+    background: color-mix(in oklch, var(--accent) 45%, var(--border));
+    transform-origin: center; transition: background var(--ease);
+  }
+  .wave i.done { background: var(--accent); }
+  .player.is-playing .wave i { animation: waveBar 1.1s ease-in-out infinite alternate; animation-delay: var(--d, 0s); }
+  .p-time { font-family: var(--font-mono); font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .speed-pill {
+    border: 1px solid var(--border); background: var(--surface); color: var(--fg);
+    border-radius: 999px; padding: 6px 12px; font-family: var(--font-mono); font-size: 11.5px;
+    font-variant-numeric: tabular-nums; transition: all var(--ease); white-space: nowrap;
+  }
+  .speed-pill:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* ─── 历史记录 · 瀑布流 ─── */
+  .chip {
+    border: 1px solid var(--border); background: var(--surface); color: var(--muted);
+    border-radius: 999px; padding: 7px 15px; font-size: 13px; font-weight: 500; transition: all var(--ease);
+  }
+  .chip:hover { color: var(--fg); }
+  .chip.is-on { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+  .masonry { columns: 2 300px; column-gap: 16px; }
+  .h-card {
+    break-inside: avoid; margin-bottom: 16px; position: relative;
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg);
+    box-shadow: var(--shadow-card); padding: 17px 18px 14px;
+    transition: box-shadow var(--ease), transform var(--ease), opacity var(--ease);
+  }
+  .h-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-float); }
+  .h-card.is-leaving { opacity: 0; transform: scale(.96); }
+  .kind { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .07em; padding: 3px 9px; border-radius: var(--r-sm); }
+  .kind-stt { background: var(--accent-soft); color: var(--accent); }
+  .kind-tts { background: var(--success-soft); color: var(--success); }
+  .h-title { font-size: 15.5px; font-weight: 650; letter-spacing: -.01em; margin: 11px 0 5px; }
+  .h-excerpt { font-size: 13.5px; line-height: 1.66; color: var(--muted); margin: 0; }
+  .h-meta { display: flex; gap: 12px; margin-top: 13px; padding-top: 11px; border-top: 1px solid var(--border); font-family: var(--font-mono); font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .h-actions {
+    position: absolute; top: 12px; right: 12px; display: flex; gap: 2px;
+    background: var(--glass); backdrop-filter: blur(8px);
+    border: 1px solid var(--border); border-radius: 12px; padding: 3px;
+    opacity: 0; transform: translateY(-4px); transition: opacity var(--ease), transform var(--ease);
+  }
+  .h-card:hover .h-actions, .h-card:focus-within .h-actions { opacity: 1; transform: none; }
+  .h-actions .icon-btn { width: 28px; height: 28px; border-radius: 8px; }
+  .h-actions .icon-btn svg { width: 13.5px; height: 13.5px; }
+
+  /* ─── 设置视图 ─── */
+  .set-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); box-shadow: var(--shadow-card); padding: 6px 20px; margin-bottom: 16px; }
+  .set-row { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 16px 0; border-top: 1px solid var(--border); }
+  .set-row:first-child { border-top: 0; }
+  .set-name { font-size: 14.5px; font-weight: 600; }
+  .set-desc { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+  .set-ctl { display: flex; align-items: center; gap: 8px; flex: none; }
+  .set-ctl .kbd, .kbd-row .kbd { margin-left: 0; }
+  .kbd-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 11px 0; border-top: 1px solid var(--border); font-size: 13.5px; }
+  .kbd-row:first-child { border-top: 0; }
+
+  /* ─── 动效伦理：尊重系统减少动效偏好 ─── */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+  }
+
+  /* ─── Toast ─── */
+  .toast {
+    position: fixed; left: 50%; top: 22px; transform: translate(-50%, -16px);
+    background: var(--fg); color: var(--bg); padding: 10px 20px; border-radius: 999px;
+    font-size: 13px; font-weight: 500; opacity: 0; pointer-events: none; z-index: 60;
+    box-shadow: var(--shadow-float); transition: opacity .25s ease, transform .25s ease;
+  }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+  /* ─── 主题切换：全表面同步过渡（200ms，禁撕裂） ─── */
+  .rail, .api-status, .recorder-card, .result-card, .tts-card, .voice-card, .h-card,
+  .seg, .pill, .chip, .kbd, .speed-pill, .empty-state, .h-actions, .btn-ghost, .icon-btn {
+    transition: background-color var(--ease), border-color var(--ease), color var(--ease),
+                box-shadow var(--ease), transform var(--ease), opacity var(--ease);
+  }
+
+  /* ─── 窄窗口：导航栏收成图标轨 ─── */
+  @media (max-width: 980px) {
+    .rail { width: 76px; padding: 18px 10px 12px; }
+    .brand-name, .brand-sub, .api-text, .api-meta, .nav-item .nav-label, .nav-item .kbd, .rail-btn .nav-label, .tb-ver { display: none; }
+    .rail-brand { justify-content: center; padding: 0; }
+    .api-status { justify-content: center; margin: 16px 0 0; padding: 9px 0; }
+    .nav-item, .rail-btn { justify-content: center; padding: 12px; }
+    .player-dock { left: 108px; }
+  }
+  @media (max-width: 640px) {
+    .app { padding: 0 10px 10px; }
+    .app-row { gap: 10px; }
+    .masonry { columns: 1; }
+    .seg-row, .sk-row { grid-template-columns: 1fr; gap: 4px; }
+    .player-dock { left: 96px; right: 10px; bottom: 10px; }
+    .p-time { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <!-- ═══ 悬浮标题栏（Windows 窗口层） ═══ -->
+  <header class="titlebar" data-od-id="titlebar">
+    <div class="tb-left">
+      <span class="tb-dot"></span>
+      <span class="tb-crumb"><strong>VoxFlow</strong> · 语音工作台</span>
+    </div>
+    <div class="tb-right">
+      <span class="tb-ver">v0.9.4 · Windows</span>
+      <div class="win-btns">
+        <button class="win-btn" id="winMin" aria-label="最小化"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><path d="M2 6h8"></path></svg></button>
+        <button class="win-btn" id="winMax" aria-label="最大化"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="2.5" y="2.5" width="7" height="7" rx="1.2"></rect></svg></button>
+        <button class="win-btn close" id="winClose" aria-label="关闭"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><path d="M3 3l6 6M9 3l-6 6"></path></svg></button>
+      </div>
+    </div>
+  </header>
+
+  <div class="app-row">
+  <!-- ═══ 悬浮 NavigationRail ═══ -->
+  <aside class="rail" data-od-id="nav-rail">
+    <div class="rail-brand">
+      <span class="brand-mark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3v18"></path><path d="M7 8v8"></path><path d="M17 8v8"></path><path d="M3 11v2"></path><path d="M21 11v2"></path></svg>
+      </span>
+      <span>
+        <div class="brand-name">VoxFlow</div>
+        <div class="brand-sub">VOICE STUDIO</div>
+      </span>
+    </div>
+
+    <div class="api-status" data-od-id="api-status">
+      <span class="status-dot"></span>
+      <span class="api-text">API 已连接</span>
+      <span class="api-meta">34ms</span>
+    </div>
+
+    <nav class="rail-nav">
+      <button class="nav-item is-active" data-view="stt" data-od-id="nav-stt">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0"></path><path d="M12 18v3"></path></svg>
+        <span class="nav-label">语音转文字</span><span class="kbd">1</span>
+      </button>
+      <button class="nav-item" data-view="tts" data-od-id="nav-tts">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4z"></path><path d="M15.5 8.5a5 5 0 0 1 0 7"></path><path d="M18.5 5.5a9 9 0 0 1 0 13"></path></svg>
+        <span class="nav-label">文字转语音</span><span class="kbd">2</span>
+      </button>
+      <button class="nav-item" data-view="history" data-od-id="nav-history">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"></path><path d="M3 4v5h5"></path><path d="M12 7v5l3.5 2"></path></svg>
+        <span class="nav-label">历史记录</span><span class="kbd">3</span>
+      </button>
+    </nav>
+
+    <div class="rail-foot">
+      <button class="rail-btn" id="themeToggle" data-od-id="theme-toggle">
+        <svg class="ic-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z"></path></svg>
+        <span class="nav-label" id="themeLabel">深色模式</span>
+      </button>
+      <button class="nav-item" data-view="settings" data-od-id="nav-settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.55V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1-1.55 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.55-1H3a2 2 0 1 1 0-4h.09a1.7 1.7 0 0 0 1.55-1 1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-1.55V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.55 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.4 9c.23.6.86 1 1.55 1H21a2 2 0 1 1 0 4h-.09c-.69 0-1.32.4-1.51 1z"></path></svg>
+        <span class="nav-label">设置</span><span class="kbd">4</span>
+      </button>
+    </div>
+  </aside>
+
+  <!-- ═══ 内容舞台 ═══ -->
+  <main class="stage">
+
+    <!-- ── 语音转文字 ── -->
+    <section class="view is-active" id="view-stt" data-od-id="view-stt">
+      <header class="view-head">
+        <div>
+          <p class="eyebrow">Speech to Text · 实时转写</p>
+          <h1>语音转文字</h1>
+        </div>
+        <div class="head-side">
+          <span class="pill">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"></circle><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"></path></svg>
+            中文 · 普通话
+          </span>
+          <span class="model-dd" id="sttModelSelect" data-od-id="stt-model-select" title="转写模型"></span>
+        </div>
+      </header>
+
+      <div class="recorder-card" id="recorderCard" data-od-id="stt-recorder">
+        <div class="rec-stage">
+          <span class="aura"></span><span class="aura a2"></span>
+          <button class="rec-btn" id="recBtn" data-od-id="rec-btn" aria-label="开始或停止录音">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><rect x="9" y="2.5" width="6" height="11.5" rx="3"></rect><path d="M5 10.5a7 7 0 0 0 14 0"></path><path d="M12 17.5v4"></path></svg>
+          </button>
+        </div>
+        <div class="rec-timer num" id="recTimer">00:00.00</div>
+        <div class="rec-status" id="recStatus">点击开始录音</div>
+        <div class="live-wave" id="liveWave" aria-hidden="true"></div>
+        <div class="rec-hint"><span class="kbd">SPACE</span> 快捷键开始 / 停止</div>
+        <button class="upload-zone" id="uploadZone" data-od-id="stt-upload">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="M17 8l-5-5-5 5"></path><path d="M12 3v12"></path></svg>
+          <span id="uploadLabel">或上传音频文件转写 · mp3 / wav / m4a / flac</span>
+        </button>
+        <input type="file" id="audioFile" accept="audio/*,.mp3,.wav,.m4a,.flac" hidden />
+      </div>
+
+      <div class="result-card" data-od-id="stt-result">
+        <div class="result-head">
+          <div>
+            <span class="result-title">转录结果</span>
+            <span class="result-meta" id="resultMeta">等待录音</span>
+          </div>
+          <div class="mini-toolbar">
+            <div class="seg" role="tablist" aria-label="导出格式">
+              <button class="seg-btn is-on" data-fmt="txt">TXT</button>
+              <button class="seg-btn" data-fmt="srt">SRT</button>
+            </div>
+            <button class="icon-btn" id="copyBtn" title="复制全文" data-od-id="stt-copy">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2.5"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+            </button>
+            <button class="icon-btn" id="dlBtn" title="导出文件" data-od-id="stt-export">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="M7 10l5 5 5-5"></path><path d="M12 15V3"></path></svg>
+            </button>
+          </div>
+        </div>
+        <div id="resultBody">
+          <div class="empty-state" id="emptyState">
+            <div class="sk-row"><span class="sk-time">00:00.00 → 00:03.84</span><span class="sk-bar" style="width:86%"></span></div>
+            <div class="sk-row"><span class="sk-time">00:03.84 → 00:08.21</span><span class="sk-bar" style="width:62%"></span></div>
+            <div class="sk-row"><span class="sk-time">00:08.21 → 00:12.47</span><span class="sk-bar" style="width:74%"></span></div>
+            <p class="empty-note">完成一次录音后，带时间轴的转录片段会显示在这里</p>
+          </div>
+          <div class="seg-list" id="segList" hidden=""></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── 文字转语音 ── -->
+    <section class="view" id="view-tts" data-od-id="view-tts">
+      <header class="view-head">
+        <div>
+          <p class="eyebrow">Text to Speech · 语音合成</p>
+          <h1>文字转语音</h1>
+        </div>
+        <div class="head-side"><span class="model-dd" id="ttsModelSelect" data-od-id="tts-model-select" title="合成模型"></span></div>
+      </header>
+
+      <div class="tts-card" data-od-id="tts-input">
+        <textarea id="ttsText" maxlength="5000" placeholder="输入或粘贴要转换为语音的文字……">欢迎使用 VoxFlow。把文字粘贴到这里，选择一款音色，点击生成语音，几秒内就能得到自然流畅的合成音频，支持语速微调与即时试听。</textarea>
+        <div class="tts-foot">
+          <button class="clear-btn" id="clearText">清空</button>
+          <span class="char-count"><span id="charNum">0</span> / 5000</span>
+        </div>
+      </div>
+
+      <div class="sub-label">
+        <h2>选择音色</h2>
+        <span class="meta">6 款预置音色 · 横向滑动</span>
+      </div>
+      <div class="voice-row" id="voiceRow" data-od-id="voice-list"></div>
+
+      <div class="gen-row">
+        <button class="btn btn-primary" id="genBtn" data-od-id="tts-generate">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4z"></path><path d="M15.5 8.5a5 5 0 0 1 0 7"></path></svg>
+          生成语音
+        </button>
+        <span class="gen-meta" id="genMeta">预计生成 ≈ 12s 音频</span>
+      </div>
+    </section>
+
+    <!-- ── 历史记录 ── -->
+    <section class="view" id="view-history" data-od-id="view-history">
+      <header class="view-head">
+        <div>
+          <p class="eyebrow">Library · 本地存档</p>
+          <h1>历史记录</h1>
+        </div>
+        <div class="head-side" id="filterRow" data-od-id="history-filter">
+          <button class="chip is-on" data-filter="all">全部</button>
+          <button class="chip" data-filter="stt">STT 转写</button>
+          <button class="chip" data-filter="tts">TTS 配音</button>
+        </div>
+      </header>
+      <div class="masonry" id="masonry" data-od-id="history-grid"></div>
+    </section>
+
+    <!-- ── 设置 ── -->
+    <section class="view" id="view-settings" data-od-id="view-settings">
+      <header class="view-head">
+        <div>
+          <p class="eyebrow">Preferences · 本地偏好</p>
+          <h1>设置</h1>
+        </div>
+      </header>
+
+      <div class="set-card" data-od-id="settings-appearance">
+        <div class="set-row">
+          <div><div class="set-name">外观</div><div class="set-desc">浅色 / 深色 / 跟随系统，即时生效并持久化</div></div>
+          <div class="set-ctl"><div class="seg" id="themeSeg">
+            <button class="seg-btn is-on" data-mode="light">浅色</button>
+            <button class="seg-btn" data-mode="dark">深色</button>
+            <button class="seg-btn" data-mode="system">跟随系统</button>
+          </div></div>
+        </div>
+      </div>
+
+      <div class="set-card" data-od-id="settings-engines">
+        <div class="set-row">
+          <div><div class="set-name">语音转文字模型</div><div class="set-desc">与 STT 视图顶部选择实时同步</div></div>
+          <div class="set-ctl"><span class="model-dd" id="sttModelSelect2"></span></div>
+        </div>
+        <div class="set-row">
+          <div><div class="set-name">文字转语音模型</div><div class="set-desc">与 TTS 视图顶部选择实时同步</div></div>
+          <div class="set-ctl"><span class="model-dd" id="ttsModelSelect2"></span></div>
+        </div>
+      </div>
+
+      <div class="set-card" data-od-id="settings-api">
+        <div class="set-row">
+          <div><div class="set-name">Base URL</div><div class="set-desc">转写 / 合成服务的接口地址，仅保存在本机</div></div>
+          <div class="set-ctl"><input class="key-input" id="baseUrlInput" type="url" autocomplete="off" spellcheck="false" placeholder="https://api.openai.com/v1" aria-label="Base URL" /></div>
+        </div>
+        <div class="set-row">
+          <div><div class="set-name">API 密钥</div><div class="set-desc">服务的访问凭证，仅保存在本机</div></div>
+          <div class="set-ctl key-wrap">
+            <input class="key-input" id="apiKeyInput" type="password" autocomplete="off" spellcheck="false" placeholder="sk-…" aria-label="API 密钥" />
+            <button class="icon-btn" id="keyToggle" title="显示 / 隐藏密钥" aria-label="显示或隐藏密钥">
+              <svg class="ic-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
+              <svg class="ic-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="display:none"><path d="M17.94 17.94A10.4 10.4 0 0 1 12 19c-6.5 0-10-7-10-7a18.4 18.4 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.9 9.9 0 0 1 12 5c6.5 0 10 7 10 7a18.5 18.5 0 0 1-2.16 3.19"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/><path d="m1 1 22 22"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="set-card" data-od-id="settings-shortcuts">
+        <div class="set-row" style="padding-bottom: 6px;">
+          <div><div class="set-name">快捷键</div><div class="set-desc">全局生效；输入框聚焦时自动让位</div></div>
+        </div>
+        <div class="kbd-row"><span>开始 / 停止录音（STT 视图）</span><span class="kbd">SPACE</span></div>
+        <div class="kbd-row"><span>切换视图</span><span class="set-ctl"><span class="kbd">1</span><span class="kbd">2</span><span class="kbd">3</span><span class="kbd">4</span></span></div>
+        <div class="kbd-row"><span>关闭播放器</span><span class="kbd">ESC</span></div>
+      </div>
+
+      <div class="set-card" data-od-id="settings-data">
+        <div class="set-row">
+          <div><div class="set-name">本地数据</div><div class="set-desc">主题、视图与引擎偏好仅存于本机 localStorage</div></div>
+          <div class="set-ctl"><button class="btn btn-ghost" id="clearData">清除缓存</button></div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+  </div>
+</div>
+
+<!-- ═══ 悬浮播放器（TTS 生成后弹出） ═══ -->
+<div class="player-dock" id="playerDock" data-od-id="tts-player">
+  <div class="player" id="player">
+    <button class="play-btn" id="playBtn" aria-label="播放或暂停">
+      <svg class="ic-play" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l11-6.5z"></path></svg>
+      <svg class="ic-pause" viewBox="0 0 24 24" fill="currentColor"><rect x="6.5" y="5" width="3.6" height="14" rx="1.2"></rect><rect x="13.9" y="5" width="3.6" height="14" rx="1.2"></rect></svg>
+    </button>
+    <div class="wave" id="wave" aria-hidden="true"></div>
+    <span class="p-time"><span id="tCur">00:00.0</span> / <span id="tTot">00:12.4</span></span>
+    <button class="speed-pill" id="speedPill" title="语速微调">1x</button>
+    <button class="icon-btn" id="closePlayer" title="关闭播放器">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"></path></svg>
+    </button>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(function () {
+  "use strict";
+  var $ = function (s) { return document.querySelector(s); };
+  var $$ = function (s) { return Array.prototype.slice.call(document.querySelectorAll(s)); };
+
+  /* ── Toast ── */
+  var toastEl = $('#toast'), toastTimer = null;
+  function toast(msg) {
+    toastEl.textContent = msg;
+    toastEl.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { toastEl.classList.remove('show'); }, 2200);
+  }
+
+  /* ── 主题：浅色 / 深色 / 跟随系统（持久化） ── */
+  var themeLabel = $('#themeLabel'), themeMode = 'light', mqDark = window.matchMedia('(prefers-color-scheme: dark)');
+  function syncThemeSeg() {
+    $$('#themeSeg .seg-btn').forEach(function (b) { b.classList.toggle('is-on', b.dataset.mode === themeMode); });
+  }
+  function applyTheme(mode) {
+    themeMode = mode;
+    var t = mode === 'system' ? (mqDark.matches ? 'dark' : 'light') : mode;
+    document.documentElement.dataset.theme = t;
+    themeLabel.textContent = mode === 'system'
+      ? '跟随系统 · ' + (t === 'dark' ? '深色' : '浅色')
+      : (t === 'dark' ? '浅色模式' : '深色模式');
+    syncThemeSeg();
+    try { localStorage.setItem('vf-theme', mode); } catch (e) {}
+  }
+  mqDark.addEventListener('change', function () { if (themeMode === 'system') applyTheme('system'); });
+  $('#themeSeg').addEventListener('click', function (e) {
+    var b = e.target.closest('.seg-btn');
+    if (b) applyTheme(b.dataset.mode);
+  });
+  applyTheme((function () { try { return localStorage.getItem('vf-theme') || 'light'; } catch (e) { return 'light'; } })());
+  $('#themeToggle').addEventListener('click', function () {
+    var cur = document.documentElement.dataset.theme;
+    applyTheme(cur === 'dark' ? 'light' : 'dark');
+  });
+
+  /* ── 视图切换 ── */
+  var views = { stt: $('#view-stt'), tts: $('#view-tts'), history: $('#view-history'), settings: $('#view-settings') };
+  var currentView = 'stt';
+  function switchView(name) {
+    if (!views[name]) return;
+    currentView = name;
+    Object.keys(views).forEach(function (k) { views[k].classList.toggle('is-active', k === name); });
+    $$('.nav-item').forEach(function (b) { b.classList.toggle('is-active', b.dataset.view === name); });
+    try { localStorage.setItem('vf-view', name); } catch (e) {}
+  }
+  $$('.nav-item').forEach(function (b) {
+    b.addEventListener('click', function () { switchView(b.dataset.view); });
+  });
+  try { switchView(localStorage.getItem('vf-view') || 'stt'); } catch (e) {}
+
+  /* ── 波形条生成（确定性图案） ── */
+  var WAVE_H = [38,55,72,50,88,64,42,76,95,58,46,70,84,52,36,62,90,68,44,78,56,40,66,82,48,60,74,50,42,58];
+  function buildWave(el, n, maxW) {
+    for (var i = 0; i < n; i++) {
+      var b = document.createElement('i');
+      b.style.setProperty('--h', WAVE_H[i % WAVE_H.length] + '%');
+      b.style.setProperty('--d', (i * 0.045).toFixed(3) + 's');
+      if (maxW) b.style.width = maxW + 'px';
+      el.appendChild(b);
+    }
+  }
+  buildWave($('#wave'), 40);
+  buildWave($('#liveWave'), 22, 3);
+
+  /* ── STT 录音状态机 ── */
+  var recorderCard = $('#recorderCard'), recTimer = $('#recTimer'), recStatus = $('#recStatus');
+  var recording = false, recStart = 0, recRaf = null, hasResult = false;
+  var SEGS = [
+    { s: 0,    e: 3840,  t: '大家好，欢迎收听本期播客。今天我们来聊聊语音工具链最近的一些新变化。' },
+    { s: 3840, e: 8210,  t: '首先是识别速度——新一代转写引擎在云端几乎可以做到逐字实时输出，延迟压到三百毫秒以内。' },
+    { s: 8210, e: 12470, t: '其次是工作流整合：转写、翻译、配音，最好能在一个工作台里一口气完成。' }
+  ];
+  function pad(n, w) { return String(n).padStart(w, '0'); }
+  function fmtClock(ms) { // mm:ss.cc
+    var m = Math.floor(ms / 60000), s = Math.floor(ms % 60000 / 1000), c = Math.floor(ms % 1000 / 10);
+    return pad(m, 2) + ':' + pad(s, 2) + '.' + pad(c, 2);
+  }
+  function fmtSrt(ms) { // hh:mm:ss,mmm
+    var h = Math.floor(ms / 3600000), m = Math.floor(ms % 3600000 / 60000),
+        s = Math.floor(ms % 60000 / 1000), x = Math.floor(ms % 1000);
+    return pad(h, 2) + ':' + pad(m, 2) + ':' + pad(s, 2) + ',' + pad(x, 3);
+  }
+  function tickTimer() {
+    recTimer.textContent = fmtClock(performance.now() - recStart);
+    if (recording) recRaf = requestAnimationFrame(tickTimer);
+  }
+  function setRecording(on) {
+    recording = on;
+    recorderCard.classList.toggle('is-recording', on);
+    if (on) {
+      recStart = performance.now();
+      recStatus.textContent = '正在录音 · 再次点击停止';
+      tickTimer();
+    } else {
+      cancelAnimationFrame(recRaf);
+      recStatus.textContent = '点击开始录音';
+      showResult();
+      toast('转写完成 · 3 个片段');
+    }
+  }
+  $('#recBtn').addEventListener('click', function () { setRecording(!recording); });
+
+  /* ── 转录结果渲染（TXT / SRT） ── */
+  var fmt = 'txt', segList = $('#segList');
+  function segText() {
+    if (fmt === 'srt') {
+      return SEGS.map(function (g, i) {
+        return (i + 1) + '\n' + fmtSrt(g.s) + ' --> ' + fmtSrt(g.e) + '\n' + g.t;
+      }).join('\n\n');
+    }
+    return SEGS.map(function (g) { return '[' + fmtClock(g.s) + ' → ' + fmtClock(g.e) + '] ' + g.t; }).join('\n');
+  }
+  function renderSegs() {
+    segList.innerHTML = '';
+    SEGS.forEach(function (g) {
+      var row = document.createElement('div');
+      row.className = 'seg-row';
+      var time = fmt === 'srt'
+        ? fmtSrt(g.s) + '\n--> ' + fmtSrt(g.e)
+        : fmtClock(g.s) + ' → ' + fmtClock(g.e);
+      row.innerHTML = '<span class="seg-time"></span><span class="seg-text"></span>';
+      row.querySelector('.seg-time').textContent = time;
+      row.querySelector('.seg-time').style.whiteSpace = 'pre-line';
+      row.querySelector('.seg-text').textContent = g.t;
+      segList.appendChild(row);
+    });
+  }
+  function showResult() {
+    hasResult = true;
+    $('#emptyState').hidden = true;
+    segList.hidden = false;
+    $('#resultMeta').textContent = '3 段 · 12.5s · 中文';
+    renderSegs();
+  }
+  $$('.seg-btn').forEach(function (b) {
+    b.addEventListener('click', function () {
+      fmt = b.dataset.fmt;
+      $$('.seg-btn').forEach(function (x) { x.classList.toggle('is-on', x === b); });
+      if (hasResult) renderSegs();
+    });
+  });
+  function copyText(str, okMsg) {
+    function done() { toast(okMsg); }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(str).then(done, function () { fallback(); });
+    } else { fallback(); }
+    function fallback() {
+      var ta = document.createElement('textarea');
+      ta.value = str; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); done(); } catch (e) { toast('复制失败'); }
+      document.body.removeChild(ta);
+    }
+  }
+  $('#copyBtn').addEventListener('click', function () {
+    if (!hasResult) { toast('还没有可复制的转录内容'); return; }
+    copyText(segText(), '已复制 ' + fmt.toUpperCase() + ' 全文');
+  });
+  $('#dlBtn').addEventListener('click', function () {
+    if (!hasResult) { toast('还没有可导出的转录内容'); return; }
+    var blob = new Blob([segText()], { type: 'text/plain;charset=utf-8' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'voxflow-transcript.' + fmt;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    toast('已导出 transcript.' + fmt);
+  });
+
+  /* ── TTS：字数统计 + 音色卡 ── */
+  var ttsText = $('#ttsText'), charNum = $('#charNum');
+  function updateCount() { charNum.textContent = ttsText.value.length; }
+  ttsText.addEventListener('input', updateCount);
+  $('#clearText').addEventListener('click', function () { ttsText.value = ''; updateCount(); ttsText.focus(); });
+  updateCount();
+
+  var VOICES = [
+    { id: 'alloy',   name: 'Alloy',   desc: '中性 · 通用',   tags: ['通用', '助手'] },
+    { id: 'echo',    name: 'Echo',    desc: '男声 · 旁白',   tags: ['旁白', '纪录片'] },
+    { id: 'fable',   name: 'Fable',   desc: '女声 · 叙事',   tags: ['有声书', '故事'] },
+    { id: 'onyx',    name: 'Onyx',    desc: '男声 · 沉稳',   tags: ['新闻', '播报'] },
+    { id: 'nova',    name: 'Nova',    desc: '女声 · 清亮',   tags: ['课程', '导学'] },
+    { id: 'shimmer', name: 'Shimmer', desc: '女声 · 轻柔',   tags: ['冥想', '耳语'] }
+  ];
+  var voiceRow = $('#voiceRow'), selectedVoice = 'alloy';
+  VOICES.forEach(function (v) {
+    var card = document.createElement('button');
+    card.className = 'voice-card' + (v.id === selectedVoice ? ' is-on' : '');
+    card.dataset.voice = v.id;
+    card.dataset.odId = 'voice-card-' + v.id;
+    card.setAttribute('data-od-id', 'voice-card-' + v.id);
+    card.innerHTML =
+      '<div class="voice-name">' + v.name +
+        '<span class="voice-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>' +
+      '</div>' +
+      '<div class="voice-desc">' + v.desc + '</div>' +
+      '<div class="voice-tags">' + v.tags.map(function (t) { return '<span class="tag">' + t + '</span>'; }).join('') + '</div>';
+    card.addEventListener('click', function () {
+      selectedVoice = v.id;
+      $$('.voice-card').forEach(function (c) { c.classList.toggle('is-on', c.dataset.voice === v.id); });
+      $('#genMeta').textContent = '已选 ' + v.name + ' · 预计生成 ≈ 12s 音频';
+    });
+    voiceRow.appendChild(card);
+  });
+
+  /* ── TTS：悬浮播放器模拟 ── */
+  var dock = $('#playerDock'), player = $('#player'), tCur = $('#tCur');
+  var DUR = 12.47, pos = 0, playing = false, playRaf = null, lastTs = 0;
+  var SPEEDS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 3, 4], speedIdx = 3;
+  var waveBars = $$('#wave i');
+  function fmtPlay(s) {
+    return pad(Math.floor(s / 60), 2) + ':' + pad(Math.floor(s % 60), 2) + '.' + Math.floor(s % 1 * 10);
+  }
+  function paintProgress() {
+    tCur.textContent = fmtPlay(pos);
+    var done = Math.floor(pos / DUR * waveBars.length);
+    waveBars.forEach(function (b, i) { b.classList.toggle('done', i < done); });
+  }
+  function playTick(ts) {
+    if (!playing) return;
+    var dt = (ts - lastTs) / 1000; lastTs = ts;
+    pos += dt * SPEEDS[speedIdx];
+    if (pos >= DUR) { pos = DUR; setPlaying(false); }
+    paintProgress();
+    if (playing) playRaf = requestAnimationFrame(playTick);
+  }
+  function setPlaying(on) {
+    playing = on;
+    player.classList.toggle('is-playing', on);
+    if (on) { lastTs = performance.now(); playRaf = requestAnimationFrame(playTick); }
+    else cancelAnimationFrame(playRaf);
+  }
+  $('#playBtn').addEventListener('click', function () {
+    if (pos >= DUR) pos = 0;
+    setPlaying(!playing);
+  });
+  $('#speedPill').addEventListener('click', function () {
+    speedIdx = (speedIdx + 1) % SPEEDS.length;
+    var v = SPEEDS[speedIdx];
+    this.textContent = v.toString().replace(/\.0+$/, '') + 'x';
+  });
+  $('#closePlayer').addEventListener('click', function () {
+    setPlaying(false);
+    dock.classList.remove('is-open');
+  });
+  $('#genBtn').addEventListener('click', function () {
+    if (!ttsText.value.trim()) { toast('请先输入要转换的文字'); return; }
+    pos = 0; paintProgress();
+    dock.classList.add('is-open');
+    var v = VOICES.filter(function (x) { return x.id === selectedVoice; })[0];
+    toast('语音已生成 · ' + v.name + ' · 12.4s');
+  });
+  $('#tTot').textContent = fmtPlay(DUR);
+  paintProgress();
+
+  /* ── 历史记录：瀑布流 + 筛选 + 操作 ── */
+  var HISTORY = [
+    { id: 1, kind: 'stt', title: '产品周会纪要 · 第 34 期', dur: '42:18', date: '08-02 14:30', engine: 'whisper-1',
+      ex: '本周重点：转写引擎的流式延迟优化进入联调阶段；桌面端悬浮导航栏视觉走查通过；下周灰度发布 0.9.4，重点关注低端 GPU 机型的回退表现。' },
+    { id: 2, kind: 'tts', title: '视频开场旁白 v2', dur: '00:12', date: '08-02 11:05', engine: 'tts-1',
+      ex: '「欢迎来到本期视频，今天用三分钟，带你看完语音工作台的一周更新。」' },
+    { id: 3, kind: 'stt', title: '用户访谈 · 王小姐', dur: '28:05', date: '08-01 16:42', engine: 'whisper-1',
+      ex: '受访者提到最多的诉求是「转写完直接配音」——不想在三个软件之间来回导文件。对时间轴逐段校对的功能评价很高，但希望快捷键可以自定义。' },
+    { id: 4, kind: 'tts', title: '有声书 · 第三章试音', dur: '04:36', date: '07-30 21:18', engine: 'tts-1',
+      ex: '第三章整体情绪偏舒缓，Fable 的叙事节奏合适；第 47 句的停顿略长，下次把句间间隔从 300ms 调到 180ms 再试一版。' },
+    { id: 5, kind: 'stt', title: '灵感速记 · 快捷键方案', dur: '01:52', date: '07-29 09:14', engine: 'whisper-1',
+      ex: '按住空格说话、松手出文字——全局热键这条链路要在设置里给个开关。' },
+    { id: 6, kind: 'tts', title: '课程导学配音 · 第一章', dur: '01:05', date: '07-28 15:50', engine: 'tts-1',
+      ex: '导学部分用 1.25x 语速听起来更利落，已按这个参数导出终版。' },
+    { id: 7, kind: 'stt', title: '电话回访记录 · 企业客户 A', dur: '12:44', date: '07-27 10:02', engine: 'whisper-1',
+      ex: '客户确认续费意向，提出两点：一是批量导出 SRT，二是团队成员共享历史记录。已录入需求池，排在 P1。' },
+    { id: 8, kind: 'tts', title: '播客片头 · 低沉版', dur: '00:08', date: '07-26 20:33', engine: 'bytedance/seed-tts-2.0',
+      ex: '「这里是 VoxCast，一档关于声音与工具的节目。」Onyx 的厚度正好，片头定稿。' }
+  ];
+  var masonry = $('#masonry');
+  function kindLabel(k) { return k === 'stt' ? 'STT' : 'TTS'; }
+  HISTORY.forEach(function (h) {
+    var card = document.createElement('article');
+    card.className = 'h-card';
+    card.dataset.kind = h.kind;
+    card.setAttribute('data-od-id', 'history-card-' + h.id);
+    card.innerHTML =
+      '<span class="kind kind-' + h.kind + '">' + kindLabel(h.kind) + '</span>' +
+      '<h3 class="h-title"></h3>' +
+      '<p class="h-excerpt"></p>' +
+      '<div class="h-meta"><span>' + h.date + '</span><span>' + h.dur + '</span><span>' + h.engine + '</span></div>' +
+      '<div class="h-actions">' +
+        '<button class="icon-btn" data-act="play" title="播放"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l11-6.5z"/></svg></button>' +
+        '<button class="icon-btn" data-act="copy" title="复制"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2.5"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>' +
+        '<button class="icon-btn danger" data-act="del" title="删除"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a1.5 1.5 0 0 1 1.5-1.5h5A1.5 1.5 0 0 1 16 4v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></button>' +
+      '</div>';
+    card.querySelector('.h-title').textContent = h.title;
+    card.querySelector('.h-excerpt').textContent = h.ex;
+    card.addEventListener('click', function (e) {
+      var btn = e.target.closest('button[data-act]');
+      if (!btn) return;
+      var act = btn.dataset.act;
+      if (act === 'copy') copyText(h.ex, '已复制「' + h.title + '」内容');
+      else if (act === 'play') toast((h.kind === 'stt' ? '回放录音' : '播放配音') + ' · ' + h.dur);
+      else if (act === 'del') {
+        card.classList.add('is-leaving');
+        setTimeout(function () { card.remove(); }, 200);
+        toast('已删除「' + h.title + '」');
+      }
+    });
+    masonry.appendChild(card);
+  });
+  $('#filterRow').addEventListener('click', function (e) {
+    var chip = e.target.closest('.chip');
+    if (!chip) return;
+    var f = chip.dataset.filter;
+    $$('#filterRow .chip').forEach(function (c) { c.classList.toggle('is-on', c === chip); });
+    $$('.h-card').forEach(function (card) {
+      card.style.display = (f === 'all' || card.dataset.kind === f) ? '' : 'none';
+    });
+  });
+
+  /* ── 在线模型选择：STT / TTS 各两处入口，双向同步并持久化 ── */
+  var STT_MODELS = ['whisper-1', 'whisper-large-v3', 'seedasr-1'];
+  var TTS_MODELS = ['tts-1', 'tts-1-hd', 'bytedance/seed-tts-2.0'];
+  var sttModel = 'whisper-1', ttsModel = 'tts-1';
+  try {
+    sttModel = localStorage.getItem('vf-stt-model') || sttModel;
+    ttsModel = localStorage.getItem('vf-tts-model') || ttsModel;
+  } catch (e) {}
+  var CHECK_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
+  var CHEV_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>';
+  function closeAllDD() {
+    $$('.model-dd').forEach(function (d) {
+      d.classList.remove('is-open');
+      var m = d.querySelector('.model-menu');
+      if (m) m.hidden = true;
+    });
+  }
+  function renderAllDD() { $$('.model-dd').forEach(function (d) { if (d._render) d._render(); }); }
+  function makeModelDD(id, kind) {
+    var dd = $(id);
+    var models = kind === 'stt' ? STT_MODELS : TTS_MODELS;
+    function cur() { return kind === 'stt' ? sttModel : ttsModel; }
+    function render() {
+      dd.classList.remove('is-open');
+      dd.innerHTML = '<button class="model-trigger" aria-haspopup="listbox"><span class="model-val"></span>' + CHEV_SVG + '</button><div class="model-menu" role="listbox" hidden></div>';
+      dd.querySelector('.model-val').textContent = cur();
+      var menu = dd.querySelector('.model-menu');
+      models.forEach(function (m) {
+        var opt = document.createElement('button');
+        opt.className = 'model-opt' + (m === cur() ? ' is-on' : '');
+        opt.setAttribute('role', 'option');
+        opt.setAttribute('aria-selected', m === cur() ? 'true' : 'false');
+        opt.innerHTML = '<span></span>' + CHECK_SVG;
+        opt.querySelector('span').textContent = m;
+        opt.addEventListener('click', function (ev) {
+          ev.stopPropagation();
+          if (kind === 'stt') sttModel = m; else ttsModel = m;
+          try { localStorage.setItem('vf-' + kind + '-model', m); } catch (e) {}
+          renderAllDD();
+          toast((kind === 'stt' ? '转写模型' : '合成模型') + ' · ' + m + '');
+        });
+        menu.appendChild(opt);
+      });
+      dd.querySelector('.model-trigger').addEventListener('click', function (ev) {
+        ev.stopPropagation();
+        var wasOpen = dd.classList.contains('is-open');
+        closeAllDD();
+        if (!wasOpen) { dd.classList.add('is-open'); menu.hidden = false; }
+      });
+    }
+    dd._render = render;
+    render();
+  }
+  makeModelDD('#sttModelSelect', 'stt');
+  makeModelDD('#ttsModelSelect', 'tts');
+  makeModelDD('#sttModelSelect2', 'stt');
+  makeModelDD('#ttsModelSelect2', 'tts');
+  document.addEventListener('click', closeAllDD);
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeAllDD(); });
+
+  /* ── API 连接：Base URL + 密钥，本机持久化 ── */
+  var baseUrlInput = $('#baseUrlInput');
+  try { baseUrlInput.value = localStorage.getItem('vf-base-url') || ''; } catch (e) {}
+  baseUrlInput.addEventListener('change', function () {
+    try { localStorage.setItem('vf-base-url', baseUrlInput.value); } catch (e) {}
+    toast(baseUrlInput.value ? 'Base URL 已保存 · 仅存本机' : 'Base URL 已清除');
+  });
+  var keyInput = $('#apiKeyInput');
+  try { keyInput.value = localStorage.getItem('vf-api-key') || ''; } catch (e) {}
+  keyInput.addEventListener('change', function () {
+    try { localStorage.setItem('vf-api-key', keyInput.value); } catch (e) {}
+    toast(keyInput.value ? 'API 密钥已保存 · 仅存本机' : 'API 密钥已清除');
+  });
+  $('#keyToggle').addEventListener('click', function () {
+    var show = keyInput.type === 'password';
+    keyInput.type = show ? 'text' : 'password';
+    this.querySelector('.ic-eye').style.display = show ? 'none' : '';
+    this.querySelector('.ic-eye-off').style.display = show ? '' : 'none';
+  });
+
+  /* ── 音频上传转写 ── */
+  var audioFile = $('#audioFile');
+  $('#uploadZone').addEventListener('click', function () { audioFile.click(); });
+  audioFile.addEventListener('change', function () {
+    var f = audioFile.files && audioFile.files[0];
+    if (!f) return;
+    var kb = Math.max(1, Math.round(f.size / 1024));
+    $('#uploadLabel').textContent = '已选择 ' + f.name + ' · ' + kb + ' KB';
+    showResult();
+    $('#resultMeta').textContent = '3 段 · 12.5s · 来源：' + f.name;
+    toast('上传完成 · 已用 ' + sttModel + ' 转写');
+    audioFile.value = '';
+  });
+
+  /* ── 窗口控制（原型语义反馈） ── */
+  $('#winMin').addEventListener('click', function () { toast('原型预览 · 窗口控制仅作示意'); });
+  $('#winMax').addEventListener('click', function () { toast('原型预览 · 窗口控制仅作示意'); });
+  $('#winClose').addEventListener('click', function () { toast('原型预览 · 关闭仅作示意'); });
+
+  /* ── 本地数据管理 ── */
+  $('#clearData').addEventListener('click', function () {
+    try { localStorage.removeItem('vf-theme'); localStorage.removeItem('vf-view'); localStorage.removeItem('vf-stt-model'); localStorage.removeItem('vf-tts-model'); localStorage.removeItem('vf-api-key'); localStorage.removeItem('vf-base-url'); } catch (e) {}
+    toast('本地缓存已清除');
+  });
+
+  /* ── 深链状态：#theme=dark&view=tts&player=1&rec=1（可分享的视图定位，也是评审截图接口） ── */
+  (function applyDeepLink() {
+    var h = (location.hash || '').replace(/^#/, '');
+    if (!h) return;
+    var p = {};
+    h.split('&').forEach(function (kv) { var parts = kv.split('='); p[parts[0]] = parts[1]; });
+    if (p.theme === 'dark' || p.theme === 'light') applyTheme(p.theme);
+    if (p.view) switchView(p.view);
+    if (p.player === '1') dock.classList.add('is-open');
+    if (p.rec === '1') setRecording(true);
+  })();
+
+  /* ── 快捷键 ── */
+  document.addEventListener('keydown', function (e) {
+    var tag = (e.target.tagName || '').toLowerCase();
+    if (tag === 'input' || tag === 'textarea' || tag === 'button' || tag === 'select' || tag === 'a') return;
+    if (e.key === '1') switchView('stt');
+    else if (e.key === '2') switchView('tts');
+    else if (e.key === '3') switchView('history');
+    else if (e.key === '4') switchView('settings');
+    else if (e.key === 'Escape') { setPlaying(false); dock.classList.remove('is-open'); }
+    else if (e.code === 'Space' && currentView === 'stt') {
+      e.preventDefault();
+      setRecording(!recording);
+    }
+  });
+})();
+</script>
+
+
+</body></html>
