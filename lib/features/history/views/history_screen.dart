@@ -1,14 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/errors/app_exception.dart';
+import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../widgets/app_status_banner.dart';
 import '../models/history_record.dart';
 import '../providers/history_provider.dart';
+
+enum _HistoryFilter { all, stt, tts }
 
 class HistoryScreen extends ConsumerStatefulWidget {
   const HistoryScreen({super.key, this.pageFocusNode});
@@ -23,6 +27,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
   late final TextEditingController _searchController;
   late final FocusNode _searchFocusNode;
   String _activeQuery = '';
+  _HistoryFilter _filter = _HistoryFilter.all;
 
   @override
   void initState() {
@@ -46,6 +51,9 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
     final locale = Localizations.localeOf(context);
     final usesLargeText = MediaQuery.textScalerOf(context).scale(1) >= 1.6;
     final cachedRecords = history.valueOrNull;
+    final useDesktopLayout =
+        Theme.of(context).platform == TargetPlatform.windows &&
+            MediaQuery.sizeOf(context).width >= 760;
     final loadErrorMessage = history.hasError
         ? history.error is AppException
             ? l10n.appError(history.error! as AppException)
@@ -75,51 +83,228 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
         focusNode: widget.pageFocusNode,
         autofocus: widget.pageFocusNode == null,
         skipTraversal: true,
-        child: Scaffold(
-          appBar: AppBar(
-            toolbarHeight: AppTheme.responsiveAppBarHeight(
-              context,
-              largeTextMaxLines: 1,
-            ),
-            title: Text(
-              l10n.text(zh: '历史记录', en: 'History'),
-              maxLines: 1,
-            ),
-            actions: [
-              IconButton(
-                tooltip: l10n.text(zh: '刷新', en: 'Refresh'),
-                onPressed: ref.read(historyProvider.notifier).load,
-                icon: const Icon(Icons.refresh),
-              ),
-            ],
-          ),
-          body: FocusTraversalGroup(
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 960),
-                child: Padding(
-                  padding: AppLayout.pagePadding(context),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Text(
-                        usesLargeText
-                            ? l10n.text(
-                                zh: '查找并管理本机历史记录。',
-                                en: 'Find and manage local history.',
-                              )
-                            : l10n.text(
-                                zh: '查找转录与语音合成记录，并管理保存在本机的关联音频。',
-                                en: 'Find transcripts and generated speech, and manage associated audio stored on this device.',
-                              ),
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .onSurfaceVariant,
+        child: useDesktopLayout
+            ? _buildDesktopPage(
+                history: history,
+                cachedRecords: cachedRecords,
+                loadErrorMessage: loadErrorMessage,
+                playback: playback,
+              )
+            : Scaffold(
+                appBar: AppBar(
+                  toolbarHeight: AppTheme.responsiveAppBarHeight(
+                    context,
+                    largeTextMaxLines: 1,
+                  ),
+                  title: Text(
+                    l10n.text(zh: '历史记录', en: 'History'),
+                    maxLines: 1,
+                  ),
+                  actions: [
+                    IconButton(
+                      tooltip: l10n.text(zh: '刷新', en: 'Refresh'),
+                      onPressed: ref.read(historyProvider.notifier).load,
+                      icon: const Icon(Icons.refresh),
+                    ),
+                  ],
+                ),
+                body: FocusTraversalGroup(
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 960),
+                      child: Padding(
+                        padding: AppLayout.pagePadding(context),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Text(
+                              usesLargeText
+                                  ? l10n.text(
+                                      zh: '查找并管理本机历史记录。',
+                                      en: 'Find and manage local history.',
+                                    )
+                                  : l10n.text(
+                                      zh: '查找转录与语音合成记录，并管理保存在本机的关联音频。',
+                                      en: 'Find transcripts and generated speech, and manage associated audio stored on this device.',
+                                    ),
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodyMedium
+                                  ?.copyWith(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant,
+                                  ),
                             ),
+                            const SizedBox(height: AppSpacing.md),
+                            TextField(
+                              key: const Key('historySearchField'),
+                              controller: _searchController,
+                              focusNode: _searchFocusNode,
+                              textInputAction: TextInputAction.search,
+                              onChanged: (_) => setState(() {}),
+                              onSubmitted: _submitSearch,
+                              decoration: InputDecoration(
+                                labelText: l10n.text(
+                                  zh: '搜索历史记录',
+                                  en: 'Search history',
+                                ),
+                                hintText: l10n.text(
+                                  zh: '搜索转录或合成文字',
+                                  en: 'Search transcripts or generated text',
+                                ),
+                                prefixIcon: const Icon(Icons.search),
+                                suffixIcon: _searchController.text.isEmpty
+                                    ? null
+                                    : IconButton(
+                                        tooltip: l10n.text(
+                                          zh: '清空搜索',
+                                          en: 'Clear search',
+                                        ),
+                                        onPressed: _clearSearch,
+                                        icon: const Icon(Icons.clear),
+                                      ),
+                              ),
+                            ),
+                            const SizedBox(height: AppSpacing.sm),
+                            Expanded(
+                              child: cachedRecords != null
+                                  ? _HistoryResults(
+                                      records: cachedRecords,
+                                      isRefreshing: history.isLoading,
+                                      loadErrorMessage: loadErrorMessage,
+                                      onRetry: ref
+                                          .read(historyProvider.notifier)
+                                          .load,
+                                      query: _activeQuery,
+                                      playback: playback,
+                                      onClearSearch: _clearSearch,
+                                      onPlay: (record) => ref
+                                          .read(
+                                              historyPlaybackProvider.notifier)
+                                          .toggle(record),
+                                      onCopy: (record) => _copy(record.text),
+                                      onDelete: _delete,
+                                    )
+                                  : history.isLoading
+                                      ? _LoadingState(
+                                          isSearch: _activeQuery.isNotEmpty,
+                                        )
+                                      : _ErrorState(
+                                          message: loadErrorMessage ??
+                                              l10n.text(
+                                                zh: '无法加载历史记录。',
+                                                en: 'History could not be loaded.',
+                                              ),
+                                          onRetry: ref
+                                              .read(historyProvider.notifier)
+                                              .load,
+                                        ),
+                            ),
+                          ],
+                        ),
                       ),
-                      const SizedBox(height: AppSpacing.md),
-                      TextField(
+                    ),
+                  ),
+                ),
+              ),
+      ),
+    );
+  }
+
+  Widget _buildDesktopPage({
+    required AsyncValue<List<HistoryRecord>> history,
+    required List<HistoryRecord>? cachedRecords,
+    required String? loadErrorMessage,
+    required HistoryPlaybackState playback,
+  }) {
+    final l10n = context.l10n;
+    final colors = Theme.of(context).colorScheme;
+    final filteredRecords = cachedRecords
+        ?.where(
+          (record) => switch (_filter) {
+            _HistoryFilter.all => true,
+            _HistoryFilter.stt => record.type == HistoryType.stt,
+            _HistoryFilter.tts => record.type == HistoryType.tts,
+          },
+        )
+        .toList(growable: false);
+
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: FocusTraversalGroup(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 920),
+            child: Padding(
+              padding: AppLayout.pagePadding(context),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final stackHeader = constraints.maxWidth < 560 ||
+                          MediaQuery.textScalerOf(context).scale(1) >= 1.6;
+                      final title = Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            l10n.text(
+                              zh: 'LIBRARY · 本地存档',
+                              en: 'LIBRARY · LOCAL ARCHIVE',
+                            ),
+                            style: Theme.of(context)
+                                .textTheme
+                                .labelSmall
+                                ?.copyWith(
+                                  color: colors.primary,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 1.4,
+                                ),
+                          ),
+                          const SizedBox(height: AppSpacing.xs),
+                          Text(
+                            l10n.text(zh: '历史记录', en: 'History'),
+                            style: Theme.of(context)
+                                .textTheme
+                                .headlineMedium
+                                ?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                  letterSpacing: -0.6,
+                                ),
+                          ),
+                        ],
+                      );
+                      final refreshButton = IconButton(
+                        tooltip: l10n.text(zh: '刷新', en: 'Refresh'),
+                        onPressed: ref.read(historyProvider.notifier).load,
+                        icon: const Icon(Icons.refresh),
+                      );
+                      if (stackHeader) {
+                        return Row(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Expanded(child: title),
+                            const SizedBox(width: AppSpacing.sm),
+                            refreshButton,
+                          ],
+                        );
+                      }
+                      return Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Expanded(child: title),
+                          refreshButton,
+                        ],
+                      );
+                    },
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final stackControls = constraints.maxWidth < 680 ||
+                          MediaQuery.textScalerOf(context).scale(1) >= 1.6;
+                      final searchField = TextField(
                         key: const Key('historySearchField'),
                         controller: _searchController,
                         focusNode: _searchFocusNode,
@@ -147,42 +332,70 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                                   icon: const Icon(Icons.clear),
                                 ),
                         ),
-                      ),
-                      const SizedBox(height: AppSpacing.sm),
-                      Expanded(
-                        child: cachedRecords != null
-                            ? _HistoryResults(
-                                records: cachedRecords,
-                                isRefreshing: history.isLoading,
-                                loadErrorMessage: loadErrorMessage,
+                      );
+                      final filters = _DesktopHistoryFilters(
+                        value: _filter,
+                        onChanged: (filter) => setState(() => _filter = filter),
+                      );
+                      if (stackControls) {
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            searchField,
+                            const SizedBox(height: AppSpacing.sm),
+                            Align(
+                              alignment: AlignmentDirectional.centerStart,
+                              child: filters,
+                            ),
+                          ],
+                        );
+                      }
+                      return Row(
+                        children: [
+                          Expanded(child: searchField),
+                          const SizedBox(width: AppSpacing.md),
+                          filters,
+                        ],
+                      );
+                    },
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  Expanded(
+                    child: filteredRecords != null
+                        ? _HistoryResults(
+                            records: filteredRecords,
+                            isRefreshing: history.isLoading,
+                            loadErrorMessage: loadErrorMessage,
+                            onRetry: ref.read(historyProvider.notifier).load,
+                            query: _activeQuery,
+                            playback: playback,
+                            onClearSearch: _clearSearch,
+                            onPlay: (record) => ref
+                                .read(historyPlaybackProvider.notifier)
+                                .toggle(record),
+                            onCopy: (record) => _copy(record.text),
+                            onDelete: _delete,
+                            desktop: true,
+                            hasTypeFilter: _filter != _HistoryFilter.all,
+                            onClearTypeFilter: () => setState(
+                              () => _filter = _HistoryFilter.all,
+                            ),
+                          )
+                        : history.isLoading
+                            ? _LoadingState(
+                                isSearch: _activeQuery.isNotEmpty,
+                              )
+                            : _ErrorState(
+                                message: loadErrorMessage ??
+                                    l10n.text(
+                                      zh: '无法加载历史记录。',
+                                      en: 'History could not be loaded.',
+                                    ),
                                 onRetry:
                                     ref.read(historyProvider.notifier).load,
-                                query: _activeQuery,
-                                playback: playback,
-                                onClearSearch: _clearSearch,
-                                onPlay: (record) => ref
-                                    .read(historyPlaybackProvider.notifier)
-                                    .toggle(record),
-                                onCopy: (record) => _copy(record.text),
-                                onDelete: _delete,
-                              )
-                            : history.isLoading
-                                ? _LoadingState(
-                                    isSearch: _activeQuery.isNotEmpty,
-                                  )
-                                : _ErrorState(
-                                    message: loadErrorMessage ??
-                                        l10n.text(
-                                          zh: '无法加载历史记录。',
-                                          en: 'History could not be loaded.',
-                                        ),
-                                    onRetry:
-                                        ref.read(historyProvider.notifier).load,
-                                  ),
-                      ),
-                    ],
+                              ),
                   ),
-                ),
+                ],
               ),
             ),
           ),
@@ -328,6 +541,9 @@ class _HistoryResults extends StatelessWidget {
     required this.onPlay,
     required this.onCopy,
     required this.onDelete,
+    this.desktop = false,
+    this.hasTypeFilter = false,
+    this.onClearTypeFilter,
   });
 
   final List<HistoryRecord> records;
@@ -340,6 +556,9 @@ class _HistoryResults extends StatelessWidget {
   final ValueChanged<HistoryRecord> onPlay;
   final ValueChanged<HistoryRecord> onCopy;
   final ValueChanged<HistoryRecord> onDelete;
+  final bool desktop;
+  final bool hasTypeFilter;
+  final VoidCallback? onClearTypeFilter;
 
   @override
   Widget build(BuildContext context) {
@@ -418,16 +637,532 @@ class _HistoryResults extends StatelessWidget {
               ? _EmptyState(
                   query: query,
                   onClearSearch: onClearSearch,
+                  hasTypeFilter: hasTypeFilter,
+                  onClearTypeFilter: onClearTypeFilter,
                 )
-              : _HistoryList(
-                  records: records,
-                  playback: playback,
-                  onPlay: onPlay,
-                  onCopy: onCopy,
-                  onDelete: onDelete,
-                ),
+              : desktop
+                  ? _DesktopHistoryGrid(
+                      records: records,
+                      playback: playback,
+                      onPlay: onPlay,
+                      onCopy: onCopy,
+                      onDelete: onDelete,
+                    )
+                  : _HistoryList(
+                      records: records,
+                      playback: playback,
+                      onPlay: onPlay,
+                      onCopy: onCopy,
+                      onDelete: onDelete,
+                    ),
         ),
       ],
+    );
+  }
+}
+
+class _DesktopHistoryFilters extends StatelessWidget {
+  const _DesktopHistoryFilters({
+    required this.value,
+    required this.onChanged,
+  });
+
+  final _HistoryFilter value;
+  final ValueChanged<_HistoryFilter> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    return Wrap(
+      spacing: AppSpacing.xs,
+      runSpacing: AppSpacing.xs,
+      children: [
+        _DesktopFilterChip(
+          key: const Key('historyFilterAll'),
+          label: l10n.text(zh: '全部', en: 'All'),
+          selected: value == _HistoryFilter.all,
+          onPressed: () => onChanged(_HistoryFilter.all),
+        ),
+        _DesktopFilterChip(
+          key: const Key('historyFilterStt'),
+          label: l10n.text(zh: 'STT 转写', en: 'STT transcripts'),
+          selected: value == _HistoryFilter.stt,
+          onPressed: () => onChanged(_HistoryFilter.stt),
+        ),
+        _DesktopFilterChip(
+          key: const Key('historyFilterTts'),
+          label: l10n.text(zh: 'TTS 配音', en: 'TTS speech'),
+          selected: value == _HistoryFilter.tts,
+          onPressed: () => onChanged(_HistoryFilter.tts),
+        ),
+      ],
+    );
+  }
+}
+
+class _DesktopFilterChip extends StatefulWidget {
+  const _DesktopFilterChip({
+    required this.label,
+    required this.selected,
+    required this.onPressed,
+    super.key,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onPressed;
+
+  @override
+  State<_DesktopFilterChip> createState() => _DesktopFilterChipState();
+}
+
+class _DesktopFilterChipState extends State<_DesktopFilterChip> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final duration = MediaQuery.disableAnimationsOf(context)
+        ? Duration.zero
+        : const Duration(milliseconds: 200);
+    final foreground = widget.selected
+        ? colors.surface
+        : (_hovered ? colors.onSurface : colors.onSurfaceVariant);
+
+    return Semantics(
+      button: true,
+      selected: widget.selected,
+      label: widget.label,
+      child: ExcludeSemantics(
+        child: MouseRegion(
+          onEnter: (_) => setState(() => _hovered = true),
+          onExit: (_) => setState(() => _hovered = false),
+          child: AnimatedContainer(
+            duration: duration,
+            decoration: BoxDecoration(
+              color: widget.selected ? colors.onSurface : colors.surface,
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(
+                color:
+                    widget.selected ? colors.onSurface : colors.outlineVariant,
+              ),
+              boxShadow: _hovered && !widget.selected
+                  ? [
+                      BoxShadow(
+                        color: colors.shadow.withValues(alpha: 0.07),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ]
+                  : null,
+            ),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(999),
+                onTap: widget.onPressed,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.md,
+                    vertical: AppSpacing.xs,
+                  ),
+                  child: Text(
+                    widget.label,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: foreground,
+                          fontWeight: FontWeight.w600,
+                        ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DesktopHistoryGrid extends StatelessWidget {
+  const _DesktopHistoryGrid({
+    required this.records,
+    required this.playback,
+    required this.onPlay,
+    required this.onCopy,
+    required this.onDelete,
+  });
+
+  final List<HistoryRecord> records;
+  final HistoryPlaybackState playback;
+  final ValueChanged<HistoryRecord> onPlay;
+  final ValueChanged<HistoryRecord> onCopy;
+  final ValueChanged<HistoryRecord> onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final textScale = MediaQuery.textScalerOf(context).scale(1);
+        final singleColumn = textScale >= 1.3 || constraints.maxWidth < 680;
+        final entries = records.indexed.toList(growable: false);
+
+        Widget card((int, HistoryRecord) entry) {
+          final (index, record) = entry;
+          return Padding(
+            padding: const EdgeInsets.only(bottom: AppSpacing.md),
+            child: FocusTraversalOrder(
+              order: NumericFocusOrder(index.toDouble()),
+              child: _DesktopHistoryCard(
+                record: record,
+                semanticOrder: index.toDouble(),
+                isPlaying: playback.recordId == record.id && playback.isPlaying,
+                onPlay: () => onPlay(record),
+                onCopy: () => onCopy(record),
+                onDelete: () => onDelete(record),
+              ),
+            ),
+          );
+        }
+
+        final content = singleColumn
+            ? Column(children: entries.map(card).toList(growable: false))
+            : _DesktopMasonryColumns(entries: entries, itemBuilder: card);
+
+        return FocusTraversalGroup(
+          policy: OrderedTraversalPolicy(),
+          child: Scrollbar(
+            child: SingleChildScrollView(
+              primary: true,
+              padding: const EdgeInsets.only(bottom: AppSpacing.md),
+              child: content,
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _DesktopMasonryColumns extends StatelessWidget {
+  const _DesktopMasonryColumns({
+    required this.entries,
+    required this.itemBuilder,
+  });
+
+  final List<(int, HistoryRecord)> entries;
+  final Widget Function((int, HistoryRecord)) itemBuilder;
+
+  @override
+  Widget build(BuildContext context) {
+    final left = <(int, HistoryRecord)>[];
+    final right = <(int, HistoryRecord)>[];
+    var leftWeight = 0.0;
+    var rightWeight = 0.0;
+    for (final entry in entries) {
+      final weight = 132 + entry.$2.text.runes.length.clamp(0, 220) * 0.48;
+      if (leftWeight <= rightWeight) {
+        left.add(entry);
+        leftWeight += weight;
+      } else {
+        right.add(entry);
+        rightWeight += weight;
+      }
+    }
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: Column(
+            children: left.map(itemBuilder).toList(growable: false),
+          ),
+        ),
+        const SizedBox(width: AppSpacing.md),
+        Expanded(
+          child: Column(
+            children: right.map(itemBuilder).toList(growable: false),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _DesktopHistoryCard extends StatefulWidget {
+  const _DesktopHistoryCard({
+    required this.record,
+    required this.semanticOrder,
+    required this.isPlaying,
+    required this.onPlay,
+    required this.onCopy,
+    required this.onDelete,
+  });
+
+  final HistoryRecord record;
+  final double semanticOrder;
+  final bool isPlaying;
+  final VoidCallback onPlay;
+  final VoidCallback onCopy;
+  final VoidCallback onDelete;
+
+  @override
+  State<_DesktopHistoryCard> createState() => _DesktopHistoryCardState();
+}
+
+class _DesktopHistoryCardState extends State<_DesktopHistoryCard> {
+  bool _hovered = false;
+  bool _focused = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final semantics = context.semanticColors;
+    final l10n = context.l10n;
+    final textScale = MediaQuery.textScalerOf(context).scale(1);
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
+    final duration =
+        reduceMotion ? Duration.zero : const Duration(milliseconds: 200);
+    final typeLabel = widget.record.type == HistoryType.stt ? 'STT' : 'TTS';
+    final typeColor = widget.record.type == HistoryType.stt
+        ? colors.primary
+        : semantics.success;
+    final typeBackground = widget.record.type == HistoryType.stt
+        ? colors.primaryContainer
+        : semantics.successContainer;
+    final formattedDate = _dateTime(context, widget.record.createdAt.toLocal());
+    final showActions = _hovered || _focused || textScale >= 1.3;
+    final semanticText = widget.record.text.length > 180
+        ? '${widget.record.text.substring(0, 180)}…'
+        : widget.record.text;
+
+    return Semantics(
+      container: true,
+      explicitChildNodes: true,
+      sortKey: OrdinalSortKey(widget.semanticOrder),
+      label: l10n.text(
+        zh: '$typeLabel 记录，$formattedDate。$semanticText',
+        en: '$typeLabel item, $formattedDate. $semanticText',
+      ),
+      child: Focus(
+        canRequestFocus: false,
+        onFocusChange: (focused) {
+          if (_focused != focused) {
+            setState(() => _focused = focused);
+          }
+        },
+        child: MouseRegion(
+          cursor: SystemMouseCursors.basic,
+          onEnter: (_) => setState(() => _hovered = true),
+          onExit: (_) => setState(() => _hovered = false),
+          child: AnimatedContainer(
+            duration: duration,
+            curve: Curves.easeOutCubic,
+            transform: Matrix4.translationValues(0, _hovered ? -2 : 0, 0),
+            decoration: BoxDecoration(
+              color: colors.surface,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: colors.outlineVariant),
+              boxShadow: [
+                BoxShadow(
+                  color: colors.shadow.withValues(
+                    alpha: _hovered ? 0.10 : 0.045,
+                  ),
+                  blurRadius: _hovered ? 28 : 16,
+                  offset: Offset(0, _hovered ? 8 : 4),
+                ),
+              ],
+            ),
+            child: Stack(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 17, 18, 14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      ExcludeSemantics(
+                        child: Row(
+                          children: [
+                            DecoratedBox(
+                              decoration: BoxDecoration(
+                                color: typeBackground,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: AppSpacing.sm,
+                                  vertical: AppSpacing.xxs,
+                                ),
+                                child: Text(
+                                  typeLabel,
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .labelSmall
+                                      ?.copyWith(
+                                    color: typeColor,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: 0.8,
+                                    fontFamily: 'Cascadia Code',
+                                    fontFamilyFallback: const [
+                                      'JetBrains Mono',
+                                      'Consolas',
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                            if (widget.isPlaying) ...[
+                              const SizedBox(width: AppSpacing.xs),
+                              Icon(
+                                Icons.graphic_eq,
+                                size: 16,
+                                color: colors.primary,
+                              ),
+                              const SizedBox(width: AppSpacing.xxs),
+                              Text(
+                                l10n.text(zh: '正在播放', en: 'Playing'),
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .labelSmall
+                                    ?.copyWith(
+                                      color: colors.primary,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                              ),
+                            ],
+                            const Spacer(),
+                            const SizedBox(width: 104),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      ExcludeSemantics(
+                        child: Text(
+                          widget.record.text,
+                          maxLines: textScale >= 1.3 ? null : 5,
+                          overflow: textScale >= 1.3
+                              ? TextOverflow.visible
+                              : TextOverflow.ellipsis,
+                          style:
+                              Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color: colors.onSurfaceVariant,
+                                    height: 1.6,
+                                  ),
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      Divider(color: colors.outlineVariant),
+                      const SizedBox(height: AppSpacing.xs),
+                      ExcludeSemantics(
+                        child: Text(
+                          formattedDate,
+                          textAlign: TextAlign.end,
+                          style:
+                              Theme.of(context).textTheme.labelSmall?.copyWith(
+                            color: colors.onSurfaceVariant,
+                            fontFamily: 'Cascadia Code',
+                            fontFamilyFallback: const [
+                              'JetBrains Mono',
+                              'Consolas',
+                            ],
+                            fontFeatures: const [
+                              FontFeature.tabularFigures(),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                PositionedDirectional(
+                  top: AppSpacing.sm,
+                  end: AppSpacing.sm,
+                  child: AnimatedOpacity(
+                    duration: duration,
+                    opacity: showActions ? 1 : 0,
+                    child: IgnorePointer(
+                      ignoring: !showActions,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: colors.surface.withValues(alpha: 0.96),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: colors.outlineVariant),
+                          boxShadow: [
+                            BoxShadow(
+                              color: colors.shadow.withValues(alpha: 0.08),
+                              blurRadius: 14,
+                              offset: const Offset(0, 5),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _DesktopHistoryAction(
+                              tooltip: widget.isPlaying
+                                  ? l10n.text(zh: '暂停', en: 'Pause')
+                                  : l10n.text(zh: '播放', en: 'Play'),
+                              icon: widget.isPlaying
+                                  ? Icons.pause
+                                  : Icons.play_arrow,
+                              onPressed: widget.onPlay,
+                            ),
+                            _DesktopHistoryAction(
+                              tooltip: l10n.text(zh: '复制', en: 'Copy'),
+                              icon: Icons.copy_outlined,
+                              onPressed: widget.onCopy,
+                            ),
+                            Semantics(
+                              button: true,
+                              label: l10n.text(
+                                zh: '删除此条历史记录，需要确认',
+                                en: 'Delete this history item. Confirmation required.',
+                              ),
+                              excludeSemantics: true,
+                              child: _DesktopHistoryAction(
+                                tooltip: l10n.text(zh: '删除', en: 'Delete'),
+                                icon: Icons.delete_outline,
+                                foregroundColor: colors.error,
+                                onPressed: widget.onDelete,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DesktopHistoryAction extends StatelessWidget {
+  const _DesktopHistoryAction({
+    required this.tooltip,
+    required this.icon,
+    required this.onPressed,
+    this.foregroundColor,
+  });
+
+  final String tooltip;
+  final IconData icon;
+  final VoidCallback onPressed;
+  final Color? foregroundColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      tooltip: tooltip,
+      onPressed: onPressed,
+      color: foregroundColor,
+      icon: Icon(icon, size: 17),
+      constraints: const BoxConstraints.tightFor(width: 32, height: 32),
+      padding: EdgeInsets.zero,
+      visualDensity: VisualDensity.compact,
     );
   }
 }
@@ -755,15 +1490,23 @@ class _RecordActions extends StatelessWidget {
 }
 
 class _EmptyState extends StatelessWidget {
-  const _EmptyState({required this.query, required this.onClearSearch});
+  const _EmptyState({
+    required this.query,
+    required this.onClearSearch,
+    this.hasTypeFilter = false,
+    this.onClearTypeFilter,
+  });
 
   final String query;
   final VoidCallback onClearSearch;
+  final bool hasTypeFilter;
+  final VoidCallback? onClearTypeFilter;
 
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final isSearch = query.isNotEmpty;
+    final isFiltered = !isSearch && hasTypeFilter;
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -786,7 +1529,7 @@ class _EmptyState extends StatelessWidget {
                         child: Padding(
                           padding: const EdgeInsets.all(AppSpacing.sm),
                           child: Icon(
-                            isSearch
+                            isSearch || isFiltered
                                 ? Icons.search_off
                                 : Icons.history_toggle_off,
                             size: 32,
@@ -801,10 +1544,15 @@ class _EmptyState extends StatelessWidget {
                                 zh: '未找到匹配的历史记录',
                                 en: 'No matching history',
                               )
-                            : context.l10n.text(
-                                zh: '暂无历史记录',
-                                en: 'No history yet',
-                              ),
+                            : isFiltered
+                                ? context.l10n.text(
+                                    zh: '此类型暂无记录',
+                                    en: 'No items of this type',
+                                  )
+                                : context.l10n.text(
+                                    zh: '暂无历史记录',
+                                    en: 'No history yet',
+                                  ),
                         textAlign: TextAlign.center,
                         style: Theme.of(context).textTheme.titleMedium,
                       ),
@@ -815,10 +1563,15 @@ class _EmptyState extends StatelessWidget {
                                 zh: '没有找到包含“$query”的记录。请检查关键词或清除搜索。',
                                 en: 'No items contain “$query”. Check the search term or clear the search.',
                               )
-                            : context.l10n.text(
-                                zh: '还没有历史记录。完成一次转录或语音合成后会显示在这里。',
-                                en: 'Completed transcripts and generated speech will appear here.',
-                              ),
+                            : isFiltered
+                                ? context.l10n.text(
+                                    zh: '当前筛选条件下没有记录，请切换类型查看其他本地存档。',
+                                    en: 'There are no records for this filter. Choose another type to view local items.',
+                                  )
+                                : context.l10n.text(
+                                    zh: '还没有历史记录。完成一次转录或语音合成后会显示在这里。',
+                                    en: 'Completed transcripts and generated speech will appear here.',
+                                  ),
                         textAlign: TextAlign.center,
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                               color: colors.onSurfaceVariant,
@@ -832,6 +1585,16 @@ class _EmptyState extends StatelessWidget {
                           label: Text(context.l10n.text(
                             zh: '清空搜索',
                             en: 'Clear search',
+                          )),
+                        ),
+                      ] else if (isFiltered && onClearTypeFilter != null) ...[
+                        const SizedBox(height: AppSpacing.md),
+                        OutlinedButton.icon(
+                          onPressed: onClearTypeFilter,
+                          icon: const Icon(Icons.filter_alt_off_outlined),
+                          label: Text(context.l10n.text(
+                            zh: '显示全部',
+                            en: 'Show all',
                           )),
                         ),
                       ],
