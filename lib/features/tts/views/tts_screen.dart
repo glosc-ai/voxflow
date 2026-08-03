@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -12,6 +14,7 @@ import '../../../widgets/app_section.dart';
 import '../../../widgets/inline_error_banner.dart';
 import '../models/tts_state.dart';
 import '../providers/tts_provider.dart';
+import '../widgets/desktop_tts_workspace.dart';
 
 class TtsScreen extends ConsumerStatefulWidget {
   const TtsScreen({super.key, this.pageFocusNode});
@@ -24,6 +27,7 @@ class TtsScreen extends ConsumerStatefulWidget {
 
 class _TtsScreenState extends ConsumerState<TtsScreen> {
   late final TextEditingController _textController;
+  String? _dismissedAudioPath;
 
   @override
   void initState() {
@@ -65,98 +69,172 @@ class _TtsScreenState extends ConsumerState<TtsScreen> {
       }
     }
 
-    return Scaffold(
-      appBar: AppBar(
-        toolbarHeight: AppTheme.responsiveAppBarHeight(
-          context,
-          largeTextMaxLines: 2,
-        ),
-        title: Text(
-          pageTitle,
-          maxLines: 2,
-          softWrap: true,
-        ),
-      ),
-      body: CallbackShortcuts(
-        bindings: {
-          const SingleActivator(LogicalKeyboardKey.enter, control: true):
-              synthesize,
-          const SingleActivator(LogicalKeyboardKey.numpadEnter, control: true):
-              synthesize,
-        },
-        child: Focus(
-          key: const Key('ttsPageFocus'),
-          focusNode: widget.pageFocusNode,
-          autofocus: widget.pageFocusNode == null,
-          skipTraversal: true,
-          child: FocusTraversalGroup(
-            policy: ReadingOrderTraversalPolicy(),
-            child: SafeArea(
-              top: false,
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final platform = Theme.of(context).platform;
-                  final stacked = platform != TargetPlatform.windows ||
-                      AppLayout.useStackedLayout(context);
-                  final editor = _TextEditorSection(
-                    controller: _textController,
-                    isGenerating: state.isGenerating,
-                    expanded: !stacked,
-                    onClear: _confirmClearText,
-                  );
-                  final parameters = _VoiceParametersSection(
-                    state: state,
-                    voiceOptions: voiceOptions,
-                    usesSeedTtsSpeakerIds: notifier.usesSeedTtsSpeakerIds,
-                    showKeyboardHint: platform == TargetPlatform.windows,
-                    onSynthesize: synthesize,
-                  );
+    return LayoutBuilder(
+      builder: (context, pageConstraints) {
+        final useDesktop =
+            Theme.of(context).platform == TargetPlatform.windows &&
+                pageConstraints.maxWidth >= 760;
+        final showDesktopPlayer = useDesktop &&
+            state.hasAudio &&
+            _dismissedAudioPath != state.audioPath;
+        return Scaffold(
+          backgroundColor: useDesktop ? Colors.transparent : null,
+          appBar: useDesktop
+              ? null
+              : AppBar(
+                  toolbarHeight: AppTheme.responsiveAppBarHeight(
+                    context,
+                    largeTextMaxLines: 2,
+                  ),
+                  title: Text(
+                    pageTitle,
+                    maxLines: 2,
+                    softWrap: true,
+                  ),
+                ),
+          body: CallbackShortcuts(
+            bindings: {
+              const SingleActivator(LogicalKeyboardKey.enter, control: true):
+                  synthesize,
+              const SingleActivator(LogicalKeyboardKey.numpadEnter,
+                  control: true): synthesize,
+              if (showDesktopPlayer)
+                const SingleActivator(LogicalKeyboardKey.escape): () {
+                  unawaited(_dismissDesktopPlayer());
+                },
+            },
+            child: Focus(
+              key: const Key('ttsPageFocus'),
+              focusNode: widget.pageFocusNode,
+              autofocus: widget.pageFocusNode == null,
+              skipTraversal: true,
+              child: FocusTraversalGroup(
+                policy: ReadingOrderTraversalPolicy(),
+                child: useDesktop
+                    ? DesktopTtsWorkspace(
+                        state: state,
+                        controller: _textController,
+                        voiceOptions: voiceOptions,
+                        usesSeedTtsSpeakerIds: notifier.usesSeedTtsSpeakerIds,
+                        errorMessage: errorMessage,
+                        showPlayer: showDesktopPlayer,
+                        onSynthesize: synthesize,
+                        onClear: _confirmClearText,
+                        onSave: _saveDesktopAudio,
+                        onDismissPlayer: _dismissDesktopPlayer,
+                      )
+                    : SafeArea(
+                        top: false,
+                        child: LayoutBuilder(
+                          builder: (context, constraints) {
+                            final platform = Theme.of(context).platform;
+                            final stacked =
+                                platform != TargetPlatform.windows ||
+                                    AppLayout.useStackedLayout(context);
+                            final editor = _TextEditorSection(
+                              controller: _textController,
+                              isGenerating: state.isGenerating,
+                              expanded: !stacked,
+                              onClear: _confirmClearText,
+                            );
+                            final parameters = _VoiceParametersSection(
+                              state: state,
+                              voiceOptions: voiceOptions,
+                              usesSeedTtsSpeakerIds:
+                                  notifier.usesSeedTtsSpeakerIds,
+                              showKeyboardHint:
+                                  platform == TargetPlatform.windows,
+                              onSynthesize: synthesize,
+                            );
 
-                  return SingleChildScrollView(
-                    keyboardDismissBehavior:
-                        ScrollViewKeyboardDismissBehavior.onDrag,
-                    padding: AppLayout.pagePadding(context),
-                    child: Center(
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 960),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            if (errorMessage != null) ...[
-                              InlineErrorBanner(
-                                message: errorMessage,
+                            return SingleChildScrollView(
+                              keyboardDismissBehavior:
+                                  ScrollViewKeyboardDismissBehavior.onDrag,
+                              padding: AppLayout.pagePadding(context),
+                              child: Center(
+                                child: ConstrainedBox(
+                                  constraints:
+                                      const BoxConstraints(maxWidth: 960),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: [
+                                      if (errorMessage != null) ...[
+                                        InlineErrorBanner(
+                                          message: errorMessage,
+                                        ),
+                                        const SizedBox(height: AppSpacing.md),
+                                      ],
+                                      if (stacked) ...[
+                                        editor,
+                                        const SizedBox(height: AppSpacing.md),
+                                        parameters,
+                                      ] else
+                                        Row(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Expanded(flex: 3, child: editor),
+                                            const SizedBox(
+                                                width: AppSpacing.md),
+                                            Expanded(
+                                                flex: 2, child: parameters),
+                                          ],
+                                        ),
+                                      if (state.hasAudio) ...[
+                                        const SizedBox(height: AppSpacing.md),
+                                        _PlayerCard(state: state),
+                                      ],
+                                    ],
+                                  ),
+                                ),
                               ),
-                              const SizedBox(height: AppSpacing.md),
-                            ],
-                            if (stacked) ...[
-                              editor,
-                              const SizedBox(height: AppSpacing.md),
-                              parameters,
-                            ] else
-                              Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Expanded(flex: 3, child: editor),
-                                  const SizedBox(width: AppSpacing.md),
-                                  Expanded(flex: 2, child: parameters),
-                                ],
-                              ),
-                            if (state.hasAudio) ...[
-                              const SizedBox(height: AppSpacing.md),
-                              _PlayerCard(state: state),
-                            ],
-                          ],
+                            );
+                          },
                         ),
                       ),
-                    ),
-                  );
-                },
               ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
+  }
+
+  Future<void> _saveDesktopAudio() async {
+    try {
+      final saved = await ref.read(ttsProvider.notifier).saveCopy(
+            dialogTitle: context.l10n.text(
+              zh: '保存合成语音',
+              en: 'Save generated speech',
+            ),
+          );
+      if (saved && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              context.l10n.text(zh: 'MP3 已保存。', en: 'MP3 saved.'),
+            ),
+          ),
+        );
+      }
+    } on AppException catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(context.l10n.appError(error))),
+        );
+      }
+    }
+  }
+
+  Future<void> _dismissDesktopPlayer() async {
+    final state = ref.read(ttsProvider);
+    if (state.isPlaying) {
+      await ref.read(ttsProvider.notifier).playOrPause();
+    }
+    if (mounted) {
+      setState(() => _dismissedAudioPath = state.audioPath);
+    }
   }
 
   Future<void> _confirmClearText() async {
