@@ -16,6 +16,7 @@ import '../../settings/providers/settings_provider.dart';
 import '../models/stt_state.dart';
 import '../providers/stt_provider.dart';
 import '../services/seed_asr_api_service.dart';
+import '../widgets/desktop_stt_workspace.dart';
 
 class SttScreen extends ConsumerStatefulWidget {
   const SttScreen({super.key, this.pageFocusNode});
@@ -72,119 +73,172 @@ class _SttScreenState extends ConsumerState<SttScreen> {
     final compactAppBar = MediaQuery.sizeOf(context).width < 560 ||
         MediaQuery.textScalerOf(context).scale(1) >= 1.3;
 
-    return Scaffold(
-      appBar: AppBar(
-        toolbarHeight: AppTheme.responsiveAppBarHeight(
-          context,
-          largeTextMaxLines: 2,
-        ),
-        title: Text(
-          l10n.text(zh: '语音转文字', en: 'Speech to text'),
-          maxLines: 2,
-        ),
-        actions: [
-          if (state.phase == SttPhase.success ||
-              state.phase == SttPhase.failure)
-            if (compactAppBar)
-              IconButton(
-                tooltip: l10n.text(zh: '新建转录', en: 'New transcript'),
-                onPressed: _startNewTranscript,
-                icon: const Icon(Icons.add_circle_outline),
-              )
-            else
-              Padding(
-                padding: const EdgeInsets.only(right: AppSpacing.xs),
-                child: Tooltip(
-                  message: l10n.text(zh: '新建转录', en: 'New transcript'),
-                  child: TextButton.icon(
-                    onPressed: _startNewTranscript,
-                    icon: const Icon(Icons.add_circle_outline),
-                    label: Text(
-                      l10n.text(zh: '新建转录', en: 'New transcript'),
-                    ),
+    return LayoutBuilder(
+      builder: (context, pageConstraints) {
+        final useDesktop =
+            Theme.of(context).platform == TargetPlatform.windows &&
+                pageConstraints.maxWidth >= 760;
+        return Scaffold(
+          backgroundColor: useDesktop ? Colors.transparent : null,
+          appBar: useDesktop
+              ? null
+              : AppBar(
+                  toolbarHeight: AppTheme.responsiveAppBarHeight(
+                    context,
+                    largeTextMaxLines: 2,
                   ),
-                ),
-              ),
-        ],
-      ),
-      body: CallbackShortcuts(
-        bindings: <ShortcutActivator, VoidCallback>{
-          const SingleActivator(LogicalKeyboardKey.keyO, control: true): () {
-            if (state.canStart && state.result == null) {
-              unawaited(
-                ref.read(sttProvider.notifier).pickAndTranscribe(
-                      dialogTitle: l10n.text(
-                        zh: '选择音频或视频文件',
-                        en: 'Choose an audio or video file',
-                      ),
-                    ),
-              );
-            }
-          },
-        },
-        child: Focus(
-          key: const Key('sttPageFocus'),
-          focusNode: widget.pageFocusNode,
-          autofocus: widget.pageFocusNode == null,
-          skipTraversal: true,
-          child: SingleChildScrollView(
-            padding: AppLayout.pagePadding(context),
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 960),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    if (errorMessage != null) ...[
-                      AppStatusBanner(
-                        kind: AppStatusKind.error,
-                        title: l10n.text(
-                          zh: '转录未完成',
-                          en: 'Transcription not completed',
+                  title: Text(
+                    l10n.text(zh: '语音转文字', en: 'Speech to text'),
+                    maxLines: 2,
+                  ),
+                  actions: [
+                    if (state.phase == SttPhase.success ||
+                        state.phase == SttPhase.failure)
+                      if (compactAppBar)
+                        IconButton(
+                          tooltip: l10n.text(zh: '新建转录', en: 'New transcript'),
+                          onPressed: _startNewTranscript,
+                          icon: const Icon(Icons.add_circle_outline),
+                        )
+                      else
+                        Padding(
+                          padding: const EdgeInsets.only(right: AppSpacing.xs),
+                          child: Tooltip(
+                            message:
+                                l10n.text(zh: '新建转录', en: 'New transcript'),
+                            child: TextButton.icon(
+                              onPressed: _startNewTranscript,
+                              icon: const Icon(Icons.add_circle_outline),
+                              label: Text(
+                                l10n.text(zh: '新建转录', en: 'New transcript'),
+                              ),
+                            ),
+                          ),
                         ),
-                        message: errorMessage,
-                        action: state.canRetrySelectedSource
-                            ? TextButton.icon(
-                                key: const Key(
-                                  'retrySelectedSttSourceButton',
-                                ),
-                                onPressed: ref
-                                    .read(sttProvider.notifier)
-                                    .retrySelectedSource,
-                                icon: const Icon(Icons.refresh),
-                                label: Text(
-                                  state.selectedSourceIsTemporaryRecording
-                                      ? l10n.text(
-                                          zh: '重试此录音',
-                                          en: 'Retry this recording',
-                                        )
-                                      : l10n.text(
-                                          zh: '重试此文件',
-                                          en: 'Retry this file',
-                                        ),
-                                ),
-                              )
-                            : null,
-                      ),
-                      const SizedBox(height: AppSpacing.md),
-                    ],
-                    if (state.result == null)
-                      _InputWorkspace(state: state)
-                    else
-                      _ResultSection(
-                        state: state,
-                        controller: _resultController,
-                        onExport: _export,
-                      ),
-                    const SizedBox(height: AppSpacing.xl),
                   ],
                 ),
-              ),
+          body: CallbackShortcuts(
+            bindings: <ShortcutActivator, VoidCallback>{
+              const SingleActivator(LogicalKeyboardKey.keyO, control: true):
+                  () {
+                if (state.canStart && state.result == null) {
+                  unawaited(
+                    ref.read(sttProvider.notifier).pickAndTranscribe(
+                          dialogTitle: l10n.text(
+                            zh: '选择音频或视频文件',
+                            en: 'Choose an audio or video file',
+                          ),
+                        ),
+                  );
+                }
+              },
+              if (useDesktop)
+                _SafeSpaceActivator(_desktopSpaceIsSafe): () {
+                  if (state.canStart) {
+                    unawaited(ref.read(sttProvider.notifier).startRecording());
+                  } else if (state.isRecording) {
+                    unawaited(ref.read(sttProvider.notifier).stopRecording());
+                  } else if (state.phase == SttPhase.countdown) {
+                    unawaited(ref.read(sttProvider.notifier).cancelRecording());
+                  }
+                },
+            },
+            child: Focus(
+              key: const Key('sttPageFocus'),
+              focusNode: widget.pageFocusNode,
+              autofocus: widget.pageFocusNode == null,
+              skipTraversal: true,
+              child: useDesktop
+                  ? DesktopSttWorkspace(
+                      state: state,
+                      controller: _resultController,
+                      onExport: _export,
+                      onNewTranscript: _startNewTranscript,
+                    )
+                  : SingleChildScrollView(
+                      padding: AppLayout.pagePadding(context),
+                      child: Center(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 960),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              if (errorMessage != null) ...[
+                                AppStatusBanner(
+                                  kind: AppStatusKind.error,
+                                  title: l10n.text(
+                                    zh: '转录未完成',
+                                    en: 'Transcription not completed',
+                                  ),
+                                  message: errorMessage,
+                                  action: state.canRetrySelectedSource
+                                      ? TextButton.icon(
+                                          key: const Key(
+                                            'retrySelectedSttSourceButton',
+                                          ),
+                                          onPressed: ref
+                                              .read(sttProvider.notifier)
+                                              .retrySelectedSource,
+                                          icon: const Icon(Icons.refresh),
+                                          label: Text(
+                                            state.selectedSourceIsTemporaryRecording
+                                                ? l10n.text(
+                                                    zh: '重试此录音',
+                                                    en: 'Retry this recording',
+                                                  )
+                                                : l10n.text(
+                                                    zh: '重试此文件',
+                                                    en: 'Retry this file',
+                                                  ),
+                                          ),
+                                        )
+                                      : null,
+                                ),
+                                const SizedBox(height: AppSpacing.md),
+                              ],
+                              if (state.result == null)
+                                _InputWorkspace(state: state)
+                              else
+                                _ResultSection(
+                                  state: state,
+                                  controller: _resultController,
+                                  onExport: _export,
+                                ),
+                              const SizedBox(height: AppSpacing.xl),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
+  }
+
+  bool _desktopSpaceIsSafe() {
+    final focusContext = FocusManager.instance.primaryFocus?.context;
+    if (focusContext == null ||
+        FocusManager.instance.primaryFocus == widget.pageFocusNode) {
+      return true;
+    }
+    var interactive = focusContext.widget is EditableText ||
+        focusContext.widget is ButtonStyleButton ||
+        focusContext.widget is IconButton ||
+        focusContext.widget is InkWell ||
+        focusContext.widget is PopupMenuButton;
+    focusContext.visitAncestorElements((element) {
+      final ancestor = element.widget;
+      interactive = interactive ||
+          ancestor is EditableText ||
+          ancestor is ButtonStyleButton ||
+          ancestor is IconButton ||
+          ancestor is InkWell ||
+          ancestor is PopupMenuButton;
+      return !interactive;
+    });
+    return !interactive;
   }
 
   Future<void> _export({required bool isSrt}) async {
@@ -288,6 +342,24 @@ class _SttScreenState extends ConsumerState<SttScreen> {
     }
     _resultController.clear();
   }
+}
+
+class _SafeSpaceActivator extends ShortcutActivator {
+  const _SafeSpaceActivator(this.isSafe);
+
+  static const _space = SingleActivator(LogicalKeyboardKey.space);
+  final bool Function() isSafe;
+
+  @override
+  Iterable<LogicalKeyboardKey>? get triggers => _space.triggers;
+
+  @override
+  bool accepts(KeyEvent event, HardwareKeyboard state) {
+    return _space.accepts(event, state) && isSafe();
+  }
+
+  @override
+  String debugDescribeKeys() => _space.debugDescribeKeys();
 }
 
 class _InputWorkspace extends StatelessWidget {
