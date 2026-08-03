@@ -21,6 +21,11 @@ class AppRadii {
   static const medium = 8.0;
   static const large = 10.0;
   static const dialog = 12.0;
+
+  static const desktopBadge = 8.0;
+  static const desktopControl = 13.0;
+  static const desktopCard = 19.0;
+  static const desktopHero = 28.0;
 }
 
 class AppBreakpoints {
@@ -29,10 +34,13 @@ class AppBreakpoints {
   static const compact = 720.0;
   static const expanded = 1040.0;
   static const large = 1440.0;
+  static const desktopRailCompact = 980.0;
 }
 
 class AppLayout {
   AppLayout._();
+
+  static const desktopContentMaxWidth = 920.0;
 
   static EdgeInsets pagePadding(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;

@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:voxflow/core/theme/app_colors.dart';
+import 'package:voxflow/core/theme/app_spacing.dart';
 import 'package:voxflow/core/theme/app_theme.dart';
 
 void main() {
@@ -52,6 +53,47 @@ void main() {
     } finally {
       debugDefaultTargetPlatformOverride = null;
     }
+  });
+
+  test('Windows themes use handoff tokens without changing Android palette',
+      () {
+    final light = AppTheme.lightFor(TargetPlatform.windows);
+    final dark = AppTheme.darkFor(TargetPlatform.windows);
+    final android = AppTheme.lightFor(TargetPlatform.android);
+
+    expect(light.scaffoldBackgroundColor, AppColors.desktopLightCanvas);
+    expect(light.colorScheme.surface, AppColors.desktopLightSurface);
+    expect(light.colorScheme.onSurface, AppColors.desktopLightTextPrimary);
+    expect(light.colorScheme.onSurfaceVariant,
+        AppColors.desktopLightTextSecondary);
+    expect(light.colorScheme.outlineVariant, AppColors.desktopLightBorder);
+    expect(light.colorScheme.primary, AppColors.desktopLightAccent);
+    expect(light.colorScheme.error, AppColors.desktopLightDanger);
+    expect(
+      light.extension<AppSemanticColors>()!.success,
+      AppColors.desktopLightSuccess,
+    );
+
+    expect(dark.scaffoldBackgroundColor, AppColors.desktopDarkCanvas);
+    expect(dark.colorScheme.surface, AppColors.desktopDarkSurface);
+    expect(dark.colorScheme.onSurface, AppColors.desktopDarkTextPrimary);
+    expect(
+        dark.colorScheme.onSurfaceVariant, AppColors.desktopDarkTextSecondary);
+    expect(dark.colorScheme.outlineVariant, AppColors.desktopDarkBorder);
+    expect(dark.colorScheme.primary, AppColors.desktopDarkAccent);
+    expect(dark.colorScheme.error, AppColors.desktopDarkDanger);
+    expect(
+      dark.extension<AppSemanticColors>()!.success,
+      AppColors.desktopDarkSuccess,
+    );
+
+    final desktopCardShape = light.cardTheme.shape! as RoundedRectangleBorder;
+    expect(
+      desktopCardShape.borderRadius,
+      BorderRadius.circular(AppRadii.desktopCard),
+    );
+    expect(android.colorScheme.primary, AppColors.lightPrimary);
+    expect(android.scaffoldBackgroundColor, AppColors.lightCanvas);
   });
 }
 

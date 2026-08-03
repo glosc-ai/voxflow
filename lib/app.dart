@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/theme/app_theme.dart';
@@ -13,6 +14,8 @@ class VoxFlowApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final platform = defaultTargetPlatform;
+    final isWindows = platform == TargetPlatform.windows;
     final themePreference = ref.watch(
       settingsProvider.select((settings) => settings.themePreference),
     );
@@ -34,15 +37,15 @@ class VoxFlowApp extends ConsumerWidget {
       localeListResolutionCallback:
           AppLocalizations.localeListResolutionCallback,
       localizationsDelegates: AppLocalizations.delegates,
-      theme: AppTheme.light,
-      darkTheme: AppTheme.dark,
+      theme: AppTheme.lightFor(platform),
+      darkTheme: AppTheme.darkFor(platform),
       themeMode: switch (themePreference) {
         AppThemePreference.system => ThemeMode.system,
         AppThemePreference.light => ThemeMode.light,
         AppThemePreference.dark => ThemeMode.dark,
       },
-      themeAnimationDuration: const Duration(milliseconds: 160),
-      themeAnimationCurve: Curves.easeOutCubic,
+      themeAnimationDuration: Duration(milliseconds: isWindows ? 200 : 160),
+      themeAnimationCurve: isWindows ? Curves.ease : Curves.easeOutCubic,
       home: const PrivacyNoticeGate(child: AppShell()),
     );
   }

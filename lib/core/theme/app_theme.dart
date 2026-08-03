@@ -10,8 +10,14 @@ class AppTheme {
   static const double androidAppBarHeight = 56;
   static const double windowsAppBarHeight = 64;
 
-  static ThemeData get light => _theme(Brightness.light);
-  static ThemeData get dark => _theme(Brightness.dark);
+  static ThemeData get light => lightFor(defaultTargetPlatform);
+  static ThemeData get dark => darkFor(defaultTargetPlatform);
+
+  static ThemeData lightFor(TargetPlatform platform) =>
+      _theme(Brightness.light, platform);
+
+  static ThemeData darkFor(TargetPlatform platform) =>
+      _theme(Brightness.dark, platform);
 
   /// Keeps the platform toolbar baseline while allowing accessibility text to
   /// grow instead of being clipped by a fixed-height [AppBar].
@@ -36,35 +42,61 @@ class AppTheme {
     return contentHeight > baseHeight ? contentHeight : baseHeight;
   }
 
-  static ThemeData _theme(Brightness brightness) {
+  static ThemeData _theme(Brightness brightness, TargetPlatform platform) {
     final isDark = brightness == Brightness.dark;
-    final isAndroid = defaultTargetPlatform == TargetPlatform.android;
+    final isAndroid = platform == TargetPlatform.android;
+    final isWindows = platform == TargetPlatform.windows;
     final controlHeight = isAndroid ? 48.0 : 40.0;
-    final colors = _colorScheme(brightness);
-    final semantics = isDark ? AppSemanticColors.dark : AppSemanticColors.light;
-    final textTheme = _textTheme(colors.onSurface);
-    const shape = RoundedRectangleBorder(
-      borderRadius: BorderRadius.all(Radius.circular(AppRadii.medium)),
+    final colors = _colorScheme(brightness, desktop: isWindows);
+    final semantics = isWindows
+        ? (isDark
+            ? AppSemanticColors.desktopDark
+            : AppSemanticColors.desktopLight)
+        : (isDark ? AppSemanticColors.dark : AppSemanticColors.light);
+    final effects = isWindows
+        ? (isDark
+            ? AppSurfaceEffects.desktopDark
+            : AppSurfaceEffects.desktopLight)
+        : AppSurfaceEffects.flat;
+    final textTheme = _textTheme(colors.onSurface, desktop: isWindows);
+    final controlRadius = isWindows ? AppRadii.desktopControl : AppRadii.medium;
+    final cardRadius = isWindows ? AppRadii.desktopCard : AppRadii.large;
+    final dialogRadius = isWindows ? AppRadii.desktopCard : AppRadii.dialog;
+    final shape = RoundedRectangleBorder(
+      borderRadius: BorderRadius.all(Radius.circular(controlRadius)),
     );
 
     return ThemeData(
       useMaterial3: true,
       brightness: brightness,
+      platform: platform,
       colorScheme: colors,
-      scaffoldBackgroundColor:
-          isDark ? AppColors.darkCanvas : AppColors.lightCanvas,
-      canvasColor: isDark ? AppColors.darkSurface : AppColors.lightSurface,
-      fontFamilyFallback: const [
-        'Segoe UI Variable',
-        'Segoe UI',
-        'Microsoft YaHei UI',
-        'Roboto',
-        'Noto Sans CJK SC',
-      ],
+      scaffoldBackgroundColor: isWindows
+          ? (isDark
+              ? AppColors.desktopDarkCanvas
+              : AppColors.desktopLightCanvas)
+          : (isDark ? AppColors.darkCanvas : AppColors.lightCanvas),
+      canvasColor: colors.surface,
+      fontFamilyFallback: isWindows
+          ? const [
+              'Segoe UI',
+              'Microsoft YaHei UI',
+              'PingFang SC',
+              'Noto Sans SC',
+            ]
+          : const [
+              'Segoe UI Variable',
+              'Segoe UI',
+              'Microsoft YaHei UI',
+              'Roboto',
+              'Noto Sans CJK SC',
+            ],
       textTheme: textTheme,
-      extensions: [semantics],
+      extensions: [semantics, effects],
       visualDensity: VisualDensity.standard,
-      materialTapTargetSize: MaterialTapTargetSize.padded,
+      materialTapTargetSize: isWindows
+          ? MaterialTapTargetSize.shrinkWrap
+          : MaterialTapTargetSize.padded,
       splashFactory: InkRipple.splashFactory,
       appBarTheme: AppBarTheme(
         elevation: 0,
@@ -84,7 +116,7 @@ class AppTheme {
         surfaceTintColor: Colors.transparent,
         clipBehavior: Clip.antiAlias,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppRadii.large),
+          borderRadius: BorderRadius.circular(cardRadius),
           side: BorderSide(color: colors.outlineVariant),
         ),
       ),
@@ -108,12 +140,15 @@ class AppTheme {
         ),
         helperStyle: textTheme.bodySmall,
         errorStyle: textTheme.bodySmall?.copyWith(color: colors.error),
-        border: _inputBorder(colors.outline),
-        enabledBorder: _inputBorder(colors.outline),
-        focusedBorder: _inputBorder(colors.primary, width: 2),
-        errorBorder: _inputBorder(colors.error),
-        focusedErrorBorder: _inputBorder(colors.error, width: 2),
-        disabledBorder: _inputBorder(colors.outlineVariant),
+        border: _inputBorder(colors.outline, radius: controlRadius),
+        enabledBorder: _inputBorder(colors.outline, radius: controlRadius),
+        focusedBorder:
+            _inputBorder(colors.primary, width: 2, radius: controlRadius),
+        errorBorder: _inputBorder(colors.error, radius: controlRadius),
+        focusedErrorBorder:
+            _inputBorder(colors.error, width: 2, radius: controlRadius),
+        disabledBorder:
+            _inputBorder(colors.outlineVariant, radius: controlRadius),
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
@@ -179,12 +214,12 @@ class AppTheme {
       navigationRailTheme: NavigationRailThemeData(
         backgroundColor: colors.surface,
         elevation: 0,
-        minWidth: 72,
-        minExtendedWidth: 232,
+        minWidth: isWindows ? 76 : 72,
+        minExtendedWidth: isWindows ? 240 : 232,
         useIndicator: true,
         indicatorColor: colors.primaryContainer,
         indicatorShape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppRadii.medium),
+          borderRadius: BorderRadius.circular(controlRadius),
         ),
         selectedIconTheme: IconThemeData(color: colors.primary, size: 24),
         unselectedIconTheme:
@@ -214,7 +249,7 @@ class AppTheme {
         backgroundColor: colors.surface,
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppRadii.dialog),
+          borderRadius: BorderRadius.circular(dialogRadius),
         ),
         titleTextStyle: textTheme.titleLarge,
         contentTextStyle: textTheme.bodyMedium,
@@ -231,7 +266,7 @@ class AppTheme {
             isDark ? const Color(0xFF30343D) : const Color(0xFF292C33),
         contentTextStyle: textTheme.bodyMedium?.copyWith(color: Colors.white),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppRadii.medium),
+          borderRadius: BorderRadius.circular(controlRadius),
         ),
       ),
       sliderTheme: SliderThemeData(
@@ -256,14 +291,99 @@ class AppTheme {
           borderRadius: BorderRadius.circular(AppRadii.small),
         ),
       ),
+      scrollbarTheme: isWindows
+          ? ScrollbarThemeData(
+              interactive: true,
+              radius: const Radius.circular(4),
+              thickness: const WidgetStatePropertyAll(8),
+              thumbColor: WidgetStateProperty.resolveWith((states) {
+                final opacity =
+                    states.contains(WidgetState.hovered) ? 0.38 : 0.28;
+                return colors.onSurfaceVariant.withValues(alpha: opacity);
+              }),
+              trackColor: const WidgetStatePropertyAll(Colors.transparent),
+              trackBorderColor:
+                  const WidgetStatePropertyAll(Colors.transparent),
+            )
+          : const ScrollbarThemeData(),
       focusColor: semantics.focus.withValues(alpha: 0.16),
       hoverColor: colors.primary.withValues(alpha: 0.04),
       highlightColor: colors.primary.withValues(alpha: 0.08),
     );
   }
 
-  static ColorScheme _colorScheme(Brightness brightness) {
+  static ColorScheme _colorScheme(
+    Brightness brightness, {
+    required bool desktop,
+  }) {
     final isDark = brightness == Brightness.dark;
+    if (desktop) {
+      final accent =
+          isDark ? AppColors.desktopDarkAccent : AppColors.desktopLightAccent;
+      final onAccent = isDark
+          ? AppColors.desktopDarkOnAccent
+          : AppColors.desktopLightOnAccent;
+      final canvas =
+          isDark ? AppColors.desktopDarkCanvas : AppColors.desktopLightCanvas;
+      final surface =
+          isDark ? AppColors.desktopDarkSurface : AppColors.desktopLightSurface;
+      final foreground = isDark
+          ? AppColors.desktopDarkTextPrimary
+          : AppColors.desktopLightTextPrimary;
+      final muted = isDark
+          ? AppColors.desktopDarkTextSecondary
+          : AppColors.desktopLightTextSecondary;
+      final border =
+          isDark ? AppColors.desktopDarkBorder : AppColors.desktopLightBorder;
+      final borderStrong = isDark
+          ? AppColors.desktopDarkBorderStrong
+          : AppColors.desktopLightBorderStrong;
+      final selected = isDark
+          ? AppColors.desktopDarkSurfaceSelected
+          : AppColors.desktopLightSurfaceSelected;
+      final danger =
+          isDark ? AppColors.desktopDarkDanger : AppColors.desktopLightDanger;
+      return ColorScheme(
+        brightness: brightness,
+        primary: accent,
+        onPrimary: onAccent,
+        primaryContainer: selected,
+        onPrimaryContainer: isDark ? const Color(0xFFC7D2FE) : accent,
+        secondary: muted,
+        onSecondary: surface,
+        secondaryContainer: canvas,
+        onSecondaryContainer: foreground,
+        tertiary: isDark
+            ? AppColors.desktopDarkSuccess
+            : AppColors.desktopLightSuccess,
+        onTertiary: isDark
+            ? AppColors.desktopDarkCanvas
+            : AppColors.desktopLightOnAccent,
+        error: danger,
+        onError: onAccent,
+        errorContainer:
+            isDark ? const Color(0xFF422426) : const Color(0xFFFDECEC),
+        onErrorContainer: danger,
+        surface: surface,
+        onSurface: foreground,
+        onSurfaceVariant: muted,
+        outline: borderStrong,
+        outlineVariant: border,
+        shadow: Colors.black,
+        scrim: Colors.black,
+        inverseSurface: foreground,
+        onInverseSurface: canvas,
+        inversePrimary: accent,
+        surfaceTint: Colors.transparent,
+        surfaceContainerLowest: surface,
+        surfaceContainerLow: canvas,
+        surfaceContainer: surface,
+        surfaceContainerHigh:
+            isDark ? const Color(0xFF25262B) : const Color(0xFFFBFCFD),
+        surfaceContainerHighest:
+            isDark ? const Color(0xFF2B2C31) : const Color(0xFFF1F3F5),
+      );
+    }
     return ColorScheme(
       brightness: brightness,
       primary: isDark ? AppColors.darkPrimary : AppColors.lightPrimary,
@@ -314,7 +434,7 @@ class AppTheme {
     );
   }
 
-  static TextTheme _textTheme(Color color) {
+  static TextTheme _textTheme(Color color, {required bool desktop}) {
     return TextTheme(
       displaySmall: TextStyle(
         fontSize: 32,
@@ -323,8 +443,8 @@ class AppTheme {
         color: color,
       ),
       headlineSmall: TextStyle(
-        fontSize: 24,
-        height: 32 / 24,
+        fontSize: desktop ? 26 : 24,
+        height: desktop ? 34 / 26 : 32 / 24,
         fontWeight: FontWeight.w600,
         color: color,
       ),
@@ -379,9 +499,13 @@ class AppTheme {
     );
   }
 
-  static OutlineInputBorder _inputBorder(Color color, {double width = 1}) {
+  static OutlineInputBorder _inputBorder(
+    Color color, {
+    double width = 1,
+    double radius = AppRadii.medium,
+  }) {
     return OutlineInputBorder(
-      borderRadius: BorderRadius.circular(AppRadii.medium),
+      borderRadius: BorderRadius.circular(radius),
       borderSide: BorderSide(color: color, width: width),
     );
   }
