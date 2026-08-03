@@ -52,6 +52,14 @@ class Win32Window {
   // If true, closing this window will quit the application.
   void SetQuitOnClose(bool quit_on_close);
 
+  // Extends Flutter into the non-client area while retaining the native resize,
+  // maximize, snap, and system-menu behaviors of an overlapped window.
+  void EnableFrameless();
+
+  // Updates the DWM frame independently from the system preference so an
+  // explicit in-app theme remains visually consistent.
+  void SetDarkMode(bool enabled);
+
   // Return a RECT representing the bounds of the current client area.
   RECT GetClientArea();
 
@@ -91,6 +99,7 @@ class Win32Window {
   static void UpdateTheme(HWND const window);
 
   bool quit_on_close_ = false;
+  bool frameless_ = false;
 
   // window handle for top level window.
   HWND window_handle_ = nullptr;

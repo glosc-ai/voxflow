@@ -2,6 +2,8 @@
 
 #include <cstdint>
 #include <optional>
+#include <string>
+#include <variant>
 
 #include "flutter/generated_plugin_registrant.h"
 #include <flutter/standard_method_codec.h>
@@ -63,6 +65,75 @@ bool FlutterWindow::OnCreate() {
           const auto microseconds = static_cast<std::int64_t>(
               (ticks.QuadPart - kWindowsToUnixEpochTicks) / 10);
           result->Success(flutter::EncodableValue(microseconds));
+          return;
+        }
+        if (call.method_name() == "enableFrameless") {
+          EnableFrameless();
+          if (flutter_controller_) {
+            const HWND view =
+                flutter_controller_->view()->GetNativeWindow();
+            const RECT client = GetClientArea();
+            ::MoveWindow(view, client.left, client.top,
+                         client.right - client.left,
+                         client.bottom - client.top, TRUE);
+            ::RedrawWindow(GetHandle(), nullptr, nullptr,
+                           RDW_INVALIDATE | RDW_UPDATENOW | RDW_FRAME |
+                               RDW_ALLCHILDREN);
+            ::RedrawWindow(view, nullptr, nullptr,
+                           RDW_INVALIDATE | RDW_UPDATENOW);
+            flutter_controller_->ForceRedraw();
+          }
+          // The first Flutter frame can be presented before the native frame
+          // transition has reached DWM. Queue the existing compositor nudge
+          // again after switching to frameless mode so startup never remains
+          // white until the user opens the system menu or resizes the window.
+          ::PostMessage(GetHandle(), kForceStartupRedrawMessage, 0, 0);
+          result->Success();
+          return;
+        }
+        if (call.method_name() == "minimize") {
+          ::ShowWindow(GetHandle(), SW_MINIMIZE);
+          result->Success();
+          return;
+        }
+        if (call.method_name() == "maximizeOrRestore") {
+          ::ShowWindow(GetHandle(), ::IsZoomed(GetHandle()) ? SW_RESTORE
+                                                            : SW_MAXIMIZE);
+          result->Success();
+          return;
+        }
+        if (call.method_name() == "close") {
+          ::PostMessage(GetHandle(), WM_CLOSE, 0, 0);
+          result->Success();
+          return;
+        }
+        if (call.method_name() == "startDrag") {
+          POINT cursor{};
+          ::GetCursorPos(&cursor);
+          ::ReleaseCapture();
+          ::PostMessage(GetHandle(), WM_NCLBUTTONDOWN, HTCAPTION,
+                        MAKELPARAM(cursor.x, cursor.y));
+          result->Success();
+          return;
+        }
+        if (call.method_name() == "isMaximized") {
+          result->Success(flutter::EncodableValue(
+              static_cast<bool>(::IsZoomed(GetHandle()))));
+          return;
+        }
+        if (call.method_name() == "getVersion") {
+          result->Success(flutter::EncodableValue(std::string(FLUTTER_VERSION)));
+          return;
+        }
+        if (call.method_name() == "setBrightness") {
+          const auto* brightness =
+              std::get_if<std::string>(call.arguments());
+          if (!brightness) {
+            result->Error("invalid_argument", "Brightness must be a string.");
+            return;
+          }
+          SetDarkMode(*brightness == "dark");
+          result->Success();
           return;
         }
         result->NotImplemented();

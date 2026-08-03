@@ -2,6 +2,7 @@
 
 #include <dwmapi.h>
 #include <flutter_windows.h>
+#include <windowsx.h>
 
 #include "resource.h"
 
@@ -35,6 +36,12 @@ using EnableNonClientDpiScaling = BOOL __stdcall(HWND hwnd);
 // scale factor
 int Scale(int source, double scale_factor) {
   return static_cast<int>(source * scale_factor);
+}
+
+int GetResizeBorderThickness(HWND window) {
+  const UINT dpi = GetDpiForWindow(window);
+  return GetSystemMetricsForDpi(SM_CXSIZEFRAME, dpi) +
+         GetSystemMetricsForDpi(SM_CXPADDEDBORDER, dpi);
 }
 
 // Dynamically loads the |EnableNonClientDpiScaling| from the User32 module.
@@ -179,6 +186,46 @@ Win32Window::MessageHandler(HWND hwnd,
                             WPARAM const wparam,
                             LPARAM const lparam) noexcept {
   switch (message) {
+    case WM_NCCALCSIZE:
+      if (frameless_ && wparam == TRUE) {
+        if (IsZoomed(hwnd)) {
+          auto* params = reinterpret_cast<NCCALCSIZE_PARAMS*>(lparam);
+          const int border = GetResizeBorderThickness(hwnd);
+          params->rgrc[0].left += border;
+          params->rgrc[0].top += border;
+          params->rgrc[0].right -= border;
+          params->rgrc[0].bottom -= border;
+        }
+        return 0;
+      }
+      break;
+
+    case WM_NCHITTEST:
+      if (frameless_ && !IsZoomed(hwnd)) {
+        POINT cursor = {GET_X_LPARAM(lparam), GET_Y_LPARAM(lparam)};
+        ScreenToClient(hwnd, &cursor);
+        RECT client{};
+        GetClientRect(hwnd, &client);
+        const int border = GetResizeBorderThickness(hwnd);
+        const bool left = cursor.x >= client.left &&
+                          cursor.x < client.left + border;
+        const bool right = cursor.x < client.right &&
+                           cursor.x >= client.right - border;
+        const bool top = cursor.y >= client.top &&
+                         cursor.y < client.top + border;
+        const bool bottom = cursor.y < client.bottom &&
+                            cursor.y >= client.bottom - border;
+        if (top && left) return HTTOPLEFT;
+        if (top && right) return HTTOPRIGHT;
+        if (bottom && left) return HTBOTTOMLEFT;
+        if (bottom && right) return HTBOTTOMRIGHT;
+        if (left) return HTLEFT;
+        if (right) return HTRIGHT;
+        if (top) return HTTOP;
+        if (bottom) return HTBOTTOM;
+      }
+      break;
+
     case WM_DESTROY:
       window_handle_ = nullptr;
       Destroy();
@@ -261,6 +308,27 @@ HWND Win32Window::GetHandle() {
 
 void Win32Window::SetQuitOnClose(bool quit_on_close) {
   quit_on_close_ = quit_on_close;
+}
+
+void Win32Window::EnableFrameless() {
+  if (!window_handle_ || frameless_) {
+    return;
+  }
+  frameless_ = true;
+  const MARGINS shadow_margins = {0, 0, 0, 1};
+  DwmExtendFrameIntoClientArea(window_handle_, &shadow_margins);
+  SetWindowPos(window_handle_, nullptr, 0, 0, 0, 0,
+               SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER |
+                   SWP_NOACTIVATE);
+}
+
+void Win32Window::SetDarkMode(bool enabled) {
+  if (!window_handle_) {
+    return;
+  }
+  const BOOL enable_dark_mode = enabled ? TRUE : FALSE;
+  DwmSetWindowAttribute(window_handle_, DWMWA_USE_IMMERSIVE_DARK_MODE,
+                        &enable_dark_mode, sizeof(enable_dark_mode));
 }
 
 bool Win32Window::OnCreate() {
