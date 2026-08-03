@@ -62,7 +62,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('数据与隐私说明'), findsNothing);
-    expect(find.byType(NavigationRail), findsOneWidget);
+    expect(find.byKey(const Key('desktopNavigation')), findsOneWidget);
     debugDefaultTargetPlatformOverride = null;
   });
 
@@ -132,12 +132,12 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.byType(NavigationRail), findsOneWidget);
+    expect(find.byKey(const Key('desktopNavigation')), findsOneWidget);
     expect(find.byType(BottomNavigationBar), findsNothing);
     debugDefaultTargetPlatformOverride = null;
   });
 
-  testWidgets('AppShell 支持 Ctrl+1 至 Ctrl+4 键盘导航', (tester) async {
+  testWidgets('AppShell 支持 1 至 4 与 Ctrl+1 至 Ctrl+4 键盘导航', (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.windows;
     SharedPreferences.setMockInitialValues({});
     final preferences = await SharedPreferences.getInstance();
@@ -177,6 +177,29 @@ void main() {
       await _sendControlShortcut(tester, key);
       expect(_selectedNavigationIndex(tester), expectedIndex);
     }
+
+    for (final (key, expectedIndex) in [
+      (LogicalKeyboardKey.digit2, 1),
+      (LogicalKeyboardKey.digit3, 2),
+      (LogicalKeyboardKey.digit4, 3),
+      (LogicalKeyboardKey.digit1, 0),
+    ]) {
+      await tester.sendKeyEvent(key);
+      await tester.pumpAndSettle();
+      expect(_selectedNavigationIndex(tester), expectedIndex);
+    }
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.digit2);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('ttsTextField')));
+    await tester.pump();
+    await tester.sendKeyEvent(LogicalKeyboardKey.digit3);
+    await tester.pumpAndSettle();
+    expect(
+      _selectedNavigationIndex(tester),
+      1,
+      reason: '裸数字快捷键不应劫持文本输入',
+    );
     debugDefaultTargetPlatformOverride = null;
   });
 
@@ -512,9 +535,18 @@ void main() {
 }
 
 int? _selectedNavigationIndex(WidgetTester tester) {
-  return tester
-      .widget<NavigationRail>(find.byType(NavigationRail))
-      .selectedIndex;
+  for (var index = 0; index < 4; index++) {
+    if (find
+        .byKey(
+          ValueKey('desktopSelectedNavigationDestination:${index + 1}'),
+          skipOffstage: false,
+        )
+        .evaluate()
+        .isNotEmpty) {
+      return index;
+    }
+  }
+  return null;
 }
 
 ThemeMode? _appThemeMode(WidgetTester tester) {

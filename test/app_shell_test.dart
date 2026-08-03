@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -29,8 +30,9 @@ void main() {
       size: const Size(600, 900),
     );
 
-    final rail = tester.widget<NavigationRail>(find.byType(NavigationRail));
-    expect(rail.extended, isFalse);
+    final rail = find.byKey(const Key('desktopNavigation'));
+    expect(rail, findsOneWidget);
+    expect(tester.getSize(rail).width, 76);
     expect(find.byKey(const Key('appBottomNavigation')), findsNothing);
     expect(find.byType(BottomNavigationBar), findsNothing);
   });
@@ -99,6 +101,108 @@ void main() {
     await _sendControlShortcut(tester, LogicalKeyboardKey.digit3);
     await _sendControlShortcut(tester, LogicalKeyboardKey.keyF);
     expect(searchField.focusNode?.hasFocus, isTrue);
+  });
+
+  testWidgets('桌面页面往返保留 TTS 草稿与 IndexedStack 状态', (tester) async {
+    await _pumpAppShell(
+      tester,
+      platform: TargetPlatform.windows,
+      size: const Size(1200, 800),
+    );
+
+    await tester.tap(find.byIcon(Icons.record_voice_over_outlined));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('ttsTextField')),
+      '保留这段尚未生成的桌面草稿',
+    );
+
+    await tester.tap(find.byIcon(Icons.history_outlined));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byIcon(Icons.record_voice_over_outlined));
+    await tester.pumpAndSettle();
+
+    expect(find.text('保留这段尚未生成的桌面草稿'), findsOneWidget);
+  });
+
+  testWidgets('桌面标题栏窗口按钮调用原生桥且关闭 hover 使用危险色', (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+    const channel = MethodChannel('ai.glosc.voxflow/window');
+    final calls = <MethodCall>[];
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async {
+      calls.add(call);
+      if (call.method == 'getVersion') {
+        return '1.0.0+1';
+      }
+      if (call.method == 'isMaximized') {
+        return false;
+      }
+      return null;
+    });
+    addTearDown(() {
+      debugDefaultTargetPlatformOverride = null;
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, null);
+    });
+
+    await _pumpAppShell(
+      tester,
+      platform: TargetPlatform.windows,
+      size: const Size(1200, 800),
+    );
+
+    expect(find.text('v1.0.0+1 · Windows'), findsOneWidget);
+    for (final key in const [
+      Key('windowMinimizeButton'),
+      Key('windowMaximizeButton'),
+      Key('windowCloseButton'),
+    ]) {
+      final buttonFinder = find.descendant(
+        of: find.byKey(key),
+        matching: find.byType(IconButton),
+      );
+      final button = tester.widget<IconButton>(buttonFinder);
+      expect(button.onPressed, isNotNull);
+      await tester.tap(find.byKey(key));
+      await tester.pump();
+    }
+
+    final gesture = await tester.startGesture(
+      tester.getCenter(find.byKey(const Key('desktopTitleBar'))),
+    );
+    await gesture.moveBy(const Offset(24, 0));
+    await gesture.up();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(
+        calls.map((call) => call.method),
+        containsAll(<String>[
+          'enableFrameless',
+          'getVersion',
+          'setBrightness',
+          'minimize',
+          'maximizeOrRestore',
+          'close',
+          'startDrag',
+        ]));
+    expect(
+      calls.firstWhere((call) => call.method == 'setBrightness').arguments,
+      'light',
+    );
+
+    final closeButton = tester.widget<IconButton>(
+      find.descendant(
+        of: find.byKey(const Key('windowCloseButton')),
+        matching: find.byType(IconButton),
+      ),
+    );
+    final context = tester.element(find.byKey(const Key('desktopShell')));
+    expect(
+      closeButton.style?.backgroundColor?.resolve({WidgetState.hovered}),
+      Theme.of(context).colorScheme.error,
+    );
+    debugDefaultTargetPlatformOverride = null;
   });
 
   testWidgets('录音中离开 STT 必须确认，取消继续录音，确认后取消录音再导航', (tester) async {
@@ -189,6 +293,10 @@ Future<void> _pumpAppShell(
         supportedLocales: AppLocalizations.supportedLocales,
         localizationsDelegates: AppLocalizations.delegates,
         theme: AppTheme.light.copyWith(platform: platform),
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context).copyWith(disableAnimations: true),
+          child: child!,
+        ),
         home: const AppShell(),
       ),
     ),
@@ -203,9 +311,18 @@ FocusNode _pageFocusNode(WidgetTester tester, String key) {
 }
 
 int? _selectedNavigationIndex(WidgetTester tester) {
-  return tester
-      .widget<NavigationRail>(find.byType(NavigationRail))
-      .selectedIndex;
+  for (var index = 0; index < 4; index++) {
+    if (find
+        .byKey(
+          ValueKey('desktopSelectedNavigationDestination:${index + 1}'),
+          skipOffstage: false,
+        )
+        .evaluate()
+        .isNotEmpty) {
+      return index;
+    }
+  }
+  return null;
 }
 
 Future<void> _sendControlShortcut(
