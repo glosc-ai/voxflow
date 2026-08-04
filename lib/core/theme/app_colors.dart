@@ -3,8 +3,9 @@ import 'package:flutter/material.dart';
 class AppColors {
   AppColors._();
 
-  // Desktop colors are kept separate from the existing cross-platform palette
-  // so the Windows redesign cannot silently alter the Android experience.
+  // Windows and Android share the handoff palette. The desktop-prefixed
+  // constants remain explicit because the native desktop shell consumes them
+  // directly, while the unprefixed constants feed Android's Material theme.
   static const desktopLightAccent = Color(0xFF5D5FEF);
   static const desktopLightOnAccent = Color(0xFFFFFFFF);
   static const desktopLightCanvas = Color(0xFFF8F9FA);
@@ -29,37 +30,41 @@ class AppColors {
   static const desktopDarkSuccess = Color(0xFF34D399);
   static const desktopDarkDanger = Color(0xFFF87171);
 
-  static const lightPrimary = Color(0xFF455BB8);
+  static const lightPrimary = Color(0xFF5D5FEF);
   static const lightOnPrimary = Color(0xFFFFFFFF);
-  static const lightPrimaryContainer = Color(0xFFE2E6FF);
-  static const lightOnPrimaryContainer = Color(0xFF18265D);
-  static const lightCanvas = Color(0xFFF7F8FC);
+  static const lightPrimaryContainer = Color(0xFFEFEFFD);
+  static const lightOnPrimaryContainer = Color(0xFF5D5FEF);
+  static const lightCanvas = Color(0xFFF8F9FA);
   static const lightSurface = Color(0xFFFFFFFF);
-  static const lightSurfaceSubtle = Color(0xFFF0F2F7);
-  static const lightSurfaceSelected = Color(0xFFEAEDFF);
-  static const lightTextPrimary = Color(0xFF191C20);
-  static const lightTextSecondary = Color(0xFF5C626D);
-  static const lightTextTertiary = Color(0xFF777E8A);
-  static const lightBorder = Color(0xFFD9DEE8);
-  static const lightBorderStrong = Color(0xFFAEB7C7);
-  static const lightDivider = Color(0xFFE5E8EF);
-  static const lightFocus = Color(0xFF315CE8);
+  static const lightSurfaceSubtle = Color(0xFFF8F9FA);
+  static const lightSurfaceSelected = Color(0xFFEFEFFD);
+  static const lightTextPrimary = Color(0xFF0F172A);
+  static const lightTextSecondary = Color(0xFF64748B);
+  static const lightTextTertiary = Color(0xFF64748B);
+  static const lightBorder = Color(0xFFE2E8F0);
+  static const lightBorderStrong = Color(0xFFCBD5E1);
+  static const lightDivider = Color(0xFFE2E8F0);
+  static const lightFocus = Color(0xFF5D5FEF);
+  static const lightSuccess = Color(0xFF10B981);
+  static const lightDanger = Color(0xFFEF4444);
 
-  static const darkPrimary = Color(0xFFB9C4FF);
-  static const darkOnPrimary = Color(0xFF14245E);
-  static const darkPrimaryContainer = Color(0xFF2D3E87);
-  static const darkOnPrimaryContainer = Color(0xFFE1E5FF);
-  static const darkCanvas = Color(0xFF111318);
-  static const darkSurface = Color(0xFF191C22);
-  static const darkSurfaceSubtle = Color(0xFF21252D);
-  static const darkSurfaceSelected = Color(0xFF293663);
-  static const darkTextPrimary = Color(0xFFE5E8EF);
-  static const darkTextSecondary = Color(0xFFB9C0CC);
-  static const darkTextTertiary = Color(0xFF9098A5);
-  static const darkBorder = Color(0xFF363C47);
-  static const darkBorderStrong = Color(0xFF56606E);
-  static const darkDivider = Color(0xFF2D323B);
-  static const darkFocus = Color(0xFFAFC0FF);
+  static const darkPrimary = Color(0xFF6366F1);
+  static const darkOnPrimary = Color(0xFFF8FAFC);
+  static const darkPrimaryContainer = Color(0xFF282840);
+  static const darkOnPrimaryContainer = Color(0xFFC7D2FE);
+  static const darkCanvas = Color(0xFF121316);
+  static const darkSurface = Color(0xFF1E1F23);
+  static const darkSurfaceSubtle = Color(0xFF2B2C30);
+  static const darkSurfaceSelected = Color(0xFF282840);
+  static const darkTextPrimary = Color(0xFFF8FAFC);
+  static const darkTextSecondary = Color(0xFF94A3B8);
+  static const darkTextTertiary = Color(0xFF94A3B8);
+  static const darkBorder = Color(0xFF2E3038);
+  static const darkBorderStrong = Color(0xFF454854);
+  static const darkDivider = Color(0xFF2E3038);
+  static const darkFocus = Color(0xFFA5B4FC);
+  static const darkSuccess = Color(0xFF34D399);
+  static const darkDanger = Color(0xFFF87171);
 }
 
 @immutable
@@ -81,14 +86,14 @@ class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
   });
 
   static const light = AppSemanticColors(
-    success: Color(0xFF18734A),
-    successContainer: Color(0xFFE5F4EB),
-    info: Color(0xFF2567A7),
-    infoContainer: Color(0xFFE7F2FD),
-    warning: Color(0xFF8A5C00),
-    warningContainer: Color(0xFFFFF2D3),
-    recording: Color(0xFFB42318),
-    recordingContainer: Color(0xFFFEECEB),
+    success: AppColors.lightSuccess,
+    successContainer: Color(0xFFE7F8F2),
+    info: Color(0xFF5D5FEF),
+    infoContainer: Color(0xFFEFEFFD),
+    warning: Color(0xFF9A6700),
+    warningContainer: Color(0xFFFFF4D6),
+    recording: AppColors.lightSuccess,
+    recordingContainer: Color(0xFFE7F8F2),
     focus: AppColors.lightFocus,
     surfaceSubtle: AppColors.lightSurfaceSubtle,
     surfaceSelected: AppColors.lightSurfaceSelected,
@@ -97,14 +102,14 @@ class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
   );
 
   static const dark = AppSemanticColors(
-    success: Color(0xFF72D9A2),
-    successContainer: Color(0xFF123526),
-    info: Color(0xFF8DC8FF),
-    infoContainer: Color(0xFF123554),
-    warning: Color(0xFFF4C34F),
-    warningContainer: Color(0xFF392B08),
-    recording: Color(0xFFFFB4AB),
-    recordingContainer: Color(0xFF591B18),
+    success: AppColors.darkSuccess,
+    successContainer: Color(0xFF23402F),
+    info: Color(0xFFA5B4FC),
+    infoContainer: Color(0xFF282840),
+    warning: Color(0xFFF6C453),
+    warningContainer: Color(0xFF40351C),
+    recording: AppColors.darkSuccess,
+    recordingContainer: Color(0xFF23402F),
     focus: AppColors.darkFocus,
     surfaceSubtle: AppColors.darkSurfaceSubtle,
     surfaceSelected: AppColors.darkSurfaceSelected,
@@ -143,6 +148,9 @@ class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
     textTertiary: AppColors.desktopDarkTextSecondary,
     borderStrong: AppColors.desktopDarkBorderStrong,
   );
+
+  static const mobileLight = desktopLight;
+  static const mobileDark = desktopDark;
 
   final Color success;
   final Color successContainer;
@@ -261,6 +269,9 @@ class AppSurfaceEffects extends ThemeExtension<AppSurfaceEffects> {
     ),
     glassOpacity: 0.74,
   );
+
+  static const mobileLight = desktopLight;
+  static const mobileDark = desktopDark;
 
   final BoxShadow cardShadow;
   final BoxShadow floatingShadow;

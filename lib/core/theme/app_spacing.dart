@@ -22,6 +22,11 @@ class AppRadii {
   static const large = 10.0;
   static const dialog = 12.0;
 
+  static const mobileBadge = 8.0;
+  static const mobileControl = 13.0;
+  static const mobileCard = 19.0;
+  static const mobileHero = 28.0;
+
   static const desktopBadge = 8.0;
   static const desktopControl = 13.0;
   static const desktopCard = 19.0;

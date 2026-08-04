@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/theme/app_theme.dart';
@@ -15,7 +16,8 @@ class VoxFlowApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final platform = defaultTargetPlatform;
-    final isWindows = platform == TargetPlatform.windows;
+    final reduceMotion = WidgetsBinding
+        .instance.platformDispatcher.accessibilityFeatures.disableAnimations;
     final themePreference = ref.watch(
       settingsProvider.select((settings) => settings.themePreference),
     );
@@ -44,8 +46,29 @@ class VoxFlowApp extends ConsumerWidget {
         AppThemePreference.light => ThemeMode.light,
         AppThemePreference.dark => ThemeMode.dark,
       },
-      themeAnimationDuration: Duration(milliseconds: isWindows ? 200 : 160),
-      themeAnimationCurve: isWindows ? Curves.ease : Curves.easeOutCubic,
+      themeAnimationDuration:
+          reduceMotion ? Duration.zero : const Duration(milliseconds: 200),
+      themeAnimationCurve: Curves.ease,
+      builder: (context, child) {
+        if (platform != TargetPlatform.android) {
+          return child!;
+        }
+        final brightness = Theme.of(context).brightness;
+        final overlayBrightness =
+            brightness == Brightness.dark ? Brightness.light : Brightness.dark;
+        return AnnotatedRegion<SystemUiOverlayStyle>(
+          value: SystemUiOverlayStyle(
+            statusBarColor: Colors.transparent,
+            statusBarIconBrightness: overlayBrightness,
+            statusBarBrightness: brightness,
+            systemNavigationBarColor: Colors.transparent,
+            systemNavigationBarDividerColor: Colors.transparent,
+            systemNavigationBarIconBrightness: overlayBrightness,
+            systemNavigationBarContrastEnforced: false,
+          ),
+          child: child!,
+        );
+      },
       home: const PrivacyNoticeGate(child: AppShell()),
     );
   }

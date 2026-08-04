@@ -7,6 +7,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../widgets/app_section.dart';
 import '../../../widgets/app_status_banner.dart';
+import '../../../widgets/mobile_design.dart';
 import '../providers/privacy_notice_provider.dart';
 
 class PrivacyNoticeGate extends ConsumerWidget {
@@ -32,6 +33,9 @@ class _PrivacyNoticeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = context.l10n;
+    if (Theme.of(context).platform == TargetPlatform.android) {
+      return _buildMobile(context, ref, l10n);
+    }
     return LayoutBuilder(
       builder: (context, constraints) {
         final compact = constraints.maxWidth < AppBreakpoints.compact ||
@@ -225,6 +229,181 @@ class _PrivacyNoticeScreen extends ConsumerWidget {
               : null,
         );
       },
+    );
+  }
+
+  Widget _buildMobile(
+    BuildContext context,
+    WidgetRef ref,
+    AppLocalizations l10n,
+  ) {
+    final colors = Theme.of(context).colorScheme;
+    final safeBottom = MediaQuery.viewPaddingOf(context).bottom;
+    return Scaffold(
+      extendBody: true,
+      body: SafeArea(
+        bottom: false,
+        child: SingleChildScrollView(
+          key: const Key('mobilePrivacyNoticeScrollView'),
+          padding: EdgeInsets.fromLTRB(16, 10, 16, 112 + safeBottom),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              MobileViewHeader(
+                eyebrow: l10n.text(
+                  zh: 'Privacy · 本地数据',
+                  en: 'Privacy · Local data',
+                ),
+                title: l10n.text(
+                  zh: '数据与隐私说明',
+                  en: 'Data and privacy',
+                ),
+              ),
+              MobileSurfaceCard(
+                radius: AppRadii.mobileHero,
+                padding: const EdgeInsets.all(AppSpacing.lg),
+                color: colors.primaryContainer,
+                borderColor: colors.primary.withValues(alpha: 0.18),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.privacy_tip_outlined,
+                      size: 28,
+                      color: colors.onPrimaryContainer,
+                    ),
+                    const SizedBox(width: AppSpacing.md),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            l10n.text(
+                              zh: '开始使用前，请确认数据处理方式',
+                              en: 'Review how your data is handled',
+                            ),
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleLarge
+                                ?.copyWith(
+                                  color: colors.onPrimaryContainer,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                          ),
+                          const SizedBox(height: AppSpacing.xs),
+                          Text(
+                            l10n.text(
+                              zh: 'VoxFlow 只会将内容发送到你配置的服务，并在本机保存必要的任务记录。',
+                              en: 'VoxFlow sends content only to the service you configure and keeps necessary task records on this device.',
+                            ),
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodyMedium
+                                ?.copyWith(color: colors.onPrimaryContainer),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              AppStatusBanner(
+                kind: AppStatusKind.warning,
+                title: l10n.text(
+                  zh: 'API Key 本机存储提示',
+                  en: 'API key storage notice',
+                ),
+                message: l10n.text(
+                  zh: 'API Key 会以明文形式保存在本机应用设置中。请仅使用可撤销、低额度的受限测试密钥。',
+                  en: 'The API key is stored as plain text in local app settings. Use only a revocable, low-limit key.',
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              MobileSurfaceCard(
+                padding: const EdgeInsets.all(AppSpacing.md),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      l10n.text(zh: '数据范围', en: 'Data scope'),
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                    ),
+                    const SizedBox(height: AppSpacing.xxs),
+                    Text(
+                      l10n.text(
+                        zh: '请确认当前配置符合你的隐私要求。',
+                        en: 'Confirm that the current configuration meets your privacy requirements.',
+                      ),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: colors.onSurfaceVariant,
+                          ),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    _NoticeItem(
+                      icon: Icons.cloud_upload_outlined,
+                      title: l10n.text(
+                        zh: '数据外发',
+                        en: 'Data sent externally',
+                      ),
+                      description: l10n.text(
+                        zh: '你提交的文本和音频会发送到你配置的 API 服务商，VoxFlow 不会替你选择其他服务商。',
+                        en: 'Submitted text and audio are sent to the API provider you configure. VoxFlow does not choose another provider for you.',
+                      ),
+                    ),
+                    const Divider(height: AppSpacing.xl),
+                    _NoticeItem(
+                      icon: Icons.folder_outlined,
+                      title: l10n.text(
+                        zh: '本地历史与音频',
+                        en: 'Local history and audio',
+                      ),
+                      description: l10n.text(
+                        zh: '历史文本和受管音频保存在本机。删除历史记录时，对应的受管音频也会被删除。',
+                        en: 'History text and managed audio stay on this device. Deleting a history item also deletes its managed audio.',
+                      ),
+                    ),
+                    const Divider(height: AppSpacing.xl),
+                    _NoticeItem(
+                      icon: Icons.description_outlined,
+                      title: l10n.text(
+                        zh: '诊断日志',
+                        en: 'Diagnostic logs',
+                      ),
+                      description: l10n.text(
+                        zh: '日志会脱敏 API Key、认证头和输入正文，但仍可能包含请求时间、接口路径、模型和错误原因。',
+                        en: 'Logs redact API keys, authorization headers, and input content, but may include request times, endpoint paths, models, and error reasons.',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      bottomNavigationBar: SafeArea(
+        top: false,
+        minimum: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        child: MobileGlassSurface(
+          radius: AppRadii.mobileCard,
+          padding: const EdgeInsets.all(AppSpacing.xs),
+          child: FilledButton(
+            key: const Key('privacyNoticeAcceptButton'),
+            onPressed: () => _acknowledge(context, ref),
+            child: Text(
+              l10n.text(
+                zh: '我已了解并继续',
+                en: 'I understand and want to continue',
+              ),
+              maxLines: 2,
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ),
+      ),
     );
   }
 

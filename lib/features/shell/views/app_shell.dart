@@ -10,6 +10,7 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/services/windows_window_service.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../widgets/mobile_design.dart';
 import '../../history/views/history_screen.dart';
 import '../../settings/views/settings_screen.dart';
 import '../../settings/models/settings_state.dart';
@@ -45,10 +46,12 @@ class AppShell extends ConsumerStatefulWidget {
   ConsumerState<AppShell> createState() => _AppShellState();
 }
 
-class _AppShellState extends ConsumerState<AppShell> {
+class _AppShellState extends ConsumerState<AppShell>
+    with SingleTickerProviderStateMixin {
   late final List<FocusNode> _pageFocusNodes;
   late final List<Widget> _screens;
   late final Future<String?> _windowVersion;
+  late final AnimationController _mobilePageTransitionController;
   bool _navigationInProgress = false;
   Brightness? _reportedWindowBrightness;
 
@@ -57,6 +60,11 @@ class _AppShellState extends ConsumerState<AppShell> {
     super.initState();
     _windowVersion = WindowsWindowService.version();
     unawaited(WindowsWindowService.enableFrameless());
+    _mobilePageTransitionController = AnimationController(
+      vsync: this,
+      duration: MobileMotion.entrance,
+      value: 1,
+    );
     _pageFocusNodes = List.generate(
       AppShell._destinations.length,
       (index) => FocusNode(debugLabel: 'appPage:$index'),
@@ -86,6 +94,7 @@ class _AppShellState extends ConsumerState<AppShell> {
 
   @override
   void dispose() {
+    _mobilePageTransitionController.dispose();
     for (final node in _pageFocusNodes) {
       node.dispose();
     }
@@ -224,11 +233,47 @@ class _AppShellState extends ConsumerState<AppShell> {
     );
   }
 
+  Widget _mobilePageStack(int selectedIndex) {
+    final stack = _pageStack(selectedIndex);
+    if (MediaQuery.disableAnimationsOf(context)) {
+      return stack;
+    }
+    return AnimatedBuilder(
+      key: const Key('mobilePageTransition'),
+      animation: _mobilePageTransitionController,
+      child: stack,
+      builder: (context, child) {
+        final progress = MobileMotion.entranceCurve.transform(
+          _mobilePageTransitionController.value,
+        );
+        return Opacity(
+          key: const Key('mobilePageTransitionOpacity'),
+          opacity: progress,
+          child: Transform.translate(
+            key: const Key('mobilePageTransitionOffset'),
+            offset: Offset(0, 6 * (1 - progress)),
+            child: child,
+          ),
+        );
+      },
+    );
+  }
+
+  void _restartMobilePageTransition() {
+    if (Theme.of(context).platform != TargetPlatform.android ||
+        MediaQuery.disableAnimationsOf(context)) {
+      _mobilePageTransitionController.value = 1;
+      return;
+    }
+    _mobilePageTransitionController.forward(from: 0);
+  }
+
   @override
   Widget build(BuildContext context) {
     ref.listen<int>(navigationIndexProvider, (previous, next) {
       if (previous != next) {
         _schedulePageFocus(next);
+        _restartMobilePageTransition();
       }
     });
 
@@ -283,7 +328,7 @@ class _AppShellState extends ConsumerState<AppShell> {
           return _CompactShell(
             selectedIndex: selectedIndex,
             onSelected: _select,
-            pageStack: _pageStack(selectedIndex),
+            pageStack: _mobilePageStack(selectedIndex),
           );
         },
       ),
@@ -1090,19 +1135,23 @@ class _CompactShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
     return Scaffold(
+      key: const Key('compactShell'),
+      extendBody: true,
       body: pageStack,
-      bottomNavigationBar: DecoratedBox(
-        key: const Key('appBottomNavigation'),
-        decoration: BoxDecoration(
-          color: colors.surface,
-          border: Border(top: BorderSide(color: colors.outlineVariant)),
-        ),
-        child: SafeArea(
-          top: false,
-          child: Padding(
-            padding: const EdgeInsets.all(AppSpacing.xxs),
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.md,
+            0,
+            AppSpacing.md,
+            AppSpacing.md,
+          ),
+          child: MobileGlassSurface(
+            key: const Key('appBottomNavigation'),
+            radius: AppRadii.mobileHero,
+            padding: const EdgeInsets.all(AppSpacing.xs),
             child: Row(
               children: [
                 for (var index = 0;
@@ -1164,67 +1213,59 @@ class _BottomNavigationItemState extends State<_BottomNavigationItem> {
       child: ExcludeSemantics(
         child: Tooltip(
           message: widget.label,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xxs),
-            child: Material(
-              color: colors.surface.withValues(alpha: 0),
-              child: InkWell(
-                onTap: widget.onTap,
-                onFocusChange: (focused) {
-                  if (_focused != focused) {
-                    setState(() => _focused = focused);
-                  }
-                },
-                borderRadius: BorderRadius.circular(AppRadii.medium),
-                child: AnimatedContainer(
-                  duration: MediaQuery.disableAnimationsOf(context)
-                      ? Duration.zero
-                      : const Duration(milliseconds: 160),
-                  curve: Curves.easeOutCubic,
-                  constraints: const BoxConstraints(
-                    minWidth: 48,
-                    minHeight: 64,
-                  ),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.xxs,
-                    vertical: AppSpacing.xs,
-                  ),
-                  decoration: BoxDecoration(
-                    color: widget.selected
-                        ? semantics.surfaceSelected
-                        : colors.surface.withValues(alpha: 0),
-                    borderRadius: BorderRadius.circular(AppRadii.medium),
-                    border: _focused
-                        ? Border.all(color: semantics.focus, width: 2)
-                        : null,
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      IconTheme(
-                        data: IconThemeData(color: foreground, size: 24),
-                        child: Icon(
-                          widget.selected
-                              ? widget.destination.selectedIcon
-                              : widget.destination.icon,
-                        ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: widget.onTap,
+              onFocusChange: (focused) {
+                if (_focused != focused) {
+                  setState(() => _focused = focused);
+                }
+              },
+              borderRadius: BorderRadius.circular(20),
+              child: AnimatedContainer(
+                duration: MobileMotion.duration(context),
+                curve: Curves.ease,
+                constraints: const BoxConstraints(
+                  minWidth: 48,
+                  minHeight: 48,
+                ),
+                padding: const EdgeInsets.fromLTRB(0, 7, 0, 6),
+                decoration: BoxDecoration(
+                  color: widget.selected
+                      ? semantics.surfaceSelected
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(20),
+                  border: _focused
+                      ? Border.all(color: semantics.focus, width: 2)
+                      : null,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    IconTheme(
+                      data: IconThemeData(color: foreground, size: 21),
+                      child: Icon(
+                        widget.selected
+                            ? widget.destination.selectedIcon
+                            : widget.destination.icon,
                       ),
-                      const SizedBox(height: AppSpacing.xxs),
-                      Text(
-                        widget.compactLabel,
-                        maxLines: 2,
-                        softWrap: true,
-                        textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: foreground,
-                              fontWeight: widget.selected
-                                  ? FontWeight.w600
-                                  : FontWeight.w400,
-                            ),
-                      ),
-                    ],
-                  ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      widget.compactLabel,
+                      maxLines: 2,
+                      softWrap: true,
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: foreground,
+                            fontSize: 10.5,
+                            height: 1.35,
+                            fontWeight: FontWeight.w500,
+                          ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -1255,8 +1296,8 @@ String _destinationLabel(BuildContext context, int index) {
 String _compactDestinationLabel(BuildContext context, int index) {
   final l10n = context.l10n;
   return switch (index) {
-    0 => l10n.text(zh: '转录', en: 'STT'),
-    1 => l10n.text(zh: '合成', en: 'TTS'),
+    0 => l10n.text(zh: '转文字', en: 'To text'),
+    1 => l10n.text(zh: '转语音', en: 'To speech'),
     2 => l10n.text(zh: '历史', en: 'History'),
     _ => l10n.text(zh: '设置', en: 'Settings'),
   };

@@ -47,21 +47,44 @@ class AppTheme {
     final isAndroid = platform == TargetPlatform.android;
     final isWindows = platform == TargetPlatform.windows;
     final controlHeight = isAndroid ? 48.0 : 40.0;
-    final colors = _colorScheme(brightness, desktop: isWindows);
+    final colors = _colorScheme(
+      brightness,
+      desktop: isWindows || isAndroid,
+    );
     final semantics = isWindows
         ? (isDark
             ? AppSemanticColors.desktopDark
             : AppSemanticColors.desktopLight)
-        : (isDark ? AppSemanticColors.dark : AppSemanticColors.light);
+        : isAndroid
+            ? (isDark
+                ? AppSemanticColors.mobileDark
+                : AppSemanticColors.mobileLight)
+            : (isDark ? AppSemanticColors.dark : AppSemanticColors.light);
     final effects = isWindows
         ? (isDark
             ? AppSurfaceEffects.desktopDark
             : AppSurfaceEffects.desktopLight)
-        : AppSurfaceEffects.flat;
+        : isAndroid
+            ? (isDark
+                ? AppSurfaceEffects.mobileDark
+                : AppSurfaceEffects.mobileLight)
+            : AppSurfaceEffects.flat;
     final textTheme = _textTheme(colors.onSurface, desktop: isWindows);
-    final controlRadius = isWindows ? AppRadii.desktopControl : AppRadii.medium;
-    final cardRadius = isWindows ? AppRadii.desktopCard : AppRadii.large;
-    final dialogRadius = isWindows ? AppRadii.desktopCard : AppRadii.dialog;
+    final controlRadius = isWindows
+        ? AppRadii.desktopControl
+        : isAndroid
+            ? AppRadii.mobileControl
+            : AppRadii.medium;
+    final cardRadius = isWindows
+        ? AppRadii.desktopCard
+        : isAndroid
+            ? AppRadii.mobileCard
+            : AppRadii.large;
+    final dialogRadius = isWindows
+        ? AppRadii.desktopCard
+        : isAndroid
+            ? AppRadii.mobileCard
+            : AppRadii.dialog;
     final shape = RoundedRectangleBorder(
       borderRadius: BorderRadius.all(Radius.circular(controlRadius)),
     );
