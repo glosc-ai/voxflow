@@ -39,7 +39,10 @@ class _SpeechModelSelectorState extends ConsumerState<SpeechModelSelector> {
       ...fetchedModels.where((model) => model.trim().isNotEmpty),
     }.toList(growable: false);
     final enabled = widget.enabled && !_saving && models.isNotEmpty;
-    final colors = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final isAndroid = theme.platform == TargetPlatform.android;
+    final menuRadius = isAndroid ? AppRadii.mobileCard : AppRadii.dialog;
 
     return PopupMenuButton<String>(
       enabled: enabled,
@@ -54,11 +57,14 @@ class _SpeechModelSelectorState extends ConsumerState<SpeechModelSelector> {
             ),
       initialValue: current,
       position: PopupMenuPosition.under,
-      constraints: const BoxConstraints(minWidth: 180, maxWidth: 320),
+      constraints: BoxConstraints(
+        minWidth: isAndroid ? 176 : 180,
+        maxWidth: isAndroid ? 300 : 320,
+      ),
       color: colors.surface,
       surfaceTintColor: Colors.transparent,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppRadii.dialog),
+        borderRadius: BorderRadius.circular(menuRadius),
         side: BorderSide(color: colors.outlineVariant),
       ),
       onSelected: _select,
@@ -66,6 +72,7 @@ class _SpeechModelSelectorState extends ConsumerState<SpeechModelSelector> {
         for (final model in models)
           PopupMenuItem<String>(
             value: model,
+            height: isAndroid ? 48 : kMinInteractiveDimension,
             child: Row(
               children: [
                 Expanded(
@@ -107,18 +114,30 @@ class _SpeechModelSelectorState extends ConsumerState<SpeechModelSelector> {
             duration: MediaQuery.disableAnimationsOf(context)
                 ? Duration.zero
                 : const Duration(milliseconds: 200),
-            constraints: const BoxConstraints(minHeight: 34, maxWidth: 260),
+            constraints: BoxConstraints(
+              minHeight: isAndroid ? 48 : 34,
+              maxWidth: isAndroid ? 280 : 260,
+            ),
             padding: const EdgeInsets.symmetric(
               horizontal: AppSpacing.sm,
               vertical: AppSpacing.xs,
             ),
             decoration: ShapeDecoration(
               color: colors.surface,
-              shape: StadiumBorder(
-                side: BorderSide(
-                  color: enabled ? colors.outlineVariant : colors.outline,
-                ),
-              ),
+              shape: isAndroid
+                  ? RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(
+                        AppRadii.mobileControl,
+                      ),
+                      side: BorderSide(
+                        color: enabled ? colors.outlineVariant : colors.outline,
+                      ),
+                    )
+                  : StadiumBorder(
+                      side: BorderSide(
+                        color: enabled ? colors.outlineVariant : colors.outline,
+                      ),
+                    ),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
