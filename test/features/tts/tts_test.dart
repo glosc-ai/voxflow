@@ -182,6 +182,99 @@ void main() {
     expect(notifier.state.phase, TtsPhase.completed);
   });
 
+  test('播放速率独立于合成语速，并按交付序列循环', () async {
+    final directory =
+        await Directory.systemTemp.createTemp('voxflow_tts_rate_');
+    addTearDown(() => directory.delete(recursive: true));
+    final audioFile = File(
+      '${directory.path}${Platform.pathSeparator}generated.mp3',
+    );
+    await audioFile.writeAsBytes([1, 2, 3]);
+    final playback = _FakePlayback();
+    addTearDown(playback.dispose);
+    final notifier = TtsNotifier(
+      apiService: _FakeTtsService(audioFile),
+      playback: playback,
+      historyWriter: ({required text, required audioPath}) async {},
+      model: 'tts-1',
+    );
+    addTearDown(notifier.dispose);
+
+    notifier.setSpeed(1.5);
+    await notifier.synthesize('播放速率测试');
+
+    expect(notifier.state.speed, 1.5);
+    expect(notifier.state.playbackRate, 1.0);
+    expect(playback.playbackRates, [1.0]);
+
+    const expectedRates = [1.25, 1.5, 2.0, 3.0, 4.0, 0.25, 0.5, 0.75, 1.0];
+    for (final expectedRate in expectedRates) {
+      await notifier.cyclePlaybackRate();
+      expect(notifier.state.playbackRate, expectedRate);
+      expect(notifier.state.speed, 1.5);
+      expect(playback.playbackRates.last, expectedRate);
+    }
+  });
+
+  test('重新合成期间停止旧音频，失败后恢复旧结果和播放设置', () async {
+    final directory =
+        await Directory.systemTemp.createTemp('voxflow_tts_restore_');
+    addTearDown(() => directory.delete(recursive: true));
+    final audioFile = File(
+      '${directory.path}${Platform.pathSeparator}generated.mp3',
+    );
+    await audioFile.writeAsBytes([1, 2, 3]);
+    final service = _ControllableTtsService(audioFile);
+    final playback = _FakePlayback();
+    addTearDown(playback.dispose);
+    final notifier = TtsNotifier(
+      apiService: service,
+      playback: playback,
+      historyWriter: ({required text, required audioPath}) async {},
+      model: 'tts-1',
+    );
+    addTearDown(notifier.dispose);
+
+    await notifier.synthesize('旧音频');
+    await notifier.seek(const Duration(seconds: 1));
+    await notifier.setVolume(0.6);
+    await notifier.setPlaybackRate(1.25);
+    await notifier.playOrPause();
+    final playCallsBeforeRetry = playback.playCalls;
+
+    final retry = service.delayNextRequest();
+    final synthesis = notifier.synthesize('新音频');
+    await Future<void>.delayed(Duration.zero);
+
+    expect(notifier.state.phase, TtsPhase.generating);
+    expect(notifier.state.audioPath, audioFile.path);
+    expect(playback.stopCalls, 1);
+    await notifier.playOrPause();
+    await notifier.seek(Duration.zero);
+    await notifier.setVolume(0.2);
+    await notifier.setPlaybackRate(2.0);
+    expect(await notifier.saveCopy(), isFalse);
+    expect(playback.playCalls, playCallsBeforeRetry);
+    expect(notifier.state.volume, 0.6);
+    expect(notifier.state.playbackRate, 1.25);
+
+    retry.completeError(StateError('retry failed'));
+    await synthesis;
+
+    expect(notifier.state.phase, TtsPhase.failure);
+    expect(notifier.state.audioPath, audioFile.path);
+    expect(notifier.state.position, const Duration(seconds: 1));
+    expect(notifier.state.volume, 0.6);
+    expect(notifier.state.playbackRate, 1.25);
+    expect(playback.loadedPaths, [audioFile.path, audioFile.path]);
+    expect(playback.seekPositions.last, const Duration(seconds: 1));
+    expect(playback.playbackRates.last, 1.25);
+
+    await notifier.playOrPause();
+    expect(notifier.state.phase, TtsPhase.playing);
+    expect(playback.playCalls, playCallsBeforeRetry + 1);
+  });
+
   test('Seed TTS Notifier 默认使用模型专属 Speaker ID', () async {
     final directory =
         await Directory.systemTemp.createTemp('voxflow_seed_tts_state_');
@@ -272,11 +365,38 @@ class _FailingTtsService extends TtsApiService {
   }
 }
 
+class _ControllableTtsService extends TtsApiService {
+  _ControllableTtsService(this.file) : super(DioClient(_settings));
+
+  final File file;
+  Completer<File>? _nextRequest;
+
+  Completer<File> delayNextRequest() {
+    return _nextRequest = Completer<File>();
+  }
+
+  @override
+  Future<File> synthesize(TtsRequest request) {
+    final delayed = _nextRequest;
+    if (delayed != null) {
+      _nextRequest = null;
+      return delayed.future;
+    }
+    return Future.value(file);
+  }
+}
+
 class _FakePlayback implements PlaybackController {
   final _positions = StreamController<Duration>.broadcast();
   final _durations = StreamController<Duration>.broadcast();
   final _completions = StreamController<void>.broadcast();
-  bool playCalled = false;
+  final loadedPaths = <String>[];
+  final playbackRates = <double>[];
+  final seekPositions = <Duration>[];
+  int playCalls = 0;
+  int stopCalls = 0;
+
+  bool get playCalled => playCalls > 0;
 
   @override
   Stream<void> get completions => _completions.stream;
@@ -289,6 +409,7 @@ class _FakePlayback implements PlaybackController {
 
   @override
   Future<void> load(String path) async {
+    loadedPaths.add(path);
     _durations.add(const Duration(seconds: 2));
   }
 
@@ -297,19 +418,27 @@ class _FakePlayback implements PlaybackController {
 
   @override
   Future<void> play() async {
-    playCalled = true;
+    playCalls += 1;
   }
 
   @override
   Future<void> seek(Duration position) async {
+    seekPositions.add(position);
     _positions.add(position);
+  }
+
+  @override
+  Future<void> setPlaybackRate(double rate) async {
+    playbackRates.add(rate);
   }
 
   @override
   Future<void> setVolume(double volume) async {}
 
   @override
-  Future<void> stop() async {}
+  Future<void> stop() async {
+    stopCalls += 1;
+  }
 
   void complete() => _completions.add(null);
 

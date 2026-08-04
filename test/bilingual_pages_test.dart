@@ -24,15 +24,10 @@ void main() {
       );
 
       expect(find.text('Speech to text'), findsOneWidget);
-      expect(find.text('Record or import'), findsOneWidget);
       expect(find.text('Start recording'), findsOneWidget);
       expect(find.text('Choose file'), findsOneWidget);
-      expect(
-        tester.getSize(find.byType(AppBar)).height,
-        greaterThanOrEqualTo(
-          tester.getSize(find.text('Speech to text')).height + 16,
-        ),
-      );
+      expect(find.byType(AppBar), findsNothing);
+      expect(find.byKey(const Key('mobileSttScrollView')), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
 
@@ -44,9 +39,10 @@ void main() {
       );
 
       expect(find.text('Text to speech'), findsOneWidget);
-      expect(find.text('Enter text'), findsOneWidget);
-      expect(find.text('Voice settings'), findsOneWidget);
+      expect(find.text('Choose a voice'), findsOneWidget);
       expect(find.text('Generate speech'), findsOneWidget);
+      expect(find.byType(AppBar), findsNothing);
+      expect(find.byKey(const Key('mobileTtsWorkspace')), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
 
@@ -60,12 +56,16 @@ void main() {
 
       expect(find.text('History'), findsOneWidget);
       expect(find.text('Search history'), findsOneWidget);
-      expect(find.text('No history yet'), findsOneWidget);
+      expect(find.text('LIBRARY · LOCAL ARCHIVE'), findsOneWidget);
+      expect(find.byType(AppBar), findsNothing);
       expect(find.byTooltip('Refresh'), findsOneWidget);
-      expect(
-        tester.getSize(find.byType(AppBar)).height,
-        greaterThanOrEqualTo(tester.getSize(find.text('History')).height + 16),
+      await tester.fling(
+        find.byKey(const Key('mobileHistoryScrollView')),
+        const Offset(0, -500),
+        1000,
       );
+      await tester.pumpAndSettle();
+      expect(find.text('No history yet'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
   });
@@ -83,8 +83,8 @@ void main() {
       AppLocalizations.simplifiedChineseLocale,
     );
     expect(find.text('语音转文字'), findsOneWidget);
-    expect(find.text('录制或导入'), findsOneWidget);
-    expect(find.text('开始录音'), findsOneWidget);
+    expect(find.text('点按开始录音'), findsOneWidget);
+    expect(find.text('自动识别'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }
@@ -156,6 +156,9 @@ class _SilentPlaybackController implements PlaybackController {
 
   @override
   Future<void> seek(Duration position) async {}
+
+  @override
+  Future<void> setPlaybackRate(double rate) async {}
 
   @override
   Future<void> setVolume(double volume) async {}

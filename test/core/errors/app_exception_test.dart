@@ -160,6 +160,9 @@ class _FailingPlayback implements PlaybackController {
   Future<void> seek(Duration position) async {}
 
   @override
+  Future<void> setPlaybackRate(double rate) async {}
+
+  @override
   Future<void> setVolume(double volume) async {}
 
   @override

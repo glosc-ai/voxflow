@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:voxflow/core/network/dio_client.dart';
+import 'package:voxflow/core/theme/app_spacing.dart';
 import 'package:voxflow/core/theme/app_theme.dart';
 import 'package:voxflow/features/history/models/history_record.dart';
 import 'package:voxflow/features/history/providers/history_provider.dart';
@@ -18,8 +19,10 @@ import 'package:voxflow/features/stt/models/stt_state.dart';
 import 'package:voxflow/features/stt/providers/stt_provider.dart';
 import 'package:voxflow/features/stt/services/audio_record_manager.dart';
 import 'package:voxflow/features/stt/services/whisper_api_service.dart';
+import 'package:voxflow/features/tts/models/tts_state.dart';
 import 'package:voxflow/features/tts/providers/tts_provider.dart';
 import 'package:voxflow/features/tts/services/audio_playback_manager.dart';
+import 'package:voxflow/features/tts/services/tts_api_service.dart';
 import 'package:voxflow/l10n/app_localizations.dart';
 
 void main() {
@@ -59,6 +62,120 @@ void main() {
         findsOneWidget,
       );
     }
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Android 200% 字体下悬浮播放器位于底部导航上方', (tester) async {
+    await _pumpAppShell(
+      tester,
+      platform: TargetPlatform.android,
+      size: const Size(360, 640),
+      textScaleFactor: 2,
+      ttsNotifier: _ReadyTtsNotifier(),
+    );
+
+    await tester.tap(
+      find.byKey(const ValueKey('bottomNavigationDestination:1')),
+    );
+    await tester.pumpAndSettle();
+
+    final player = find.byKey(const Key('mobileTtsPlayer'));
+    final navigation = find.byKey(const Key('appBottomNavigation'));
+    expect(player, findsOneWidget);
+    expect(
+      tester.getRect(player).bottom,
+      lessThanOrEqualTo(tester.getRect(navigation).top - 8),
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Android 底栏按交付稿悬浮并使用毛玻璃表面', (tester) async {
+    await _pumpAppShell(
+      tester,
+      platform: TargetPlatform.android,
+      size: const Size(412, 892),
+    );
+
+    final shell = tester.widget<Scaffold>(
+      find.byKey(const Key('compactShell')),
+    );
+    final bar = find.byKey(const Key('appBottomNavigation'));
+    final barRect = tester.getRect(bar);
+
+    expect(shell.extendBody, isTrue);
+    expect(barRect.left, closeTo(16, 0.01));
+    expect(barRect.right, closeTo(396, 0.01));
+    expect(barRect.bottom, closeTo(876, 0.01));
+    expect(
+      find.descendant(of: bar, matching: find.byType(BackdropFilter)),
+      findsOneWidget,
+    );
+    final clip = tester.widget<ClipRRect>(
+      find.descendant(of: bar, matching: find.byType(ClipRRect)).first,
+    );
+    expect(clip.borderRadius, BorderRadius.circular(AppRadii.mobileHero));
+    expect(find.text('转文字'), findsOneWidget);
+    expect(find.text('转语音'), findsOneWidget);
+  });
+
+  testWidgets('Android 页面切换使用 260ms 淡入位移动效', (tester) async {
+    await _pumpAppShell(
+      tester,
+      platform: TargetPlatform.android,
+      size: const Size(412, 892),
+      disableAnimations: false,
+    );
+
+    await tester.tap(
+      find.byKey(const ValueKey('bottomNavigationDestination:1')),
+    );
+    await tester.pump();
+
+    var opacity = tester.widget<Opacity>(
+      find.byKey(const Key('mobilePageTransitionOpacity')),
+    );
+    var transform = tester.widget<Transform>(
+      find.byKey(const Key('mobilePageTransitionOffset')),
+    );
+    expect(opacity.opacity, 0);
+    expect(transform.transform.getTranslation().y, 6);
+
+    await tester.pump(const Duration(milliseconds: 130));
+    opacity = tester.widget<Opacity>(
+      find.byKey(const Key('mobilePageTransitionOpacity')),
+    );
+    transform = tester.widget<Transform>(
+      find.byKey(const Key('mobilePageTransitionOffset')),
+    );
+    expect(opacity.opacity, inExclusiveRange(0, 1));
+    expect(transform.transform.getTranslation().y, inExclusiveRange(0, 6));
+
+    await tester.pump(const Duration(milliseconds: 130));
+    opacity = tester.widget<Opacity>(
+      find.byKey(const Key('mobilePageTransitionOpacity')),
+    );
+    transform = tester.widget<Transform>(
+      find.byKey(const Key('mobilePageTransitionOffset')),
+    );
+    expect(opacity.opacity, 1);
+    expect(transform.transform.getTranslation().y, 0);
+  });
+
+  testWidgets('Android 页面切换在减少动态效果时立即完成', (tester) async {
+    await _pumpAppShell(
+      tester,
+      platform: TargetPlatform.android,
+      size: const Size(412, 892),
+    );
+
+    await tester.tap(
+      find.byKey(const ValueKey('bottomNavigationDestination:1')),
+    );
+    await tester.pump();
+
+    expect(find.byKey(const Key('mobilePageTransition')), findsNothing);
+    expect(_selectedNavigationIndex(tester), isNull);
+    expect(find.text('文字转语音'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -262,7 +379,9 @@ Future<void> _pumpAppShell(
   required TargetPlatform platform,
   required Size size,
   double textScaleFactor = 1,
+  bool disableAnimations = true,
   SttNotifier? sttNotifier,
+  TtsNotifier? ttsNotifier,
 }) async {
   SharedPreferences.setMockInitialValues({});
   final preferences = await SharedPreferences.getInstance();
@@ -287,14 +406,17 @@ Future<void> _pumpAppShell(
           _MemoryHistoryRepository(),
         ),
         if (sttNotifier != null) sttProvider.overrideWith((ref) => sttNotifier),
+        if (ttsNotifier != null) ttsProvider.overrideWith((ref) => ttsNotifier),
       ],
       child: MaterialApp(
         locale: AppLocalizations.simplifiedChineseLocale,
         supportedLocales: AppLocalizations.supportedLocales,
         localizationsDelegates: AppLocalizations.delegates,
-        theme: AppTheme.light.copyWith(platform: platform),
+        theme: AppTheme.lightFor(platform),
         builder: (context, child) => MediaQuery(
-          data: MediaQuery.of(context).copyWith(disableAnimations: true),
+          data: MediaQuery.of(context).copyWith(
+            disableAnimations: disableAnimations,
+          ),
           child: child!,
         ),
         home: const AppShell(),
@@ -360,10 +482,30 @@ class _SilentPlaybackController implements PlaybackController {
   Future<void> seek(Duration position) async {}
 
   @override
+  Future<void> setPlaybackRate(double rate) async {}
+
+  @override
   Future<void> setVolume(double volume) async {}
 
   @override
   Future<void> stop() async {}
+}
+
+class _ReadyTtsNotifier extends TtsNotifier {
+  _ReadyTtsNotifier()
+      : super(
+          apiService: TtsApiService(DioClient(const SettingsState())),
+          playback: const _SilentPlaybackController(),
+          historyWriter: ({required text, required audioPath}) async {},
+          model: 'tts-1',
+        ) {
+    state = const TtsState(
+      phase: TtsPhase.ready,
+      audioPath: 'generated.mp3',
+      duration: Duration(seconds: 12),
+      position: Duration(seconds: 2),
+    );
+  }
 }
 
 class _MemoryHistoryRepository extends HistoryRepository {

@@ -66,6 +66,49 @@ void main() {
     debugDefaultTargetPlatformOverride = null;
   });
 
+  testWidgets('Android 隐私说明在 360x640 与 200% 字体下保持可用', (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    SharedPreferences.setMockInitialValues({});
+    final preferences = await SharedPreferences.getInstance();
+    await SettingsRepository(preferences).save(
+      const SettingsState(localePreference: AppLocalePreference.english),
+    );
+    await tester.binding.setSurfaceSize(const Size(360, 640));
+    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(() async {
+      debugDefaultTargetPlatformOverride = null;
+      await tester.binding.setSurfaceSize(null);
+      tester.platformDispatcher.clearTextScaleFactorTestValue();
+    });
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          sharedPreferencesProvider.overrideWithValue(preferences),
+          ttsPlaybackManagerProvider.overrideWithValue(
+            const _SilentPlaybackController(),
+          ),
+          historyPlaybackManagerProvider.overrideWithValue(
+            const _SilentPlaybackController(),
+          ),
+          historyRepositoryProvider.overrideWithValue(
+            _MemoryHistoryRepository(),
+          ),
+        ],
+        child: const VoxFlowApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(AppBar), findsNothing);
+    expect(
+        find.byKey(const Key('mobilePrivacyNoticeScrollView')), findsOneWidget);
+    expect(find.text('Data and privacy'), findsOneWidget);
+    expect(find.byKey(const Key('privacyNoticeAcceptButton')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    debugDefaultTargetPlatformOverride = null;
+  });
+
   testWidgets('移动端使用底部导航', (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
     SharedPreferences.setMockInitialValues({});
@@ -242,9 +285,19 @@ void main() {
       );
       await tester.ensureVisible(themeField);
       await tester.pumpAndSettle();
-      await tester.tap(themeField);
-      await tester.pumpAndSettle();
-      await tester.tap(find.text(_englishThemeLabel(preference)).last);
+      if (tester.widget(themeField)
+          is DropdownButtonFormField<AppThemePreference>) {
+        await tester.tap(themeField);
+        await tester.pumpAndSettle();
+        await tester.tap(find.text(_englishThemeLabel(preference)).last);
+      } else {
+        await tester.tap(
+          find.descendant(
+            of: themeField,
+            matching: find.text(_englishThemeLabel(preference)),
+          ),
+        );
+      }
       await tester.pumpAndSettle();
 
       expect(_appThemeMode(tester), expectedMode);
@@ -340,7 +393,9 @@ void main() {
 
     await tester.tap(find.byTooltip('清空搜索'));
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(TextButton, '删除').first);
+    await tester.tap(find.byKey(const ValueKey('mobileHistoryCard:1')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('删除'));
     await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(FilledButton, '删除'));
     await tester.pumpAndSettle();
@@ -492,9 +547,12 @@ void main() {
   });
 
   testWidgets('TTS 失败原因持续显示在页面内', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final preferences = await SharedPreferences.getInstance();
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          sharedPreferencesProvider.overrideWithValue(preferences),
           ttsProvider.overrideWith((ref) => _FailureTtsNotifier()),
         ],
         child: const MaterialApp(home: TtsScreen()),
@@ -513,6 +571,10 @@ void main() {
   });
 
   testWidgets('Seed TTS 使用模型专属火山 Speaker ID', (tester) async {
+    SharedPreferences.setMockInitialValues({
+      'settings.tts_model': 'bytedance/seed-tts-2.0',
+    });
+    final preferences = await SharedPreferences.getInstance();
     final notifier = TtsNotifier(
       apiService: TtsApiService(DioClient(const SettingsState())),
       playback: const _SilentPlaybackController(),
@@ -522,6 +584,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          sharedPreferencesProvider.overrideWithValue(preferences),
           ttsProvider.overrideWith((ref) => notifier),
         ],
         child: const MaterialApp(home: TtsScreen()),
@@ -612,6 +675,9 @@ class _SilentPlaybackController implements PlaybackController {
 
   @override
   Future<void> seek(Duration position) async {}
+
+  @override
+  Future<void> setPlaybackRate(double rate) async {}
 
   @override
   Future<void> setVolume(double volume) async {}

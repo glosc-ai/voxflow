@@ -1,11 +1,16 @@
+import 'dart:ui' show SemanticsAction;
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:voxflow/core/constants/app_constants.dart';
 import 'package:voxflow/core/network/dio_client.dart';
 import 'package:voxflow/core/theme/app_theme.dart';
 import 'package:voxflow/features/settings/models/settings_state.dart';
+import 'package:voxflow/features/settings/providers/settings_provider.dart';
 import 'package:voxflow/features/tts/models/tts_state.dart';
 import 'package:voxflow/features/tts/providers/tts_provider.dart';
 import 'package:voxflow/features/tts/services/audio_playback_manager.dart';
@@ -14,7 +19,7 @@ import 'package:voxflow/features/tts/views/tts_screen.dart';
 import 'package:voxflow/l10n/app_localizations.dart';
 
 void main() {
-  testWidgets('Android 200% text keeps the two-line TTS title visible',
+  testWidgets('Android TTS uses the mobile handoff at 200% text scale',
       (tester) async {
     await _pumpTtsScreen(
       tester,
@@ -23,11 +28,42 @@ void main() {
       textScaleFactor: 2,
     );
 
-    final appBarHeight = tester.getSize(find.byType(AppBar)).height;
-    final titleHeight = tester.getSize(find.text('Text to speech')).height;
+    expect(find.byType(AppBar), findsNothing);
+    expect(find.byKey(const Key('mobileTtsWorkspace')), findsOneWidget);
+    expect(find.byKey(const Key('mobileTtsInputCard')), findsOneWidget);
+    expect(find.byKey(const Key('mobileVoiceList')), findsOneWidget);
+    expect(find.text('Text to speech'), findsOneWidget);
+    expect(find.text('Choose a voice'), findsOneWidget);
+    final alloySemantics = tester.getSemantics(
+      find.bySemanticsLabel('Alloy, Neutral · versatile'),
+    );
+    expect(
+      alloySemantics.getSemanticsData().hasAction(SemanticsAction.tap),
+      isTrue,
+    );
+    expect(tester.takeException(), isNull);
+  });
 
-    expect(appBarHeight, greaterThan(AppTheme.androidAppBarHeight));
-    expect(appBarHeight, greaterThanOrEqualTo(titleHeight + 16));
+  testWidgets('large text keeps the full Seed TTS Speaker ID visible',
+      (tester) async {
+    await _pumpTtsScreen(
+      tester,
+      locale: AppLocalizations.englishLocale,
+      platform: TargetPlatform.android,
+      textScaleFactor: 2,
+      notifier: _TestTtsNotifier(model: AppConstants.seedTtsModel),
+    );
+
+    const speakerId = 'zh_female_cancan_uranus_bigtts';
+    final speaker = find.text(speakerId);
+    final text = tester.widget<Text>(speaker);
+    final card = find
+        .ancestor(of: speaker, matching: find.byType(AnimatedContainer))
+        .first;
+
+    expect(text.maxLines, isNull);
+    expect(text.overflow, TextOverflow.visible);
+    expect(tester.getSize(card).width, greaterThanOrEqualTo(240));
     expect(tester.takeException(), isNull);
   });
 
@@ -57,7 +93,13 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Cancel'), findsOneWidget);
-    expect(find.text('Clear'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.text('Clear'),
+      ),
+      findsOneWidget,
+    );
     expect(tester.takeException(), isNull);
 
     await tester.sendKeyEvent(LogicalKeyboardKey.enter);
@@ -102,7 +144,13 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('取消'), findsOneWidget);
-    expect(find.text('清空'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.text('清空'),
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('generate button loading state keeps size and spinner contrast',
@@ -138,6 +186,69 @@ void main() {
     expect(tester.getSize(buttonFinder), buttonSize);
     expect(tester.getSize(labelStackFinder), labelStackSize);
   });
+
+  testWidgets('generated audio opens and dismisses the mobile player dock',
+      (tester) async {
+    await _pumpTtsScreen(
+      tester,
+      locale: AppLocalizations.englishLocale,
+      platform: TargetPlatform.android,
+      textScaleFactor: 2,
+      notifier: _TestTtsNotifier(ready: true),
+    );
+
+    expect(find.byKey(const Key('mobileTtsPlayer')), findsOneWidget);
+    expect(find.byTooltip('Save MP3'), findsOneWidget);
+    expect(find.byTooltip('Close player'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('mobileTtsPlayer')),
+        matching: find.text('1×'),
+      ),
+      findsOneWidget,
+    );
+    final rateButton = find.byKey(const Key('ttsPlaybackRateButton'));
+    expect(tester.getSize(rateButton).height, greaterThanOrEqualTo(48));
+    expect(
+      tester.getSize(find.byKey(const Key('ttsWaveProgressHitTarget'))).height,
+      greaterThanOrEqualTo(48),
+    );
+
+    await tester.tap(rateButton);
+    await tester.pump();
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('mobileTtsPlayer')),
+        matching: find.text('1.25×'),
+      ),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+
+    await tester.tap(find.byTooltip('Close player'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('mobileTtsPlayer')), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('mobile player is unavailable while replacing existing audio',
+      (tester) async {
+    final notifier = _TestTtsNotifier(ready: true);
+    await _pumpTtsScreen(
+      tester,
+      locale: AppLocalizations.englishLocale,
+      platform: TargetPlatform.android,
+      notifier: notifier,
+    );
+    expect(find.byKey(const Key('mobileTtsPlayer')), findsOneWidget);
+
+    notifier.setGenerating();
+    await tester.pump();
+
+    expect(notifier.state.hasAudio, isTrue);
+    expect(find.byKey(const Key('mobileTtsPlayer')), findsNothing);
+  });
 }
 
 Future<void> _pumpTtsScreen(
@@ -147,6 +258,8 @@ Future<void> _pumpTtsScreen(
   double textScaleFactor = 1,
   _TestTtsNotifier? notifier,
 }) async {
+  SharedPreferences.setMockInitialValues({});
+  final preferences = await SharedPreferences.getInstance();
   debugDefaultTargetPlatformOverride = platform;
   await tester.binding.setSurfaceSize(const Size(360, 640));
   tester.platformDispatcher.textScaleFactorTestValue = textScaleFactor;
@@ -159,6 +272,7 @@ Future<void> _pumpTtsScreen(
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          sharedPreferencesProvider.overrideWithValue(preferences),
           ttsProvider.overrideWith((ref) => notifier ?? _TestTtsNotifier()),
         ],
         child: MaterialApp(
@@ -190,15 +304,24 @@ String _text(WidgetTester tester) {
 }
 
 class _TestTtsNotifier extends TtsNotifier {
-  _TestTtsNotifier({bool generating = false})
-      : super(
+  _TestTtsNotifier({
+    bool generating = false,
+    bool ready = false,
+    super.model = 'tts-1',
+  }) : super(
           apiService: TtsApiService(DioClient(const SettingsState())),
           playback: const _SilentPlaybackController(),
           historyWriter: ({required text, required audioPath}) async {},
-          model: 'tts-1',
         ) {
     if (generating) {
       state = const TtsState(phase: TtsPhase.generating);
+    } else if (ready) {
+      state = const TtsState(
+        phase: TtsPhase.ready,
+        audioPath: 'generated.mp3',
+        duration: Duration(seconds: 12),
+        position: Duration(seconds: 2),
+      );
     }
   }
 
@@ -230,6 +353,9 @@ class _SilentPlaybackController implements PlaybackController {
 
   @override
   Future<void> seek(Duration position) async {}
+
+  @override
+  Future<void> setPlaybackRate(double rate) async {}
 
   @override
   Future<void> setVolume(double volume) async {}

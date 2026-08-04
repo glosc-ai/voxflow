@@ -141,6 +141,223 @@ void main() {
       defaults.baseUrl,
     );
   });
+
+  testWidgets('Android 设置按交付稿分组且 360×640 的 200% 字体无溢出', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final preferences = await SharedPreferences.getInstance();
+    final repository = SettingsRepository(preferences);
+    await repository.save(
+      const SettingsState(
+        apiKey: 'mobile-restricted-secret',
+        baseUrl: 'https://proxy.example/v1',
+        sttModel: 'gpt-4o-transcribe',
+        ttsModel: 'gpt-4o-mini-tts',
+      ),
+    );
+    final notifier = SettingsNotifier(repository);
+    await tester.binding.setSurfaceSize(const Size(360, 640));
+    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(() async {
+      await tester.binding.setSurfaceSize(null);
+      tester.platformDispatcher.clearTextScaleFactorTestValue();
+    });
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          settingsProvider.overrideWith((ref) => notifier),
+        ],
+        child: MaterialApp(
+          locale: AppLocalizations.simplifiedChineseLocale,
+          supportedLocales: AppLocalizations.supportedLocales,
+          localizationsDelegates: AppLocalizations.delegates,
+          theme: AppTheme.lightFor(TargetPlatform.android),
+          home: const SettingsScreen(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('mobileSettingsScrollView')), findsOneWidget);
+    expect(find.text('设置'), findsOneWidget);
+    for (final key in const [
+      ValueKey('mobileThemeOption:light'),
+      ValueKey('mobileThemeOption:dark'),
+      ValueKey('mobileThemeOption:system'),
+      ValueKey('mobileLocaleOption:zhHans'),
+      ValueKey('mobileLocaleOption:english'),
+      ValueKey('mobileLocaleOption:system'),
+    ]) {
+      final option = find.byKey(key);
+      expect(option, findsOneWidget);
+      expect(tester.getSize(option).height, greaterThanOrEqualTo(48));
+    }
+
+    final sttSelector = find.byKey(const Key('sttModelField'));
+    await tester.ensureVisible(sttSelector);
+    await tester.pumpAndSettle();
+    expect(tester.getSize(sttSelector).height, greaterThanOrEqualTo(48));
+
+    final apiKey = find.byKey(const Key('apiKeySemantics'));
+    await tester.ensureVisible(apiKey);
+    await tester.pumpAndSettle();
+    final apiKeySemantics = tester.widget<Semantics>(apiKey).properties;
+    expect(apiKeySemantics.obscured, isTrue);
+    expect(apiKeySemantics.value, '已填写');
+    expect(
+      apiKeySemantics.value,
+      isNot(contains('mobile-restricted-secret')),
+    );
+
+    for (final key in const [
+      Key('fetchModelsButton'),
+      Key('testConnectionButton'),
+      Key('viewLogsButton'),
+      Key('exportLogsButton'),
+      Key('resetLocalPreferencesButton'),
+      Key('settingsSaveButton'),
+    ]) {
+      final control = find.byKey(key);
+      expect(control, findsOneWidget);
+      await tester.ensureVisible(control);
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    }
+    expect(
+      tester.getSize(find.byKey(const Key('settingsSaveButton'))).height,
+      greaterThanOrEqualTo(48),
+    );
+  });
+
+  testWidgets('Android 设置确认后安全重置本地偏好并保留隐私确认', (tester) async {
+    SharedPreferences.setMockInitialValues({
+      'privacy_notice.acknowledged.v1': true,
+    });
+    final preferences = await SharedPreferences.getInstance();
+    final repository = SettingsRepository(preferences);
+    await repository.save(
+      const SettingsState(
+        apiKey: 'mobile-secret',
+        baseUrl: 'https://proxy.example/v1',
+        sttModel: 'gpt-4o-transcribe',
+        ttsModel: 'gpt-4o-mini-tts',
+        themePreference: AppThemePreference.dark,
+        localePreference: AppLocalePreference.english,
+      ),
+    );
+    final notifier = SettingsNotifier(repository);
+    await tester.binding.setSurfaceSize(const Size(360, 640));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          settingsProvider.overrideWith((ref) => notifier),
+        ],
+        child: MaterialApp(
+          locale: AppLocalizations.simplifiedChineseLocale,
+          supportedLocales: AppLocalizations.supportedLocales,
+          localizationsDelegates: AppLocalizations.delegates,
+          theme: AppTheme.lightFor(TargetPlatform.android),
+          home: const SettingsScreen(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final resetButton = find.byKey(
+      const Key('resetLocalPreferencesButton'),
+    );
+    await tester.ensureVisible(resetButton);
+    await tester.pumpAndSettle();
+    await tester.tap(resetButton);
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('resetLocalPreferencesConfirmButton')),
+      findsOneWidget,
+    );
+
+    await tester.tap(
+      find.byKey(const Key('resetLocalPreferencesConfirmButton')),
+    );
+    await tester.pumpAndSettle();
+
+    const defaults = SettingsState();
+    expect(notifier.state.apiKey, defaults.apiKey);
+    expect(notifier.state.baseUrl, defaults.baseUrl);
+    expect(notifier.state.sttModel, defaults.sttModel);
+    expect(notifier.state.ttsModel, defaults.ttsModel);
+    expect(notifier.state.themePreference, defaults.themePreference);
+    expect(notifier.state.localePreference, defaults.localePreference);
+    expect(preferences.getBool('privacy_notice.acknowledged.v1'), isTrue);
+    expect(
+      tester
+          .widget<TextFormField>(
+            find.byKey(const Key('apiKeyField')),
+          )
+          .controller
+          ?.text,
+      isEmpty,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Android 模型选择与工作台实时同步并由显式保存保留', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final preferences = await SharedPreferences.getInstance();
+    final repository = SettingsRepository(preferences);
+    await repository.save(
+      const SettingsState(
+        apiKey: 'mobile-restricted-secret',
+        baseUrl: 'https://proxy.example/v1',
+      ),
+    );
+    final notifier = _TestSettingsNotifier(repository)..setFetchedModels();
+    await tester.binding.setSurfaceSize(const Size(360, 720));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          settingsProvider.overrideWith((ref) => notifier),
+        ],
+        child: MaterialApp(
+          locale: AppLocalizations.simplifiedChineseLocale,
+          supportedLocales: AppLocalizations.supportedLocales,
+          localizationsDelegates: AppLocalizations.delegates,
+          theme: AppTheme.lightFor(TargetPlatform.android),
+          home: const SettingsScreen(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final selector = find.byKey(const Key('sttModelField'));
+    await tester.ensureVisible(selector);
+    await tester.pumpAndSettle();
+    await tester.tap(selector);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('gpt-4o-transcribe'));
+    await tester.pumpAndSettle();
+
+    expect(notifier.state.sttModel, 'gpt-4o-transcribe');
+    expect(
+      find.descendant(
+        of: selector,
+        matching: find.text('gpt-4o-transcribe'),
+      ),
+      findsOneWidget,
+    );
+
+    final saveButton = find.byKey(const Key('settingsSaveButton'));
+    await tester.ensureVisible(saveButton);
+    await tester.pumpAndSettle();
+    await tester.tap(saveButton);
+    await tester.pumpAndSettle();
+
+    expect(repository.load().sttModel, 'gpt-4o-transcribe');
+    expect(tester.takeException(), isNull);
+  });
 }
 
 class _TestSettingsNotifier extends SettingsNotifier {
@@ -148,5 +365,13 @@ class _TestSettingsNotifier extends SettingsNotifier {
 
   void setSaving() {
     state = state.copyWith(activeOperation: SettingsOperation.saving);
+  }
+
+  void setFetchedModels() {
+    state = state.copyWith(
+      availableSttModels: const ['whisper-1', 'gpt-4o-transcribe'],
+      availableTtsModels: const ['tts-1', 'gpt-4o-mini-tts'],
+      hasFetchedModels: true,
+    );
   }
 }

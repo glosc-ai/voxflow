@@ -126,19 +126,18 @@ void main() {
         overrides: [
           sharedPreferencesProvider.overrideWithValue(preferences),
         ],
-        child: const _LocalizedSettingsHarness(),
+        child: const _LocalizedSettingsHarness(
+          platform: TargetPlatform.android,
+        ),
       ),
     );
     await tester.pumpAndSettle();
 
     expect(find.text('Settings'), findsOneWidget);
-    expect(
-        find.text('Connection, models, and local diagnostics'), findsOneWidget);
-    expect(find.text('Appearance and language'), findsOneWidget);
-    expect(
-      tester.getSize(find.byType(AppBar)).height,
-      greaterThanOrEqualTo(tester.getSize(find.text('Settings')).height + 16),
-    );
+    expect(find.text('PREFERENCES · LOCAL SETTINGS'), findsOneWidget);
+    expect(find.text('Appearance'), findsOneWidget);
+    expect(find.byType(AppBar), findsNothing);
+    expect(find.byKey(const Key('mobileSettingsScrollView')), findsOneWidget);
     expect(tester.takeException(), isNull);
 
     var apiKeySemantics = tester.widget<Semantics>(
@@ -168,7 +167,9 @@ void main() {
 }
 
 class _LocalizedSettingsHarness extends ConsumerWidget {
-  const _LocalizedSettingsHarness();
+  const _LocalizedSettingsHarness({this.platform});
+
+  final TargetPlatform? platform;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -185,8 +186,8 @@ class _LocalizedSettingsHarness extends ConsumerWidget {
       localeListResolutionCallback:
           AppLocalizations.localeListResolutionCallback,
       localizationsDelegates: AppLocalizations.delegates,
-      theme: AppTheme.light,
-      darkTheme: AppTheme.dark,
+      theme: platform == null ? AppTheme.light : AppTheme.lightFor(platform!),
+      darkTheme: platform == null ? AppTheme.dark : AppTheme.darkFor(platform!),
       home: const SettingsScreen(),
     );
   }
