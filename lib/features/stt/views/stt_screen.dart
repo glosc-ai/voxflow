@@ -17,6 +17,7 @@ import '../models/stt_state.dart';
 import '../providers/stt_provider.dart';
 import '../services/seed_asr_api_service.dart';
 import '../widgets/desktop_stt_workspace.dart';
+import '../widgets/mobile_stt_workspace.dart';
 
 class SttScreen extends ConsumerStatefulWidget {
   const SttScreen({super.key, this.pageFocusNode});
@@ -75,12 +76,13 @@ class _SttScreenState extends ConsumerState<SttScreen> {
 
     return LayoutBuilder(
       builder: (context, pageConstraints) {
-        final useDesktop =
-            Theme.of(context).platform == TargetPlatform.windows &&
-                pageConstraints.maxWidth >= 760;
+        final platform = Theme.of(context).platform;
+        final useDesktop = platform == TargetPlatform.windows &&
+            pageConstraints.maxWidth >= 760;
+        final useMobile = platform == TargetPlatform.android;
         return Scaffold(
           backgroundColor: useDesktop ? Colors.transparent : null,
-          appBar: useDesktop
+          appBar: useDesktop || useMobile
               ? null
               : AppBar(
                   toolbarHeight: AppTheme.responsiveAppBarHeight(
@@ -155,61 +157,68 @@ class _SttScreenState extends ConsumerState<SttScreen> {
                       onExport: _export,
                       onNewTranscript: _startNewTranscript,
                     )
-                  : SingleChildScrollView(
-                      padding: AppLayout.pagePadding(context),
-                      child: Center(
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 960),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              if (errorMessage != null) ...[
-                                AppStatusBanner(
-                                  kind: AppStatusKind.error,
-                                  title: l10n.text(
-                                    zh: '转录未完成',
-                                    en: 'Transcription not completed',
-                                  ),
-                                  message: errorMessage,
-                                  action: state.canRetrySelectedSource
-                                      ? TextButton.icon(
-                                          key: const Key(
-                                            'retrySelectedSttSourceButton',
-                                          ),
-                                          onPressed: ref
-                                              .read(sttProvider.notifier)
-                                              .retrySelectedSource,
-                                          icon: const Icon(Icons.refresh),
-                                          label: Text(
-                                            state.selectedSourceIsTemporaryRecording
-                                                ? l10n.text(
-                                                    zh: '重试此录音',
-                                                    en: 'Retry this recording',
-                                                  )
-                                                : l10n.text(
-                                                    zh: '重试此文件',
-                                                    en: 'Retry this file',
-                                                  ),
-                                          ),
-                                        )
-                                      : null,
-                                ),
-                                const SizedBox(height: AppSpacing.md),
-                              ],
-                              if (state.result == null)
-                                _InputWorkspace(state: state)
-                              else
-                                _ResultSection(
-                                  state: state,
-                                  controller: _resultController,
-                                  onExport: _export,
-                                ),
-                              const SizedBox(height: AppSpacing.xl),
-                            ],
+                  : useMobile
+                      ? MobileSttWorkspace(
+                          state: state,
+                          controller: _resultController,
+                          onExport: _export,
+                          onNewTranscript: _startNewTranscript,
+                        )
+                      : SingleChildScrollView(
+                          padding: AppLayout.pagePadding(context),
+                          child: Center(
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 960),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  if (errorMessage != null) ...[
+                                    AppStatusBanner(
+                                      kind: AppStatusKind.error,
+                                      title: l10n.text(
+                                        zh: '转录未完成',
+                                        en: 'Transcription not completed',
+                                      ),
+                                      message: errorMessage,
+                                      action: state.canRetrySelectedSource
+                                          ? TextButton.icon(
+                                              key: const Key(
+                                                'retrySelectedSttSourceButton',
+                                              ),
+                                              onPressed: ref
+                                                  .read(sttProvider.notifier)
+                                                  .retrySelectedSource,
+                                              icon: const Icon(Icons.refresh),
+                                              label: Text(
+                                                state.selectedSourceIsTemporaryRecording
+                                                    ? l10n.text(
+                                                        zh: '重试此录音',
+                                                        en: 'Retry this recording',
+                                                      )
+                                                    : l10n.text(
+                                                        zh: '重试此文件',
+                                                        en: 'Retry this file',
+                                                      ),
+                                              ),
+                                            )
+                                          : null,
+                                    ),
+                                    const SizedBox(height: AppSpacing.md),
+                                  ],
+                                  if (state.result == null)
+                                    _InputWorkspace(state: state)
+                                  else
+                                    _ResultSection(
+                                      state: state,
+                                      controller: _resultController,
+                                      onExport: _export,
+                                    ),
+                                  const SizedBox(height: AppSpacing.xl),
+                                ],
+                              ),
+                            ),
                           ),
                         ),
-                      ),
-                    ),
             ),
           ),
         );
