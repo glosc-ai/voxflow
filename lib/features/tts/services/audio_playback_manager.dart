@@ -14,6 +14,7 @@ abstract interface class PlaybackController {
   Future<void> pause();
   Future<void> stop();
   Future<void> seek(Duration position);
+  Future<void> setPlaybackRate(double rate);
   Future<void> setVolume(double volume);
 }
 
@@ -114,6 +115,19 @@ class AudioPlaybackManager implements PlaybackController {
         AppErrorCode.playbackFailed,
         '调整播放进度失败。',
         englishMessage: 'Unable to seek in the audio.',
+      );
+    }
+  }
+
+  @override
+  Future<void> setPlaybackRate(double rate) async {
+    try {
+      await _player.setPlaybackRate(rate.clamp(0.25, 4.0));
+    } catch (_) {
+      throw const AppException(
+        AppErrorCode.playbackFailed,
+        '调整播放速度失败。',
+        englishMessage: 'Unable to change the playback speed.',
       );
     }
   }

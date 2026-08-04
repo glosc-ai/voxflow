@@ -15,6 +15,7 @@ import '../../../widgets/inline_error_banner.dart';
 import '../models/tts_state.dart';
 import '../providers/tts_provider.dart';
 import '../widgets/desktop_tts_workspace.dart';
+import '../widgets/mobile_tts_workspace.dart';
 
 class TtsScreen extends ConsumerStatefulWidget {
   const TtsScreen({super.key, this.pageFocusNode});
@@ -71,15 +72,19 @@ class _TtsScreenState extends ConsumerState<TtsScreen> {
 
     return LayoutBuilder(
       builder: (context, pageConstraints) {
-        final useDesktop =
-            Theme.of(context).platform == TargetPlatform.windows &&
-                pageConstraints.maxWidth >= 760;
+        final platform = Theme.of(context).platform;
+        final useDesktop = platform == TargetPlatform.windows &&
+            pageConstraints.maxWidth >= 760;
+        final useMobile = platform == TargetPlatform.android;
         final showDesktopPlayer = useDesktop &&
+            state.hasAudio &&
+            _dismissedAudioPath != state.audioPath;
+        final showMobilePlayer = useMobile &&
             state.hasAudio &&
             _dismissedAudioPath != state.audioPath;
         return Scaffold(
           backgroundColor: useDesktop ? Colors.transparent : null,
-          appBar: useDesktop
+          appBar: useDesktop || useMobile
               ? null
               : AppBar(
                   toolbarHeight: AppTheme.responsiveAppBarHeight(
@@ -98,7 +103,7 @@ class _TtsScreenState extends ConsumerState<TtsScreen> {
                   synthesize,
               const SingleActivator(LogicalKeyboardKey.numpadEnter,
                   control: true): synthesize,
-              if (showDesktopPlayer)
+              if (showDesktopPlayer || showMobilePlayer)
                 const SingleActivator(LogicalKeyboardKey.escape): () {
                   unawaited(_dismissDesktopPlayer());
                 },
@@ -123,76 +128,94 @@ class _TtsScreenState extends ConsumerState<TtsScreen> {
                         onSave: _saveDesktopAudio,
                         onDismissPlayer: _dismissDesktopPlayer,
                       )
-                    : SafeArea(
-                        top: false,
-                        child: LayoutBuilder(
-                          builder: (context, constraints) {
-                            final platform = Theme.of(context).platform;
-                            final stacked =
-                                platform != TargetPlatform.windows ||
-                                    AppLayout.useStackedLayout(context);
-                            final editor = _TextEditorSection(
-                              controller: _textController,
-                              isGenerating: state.isGenerating,
-                              expanded: !stacked,
-                              onClear: _confirmClearText,
-                            );
-                            final parameters = _VoiceParametersSection(
-                              state: state,
-                              voiceOptions: voiceOptions,
-                              usesSeedTtsSpeakerIds:
-                                  notifier.usesSeedTtsSpeakerIds,
-                              showKeyboardHint:
-                                  platform == TargetPlatform.windows,
-                              onSynthesize: synthesize,
-                            );
+                    : useMobile
+                        ? MobileTtsWorkspace(
+                            state: state,
+                            controller: _textController,
+                            voiceOptions: voiceOptions,
+                            usesSeedTtsSpeakerIds:
+                                notifier.usesSeedTtsSpeakerIds,
+                            errorMessage: errorMessage,
+                            showPlayer: showMobilePlayer,
+                            onSynthesize: synthesize,
+                            onClear: _confirmClearText,
+                            onSave: _saveDesktopAudio,
+                            onDismissPlayer: _dismissDesktopPlayer,
+                          )
+                        : SafeArea(
+                            top: false,
+                            child: LayoutBuilder(
+                              builder: (context, constraints) {
+                                final platform = Theme.of(context).platform;
+                                final stacked =
+                                    platform != TargetPlatform.windows ||
+                                        AppLayout.useStackedLayout(context);
+                                final editor = _TextEditorSection(
+                                  controller: _textController,
+                                  isGenerating: state.isGenerating,
+                                  expanded: !stacked,
+                                  onClear: _confirmClearText,
+                                );
+                                final parameters = _VoiceParametersSection(
+                                  state: state,
+                                  voiceOptions: voiceOptions,
+                                  usesSeedTtsSpeakerIds:
+                                      notifier.usesSeedTtsSpeakerIds,
+                                  showKeyboardHint:
+                                      platform == TargetPlatform.windows,
+                                  onSynthesize: synthesize,
+                                );
 
-                            return SingleChildScrollView(
-                              keyboardDismissBehavior:
-                                  ScrollViewKeyboardDismissBehavior.onDrag,
-                              padding: AppLayout.pagePadding(context),
-                              child: Center(
-                                child: ConstrainedBox(
-                                  constraints:
-                                      const BoxConstraints(maxWidth: 960),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.stretch,
-                                    children: [
-                                      if (errorMessage != null) ...[
-                                        InlineErrorBanner(
-                                          message: errorMessage,
-                                        ),
-                                        const SizedBox(height: AppSpacing.md),
-                                      ],
-                                      if (stacked) ...[
-                                        editor,
-                                        const SizedBox(height: AppSpacing.md),
-                                        parameters,
-                                      ] else
-                                        Row(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Expanded(flex: 3, child: editor),
+                                return SingleChildScrollView(
+                                  keyboardDismissBehavior:
+                                      ScrollViewKeyboardDismissBehavior.onDrag,
+                                  padding: AppLayout.pagePadding(context),
+                                  child: Center(
+                                    child: ConstrainedBox(
+                                      constraints:
+                                          const BoxConstraints(maxWidth: 960),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.stretch,
+                                        children: [
+                                          if (errorMessage != null) ...[
+                                            InlineErrorBanner(
+                                              message: errorMessage,
+                                            ),
                                             const SizedBox(
-                                                width: AppSpacing.md),
-                                            Expanded(
-                                                flex: 2, child: parameters),
+                                                height: AppSpacing.md),
                                           ],
-                                        ),
-                                      if (state.hasAudio) ...[
-                                        const SizedBox(height: AppSpacing.md),
-                                        _PlayerCard(state: state),
-                                      ],
-                                    ],
+                                          if (stacked) ...[
+                                            editor,
+                                            const SizedBox(
+                                                height: AppSpacing.md),
+                                            parameters,
+                                          ] else
+                                            Row(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Expanded(
+                                                    flex: 3, child: editor),
+                                                const SizedBox(
+                                                    width: AppSpacing.md),
+                                                Expanded(
+                                                    flex: 2, child: parameters),
+                                              ],
+                                            ),
+                                          if (state.hasAudio) ...[
+                                            const SizedBox(
+                                                height: AppSpacing.md),
+                                            _PlayerCard(state: state),
+                                          ],
+                                        ],
+                                      ),
+                                    ),
                                   ),
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
+                                );
+                              },
+                            ),
+                          ),
               ),
             ),
           ),

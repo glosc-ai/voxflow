@@ -54,6 +54,18 @@ final ttsProvider = StateNotifierProvider<TtsNotifier, TtsState>((ref) {
 });
 
 class TtsNotifier extends StateNotifier<TtsState> {
+  static const supportedPlaybackRates = <double>[
+    0.25,
+    0.5,
+    0.75,
+    1.0,
+    1.25,
+    1.5,
+    2.0,
+    3.0,
+    4.0,
+  ];
+
   TtsNotifier({
     required TtsApiService apiService,
     required PlaybackController playback,
@@ -122,10 +134,46 @@ class TtsNotifier extends StateNotifier<TtsState> {
     }
   }
 
+  Future<void> setPlaybackRate(double rate) async {
+    if (state.isGenerating) {
+      return;
+    }
+    final normalized = rate.clamp(0.25, 4.0).toDouble();
+    final previousRate = state.playbackRate;
+    state = state.copyWith(playbackRate: normalized, clearError: true);
+    if (!state.hasAudio) {
+      return;
+    }
+    try {
+      await _playback.setPlaybackRate(normalized);
+    } catch (error) {
+      state = state.copyWith(playbackRate: previousRate);
+      _setFailure(
+        error,
+        const AppMessage(
+          zh: '调整播放速度失败。',
+          en: 'Unable to change the playback speed.',
+        ),
+      );
+    }
+  }
+
+  Future<void> cyclePlaybackRate() {
+    final currentIndex = supportedPlaybackRates.indexWhere(
+      (rate) => (rate - state.playbackRate).abs() < 0.001,
+    );
+    final nextRate = currentIndex < 0
+        ? 1.0
+        : supportedPlaybackRates[
+            (currentIndex + 1) % supportedPlaybackRates.length];
+    return setPlaybackRate(nextRate);
+  }
+
   Future<void> synthesize(String text) async {
     if (state.isGenerating) {
       return;
     }
+    final previousState = state;
     state = state.copyWith(
       phase: TtsPhase.generating,
       position: Duration.zero,
@@ -134,15 +182,19 @@ class TtsNotifier extends StateNotifier<TtsState> {
     );
     File? output;
     try {
+      if (previousState.hasAudio) {
+        await _playback.stop();
+      }
       final request = TtsRequest(
         text: text,
         model: _model,
-        voice: state.voice,
-        speed: state.speed,
+        voice: previousState.voice,
+        speed: previousState.speed,
       ).validated();
       output = await _apiService.synthesize(request);
       await _playback.load(output.path);
-      await _playback.setVolume(state.volume);
+      await _playback.setVolume(previousState.volume);
+      await _playback.setPlaybackRate(previousState.playbackRate);
       await _historyWriter(text: request.text, audioPath: output.path);
       state = state.copyWith(
         phase: TtsPhase.ready,
@@ -151,7 +203,7 @@ class TtsNotifier extends StateNotifier<TtsState> {
         clearError: true,
       );
     } catch (error) {
-      if (output != null) {
+      if (output != null && output.path != previousState.audioPath) {
         try {
           await _playback.stop();
           if (await output.exists()) {
@@ -161,18 +213,20 @@ class TtsNotifier extends StateNotifier<TtsState> {
           // Best-effort cleanup for a synthesis that did not complete.
         }
       }
-      _setFailure(
-        error,
-        const AppMessage(
-          zh: '语音合成失败，请稍后重试。',
-          en: 'Speech synthesis failed. Try again later.',
-        ),
+      await _restorePreviousAudio(previousState);
+      const fallback = AppMessage(
+        zh: '语音合成失败，请稍后重试。',
+        en: 'Speech synthesis failed. Try again later.',
+      );
+      state = previousState.copyWith(
+        phase: TtsPhase.failure,
+        error: error is AppException ? error.localizedMessage : fallback,
       );
     }
   }
 
   Future<void> playOrPause() async {
-    if (!state.hasAudio) {
+    if (!state.hasAudio || state.isGenerating) {
       return;
     }
     try {
@@ -199,7 +253,7 @@ class TtsNotifier extends StateNotifier<TtsState> {
   }
 
   Future<void> seek(Duration position) async {
-    if (!state.hasAudio) {
+    if (!state.hasAudio || state.isGenerating) {
       return;
     }
     final maximum = state.duration;
@@ -221,6 +275,9 @@ class TtsNotifier extends StateNotifier<TtsState> {
   }
 
   Future<void> setVolume(double volume) async {
+    if (state.isGenerating) {
+      return;
+    }
     final normalized = volume.clamp(0.0, 1.0);
     state = state.copyWith(volume: normalized);
     try {
@@ -238,7 +295,7 @@ class TtsNotifier extends StateNotifier<TtsState> {
 
   Future<bool> saveCopy({String dialogTitle = '保存合成语音'}) async {
     final audioPath = state.audioPath;
-    if (audioPath == null) {
+    if (audioPath == null || state.isGenerating) {
       return false;
     }
     try {
@@ -273,6 +330,24 @@ class TtsNotifier extends StateNotifier<TtsState> {
         '保存 MP3 失败，请重新选择位置。',
         englishMessage: 'Unable to save the MP3 file. Choose another location.',
       );
+    }
+  }
+
+  Future<void> _restorePreviousAudio(TtsState previousState) async {
+    final path = previousState.audioPath;
+    if (path == null) {
+      return;
+    }
+    try {
+      await _playback.load(path);
+      await _playback.setVolume(previousState.volume);
+      await _playback.setPlaybackRate(previousState.playbackRate);
+      if (previousState.position > Duration.zero) {
+        await _playback.seek(previousState.position);
+      }
+    } catch (_) {
+      // Restoring an older result is best-effort; the synthesis error remains
+      // the primary user-facing failure.
     }
   }
 

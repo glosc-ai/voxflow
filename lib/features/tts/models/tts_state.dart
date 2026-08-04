@@ -17,6 +17,7 @@ class TtsState {
     this.phase = TtsPhase.idle,
     this.voice = 'alloy',
     this.speed = 1.0,
+    this.playbackRate = 1.0,
     this.volume = 1.0,
     this.position = Duration.zero,
     this.duration = Duration.zero,
@@ -28,6 +29,7 @@ class TtsState {
   final TtsPhase phase;
   final String voice;
   final double speed;
+  final double playbackRate;
   final double volume;
   final Duration position;
   final Duration duration;
@@ -50,6 +52,7 @@ class TtsState {
     TtsPhase? phase,
     String? voice,
     double? speed,
+    double? playbackRate,
     double? volume,
     Duration? position,
     Duration? duration,
@@ -69,6 +72,7 @@ class TtsState {
       phase: phase ?? this.phase,
       voice: voice ?? this.voice,
       speed: speed ?? this.speed,
+      playbackRate: playbackRate ?? this.playbackRate,
       volume: volume ?? this.volume,
       position: position ?? this.position,
       duration: duration ?? this.duration,
