@@ -39,7 +39,7 @@
 - 深度 = 超软浅阴影 + 1px 边框，禁高投影：`0 4px 16px rgb(15 23 42 / 0.04)`；悬浮壳（导航栏/播放器）可升至 `0 8px 32px rgb(15 23 42 / 0.08)` + `backdrop-filter: blur(10px)`
 
 ## 姿态规则（observed）
-1. **Shell 悬浮，不贴边。** Windows 左侧 240px NavigationRail，四周留白 16px；顶部放 Logo + API 状态绿光点（带 glow 脉冲）。不用贴边 AppBar。
+1. **Shell 悬浮，不贴边。** Windows 左侧 240px NavigationRail，四周留白 16px；顶部放 Logo + API 状态绿光点（带 glow 脉冲）。Android 用底部悬浮 Bottom Bar（毛玻璃 `blur(10px)`，距底与两侧各 16px，四目标页：转文字 / 转语音 / 历史 / 设置），配 Android 状态栏与居中挖孔机身呈现。不用贴边 AppBar / BottomNavigationBar。
 2. **层级靠留白与边框，不靠投影堆叠。** 卡片永远是 `surface + 1px border + 软阴影`；内容区间用 hairline 分隔，不砌盒子墙。
 3. **主色是稀缺资源。** 蓝紫只给：当前导航态、主 CTA、选中态。绿/红只做状态语义，绝不装饰。
 4. **数值永远等宽。** 计时器、时长、时间戳、字数统计全部 mono + tabular-nums，右对齐。
