@@ -54,11 +54,16 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('数据与隐私说明'), findsOneWidget);
-    expect(find.textContaining('当前用户配置文件的 DPAPI'), findsOneWidget);
-    expect(find.textContaining('系统备份'), findsOneWidget);
+    expect(find.textContaining('当前用户作用域的 DPAPI 加密'), findsOneWidget);
+    expect(find.textContaining('Android 应用数据备份已禁用'), findsOneWidget);
+    expect(find.textContaining('当前用户注册表'), findsOneWidget);
+    expect(find.textContaining('不防御已控制同一 Windows 用户的进程'), findsOneWidget);
+    expect(find.textContaining('可随时撤销、设置了低额度上限的测试密钥'), findsOneWidget);
+    expect(find.textContaining('不会写入普通应用设置、系统备份'), findsNothing);
     expect(find.textContaining('发送到你配置的 API 服务商'), findsOneWidget);
     expect(find.textContaining('历史文本和受管音频保存在本机'), findsOneWidget);
-    expect(find.textContaining('请求时间、接口路径、模型和错误原因'), findsOneWidget);
+    expect(find.textContaining('文件删除失败时会提示'), findsOneWidget);
+    expect(find.textContaining('错误原因可能回显部分输入内容'), findsOneWidget);
     expect(find.byKey(const Key('apiKeyField')), findsNothing);
 
     await tester.tap(find.byKey(const Key('privacyNoticeAcceptButton')));
@@ -109,7 +114,21 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Data and privacy'), findsOneWidget);
+    expect(
+      find.textContaining('revocable test key with a low quota limit'),
+      findsOneWidget,
+    );
     expect(find.byKey(const Key('privacyNoticeAcceptButton')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await tester.tap(find.byKey(const Key('privacyNoticeAcceptButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Data and privacy'), findsNothing);
+    expect(
+      find.byKey(const ValueKey('bottomNavigationDestination:0')),
+      findsOneWidget,
+    );
     expect(tester.takeException(), isNull);
     debugDefaultTargetPlatformOverride = null;
   });
