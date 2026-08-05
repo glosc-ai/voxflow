@@ -218,6 +218,10 @@ class _DesktopPageHeader extends StatelessWidget {
         ),
       ],
     );
+    final rightAlignedControls = Align(
+      alignment: Alignment.centerRight,
+      child: controls,
+    );
 
     if (textScale >= 1.6) {
       return Column(
@@ -225,7 +229,7 @@ class _DesktopPageHeader extends StatelessWidget {
         children: [
           header,
           const SizedBox(height: AppSpacing.md),
-          controls,
+          rightAlignedControls,
         ],
       );
     }
@@ -234,7 +238,7 @@ class _DesktopPageHeader extends StatelessWidget {
       children: [
         Expanded(child: header),
         const SizedBox(width: AppSpacing.md),
-        Flexible(child: controls),
+        Flexible(child: rightAlignedControls),
       ],
     );
   }

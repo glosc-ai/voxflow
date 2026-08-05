@@ -143,13 +143,17 @@ class _DesktopTtsHeader extends StatelessWidget {
       kind: SpeechModelKind.tts,
       enabled: !state.isGenerating,
     );
+    final rightAlignedSelector = Align(
+      alignment: Alignment.centerRight,
+      child: selector,
+    );
     if (MediaQuery.textScalerOf(context).scale(1) >= 1.6) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           title,
           const SizedBox(height: AppSpacing.md),
-          selector,
+          rightAlignedSelector,
         ],
       );
     }
@@ -158,7 +162,7 @@ class _DesktopTtsHeader extends StatelessWidget {
       children: [
         Expanded(child: title),
         const SizedBox(width: AppSpacing.md),
-        Flexible(child: selector),
+        Flexible(child: rightAlignedSelector),
       ],
     );
   }
