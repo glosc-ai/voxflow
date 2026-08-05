@@ -71,13 +71,11 @@ void main() {
       historyWriter: (
           {required type, required text, required audioPath}) async {},
       nowUtc: clock.read,
-      requiresPcmWav: () => true,
     );
     addTearDown(notifier.dispose);
 
     await notifier.startRecording();
     expect(recorder.startCalls, 1);
-    expect(recorder.requireWav, isTrue);
     expect(notifier.state.phase, SttPhase.recording);
 
     clock.autoAdvance = false;
@@ -199,12 +197,10 @@ class _FakeRecorder implements AudioRecordManager {
 
   final File? stopFile;
   int startCalls = 0;
-  bool? requireWav;
 
   @override
-  Future<void> start({bool requireWav = false}) async {
+  Future<void> start() async {
     startCalls++;
-    this.requireWav = requireWav;
   }
 
   @override

@@ -637,8 +637,8 @@ class _ImportPanel extends ConsumerWidget {
     final description = fileName ??
         (seedAsrSelected
             ? context.l10n.text(
-                zh: 'SeedASR 仅支持 16 kHz、16-bit、单声道 PCM WAV，最大 25 MB',
-                en: 'SeedASR accepts only 16 kHz, 16-bit, mono PCM WAV files up to 25 MB',
+                zh: '支持 MP3、MP4、MPEG、MPGA、M4A、WAV、WEBM；SeedASR 会自动转换，最大 25 MB',
+                en: 'Supports MP3, MP4, MPEG, MPGA, M4A, WAV, and WEBM; SeedASR converts them automatically, up to 25 MB',
               )
             : context.l10n.text(
                 zh: '支持 MP3、MP4、MPEG、MPGA、M4A、WAV、WEBM，最大 25 MB',

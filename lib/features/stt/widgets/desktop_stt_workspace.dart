@@ -733,8 +733,8 @@ class _UploadZone extends ConsumerWidget {
         filePath == null ? null : File(filePath).uri.pathSegments.last;
     final detail = seedAsrSelected
         ? context.l10n.text(
-            zh: '仅支持 16 kHz 单声道 PCM WAV · 最大 25 MB',
-            en: '16 kHz mono PCM WAV only · up to 25 MB',
+            zh: 'MP3 / MP4 / MPEG / MPGA / M4A / WAV / WEBM · SeedASR 自动转换 · 最大 25 MB',
+            en: 'MP3 / MP4 / MPEG / MPGA / M4A / WAV / WEBM · auto-converted for SeedASR · up to 25 MB',
           )
         : context.l10n.text(
             zh: 'MP3 / MP4 / M4A / WAV / WEBM · 最大 25 MB',

@@ -7,8 +7,11 @@ import 'dart:typed_data';
 import '../../../core/errors/app_exception.dart';
 import '../../../core/logging/app_logger.dart';
 import '../../../core/network/dio_client.dart';
+import '../../settings/models/settings_state.dart';
 import '../models/transcription_result.dart';
 import 'audio_file_validator.dart';
+import 'audio_normalization_service.dart';
+import 'seed_asr_pcm_wav.dart';
 import 'transcription_service.dart';
 
 typedef SeedAsrSocketConnector = Future<SeedAsrSocket> Function(
@@ -26,14 +29,18 @@ abstract interface class SeedAsrSocket {
 
 class SeedAsrApiService implements TranscriptionService {
   SeedAsrApiService(
-    this._client, {
+    DioClient client, {
     AudioFileValidator validator = const AudioFileValidator(),
+    AudioNormalizationService? normalizer,
     SeedAsrSocketConnector? connect,
     this.chunkInterval = const Duration(milliseconds: 200),
     this.connectTimeout = const Duration(seconds: 30),
     this.initialResponseTimeout = const Duration(seconds: 15),
     this.finalResponseTimeout = const Duration(seconds: 15),
-  })  : _validator = validator,
+  })  : _client = client,
+        _validator = validator,
+        _normalizer = normalizer ??
+            FfmpegAudioNormalizationService(eventLogger: client.logger),
         _connect = connect ?? _connectSocket;
 
   static const _endpointPath = '/api/v3/plan/sauc/bigmodel_nostream';
@@ -41,6 +48,7 @@ class SeedAsrApiService implements TranscriptionService {
 
   final DioClient _client;
   final AudioFileValidator _validator;
+  final AudioNormalizationService _normalizer;
   final SeedAsrSocketConnector _connect;
   final Duration chunkInterval;
   final Duration connectTimeout;
@@ -60,7 +68,21 @@ class SeedAsrApiService implements TranscriptionService {
   }) async {
     final settings = _client.settings.validated();
     await _validator.validate(file);
-    final audio = await _PcmWavAudio.read(file);
+    return _normalizer.withSeedAsrAudio(
+      file,
+      (_, normalizedAudio) => _transcribeNormalized(
+        normalizedAudio,
+        settings,
+        onUploadProgress,
+      ),
+    );
+  }
+
+  Future<TranscriptionResult> _transcribeNormalized(
+    SeedAsrPcmWavAudio audio,
+    SettingsState settings,
+    UploadProgressCallback? onUploadProgress,
+  ) async {
     final endpoint = _webSocketEndpoint(settings.baseUrl);
     final model = settings.sttModel;
     final requestId = _uuidV4();
@@ -524,73 +546,6 @@ class _SeedAsrOutcome {
 
   final bool finalReceived;
   final String text;
-}
-
-class _PcmWavAudio {
-  const _PcmWavAudio({required this.bytes, required this.duration});
-
-  final Uint8List bytes;
-  final Duration duration;
-
-  static Future<_PcmWavAudio> read(File file) async {
-    final bytes = await file.readAsBytes();
-    try {
-      if (bytes.length < 44 ||
-          _ascii(bytes, 0, 4) != 'RIFF' ||
-          _ascii(bytes, 8, 4) != 'WAVE') {
-        throw const FormatException('not a RIFF WAVE file');
-      }
-      final data = ByteData.sublistView(bytes);
-      int? format;
-      int? channels;
-      int? sampleRate;
-      int? bitsPerSample;
-      int? dataLength;
-      var offset = 12;
-      while (offset + 8 <= bytes.length) {
-        final chunkId = _ascii(bytes, offset, 4);
-        final chunkLength = data.getUint32(offset + 4, Endian.little);
-        final chunkStart = offset + 8;
-        if (chunkStart + chunkLength > bytes.length) {
-          throw const FormatException('truncated WAV chunk');
-        }
-        if (chunkId == 'fmt ' && chunkLength >= 16) {
-          format = data.getUint16(chunkStart, Endian.little);
-          channels = data.getUint16(chunkStart + 2, Endian.little);
-          sampleRate = data.getUint32(chunkStart + 4, Endian.little);
-          bitsPerSample = data.getUint16(chunkStart + 14, Endian.little);
-        } else if (chunkId == 'data') {
-          dataLength = chunkLength;
-        }
-        offset = chunkStart + chunkLength + (chunkLength.isOdd ? 1 : 0);
-      }
-      if (format != 1 ||
-          channels != 1 ||
-          sampleRate != 16000 ||
-          bitsPerSample != 16 ||
-          dataLength == null ||
-          dataLength <= 0) {
-        throw const FormatException('unsupported PCM WAV parameters');
-      }
-      final microseconds =
-          dataLength * Duration.microsecondsPerSecond ~/ (16000 * 2);
-      return _PcmWavAudio(
-        bytes: bytes,
-        duration: Duration(microseconds: microseconds),
-      );
-    } on FormatException {
-      throw const AppException(
-        AppErrorCode.invalidFile,
-        'SeedASR 目前仅支持 16 kHz、16-bit、单声道 PCM WAV。请转换文件格式，或选择兼容 OpenAI 转写接口的模型。',
-        englishMessage:
-            'SeedASR currently supports only 16 kHz, 16-bit, mono PCM WAV. Convert the file or choose a model compatible with the OpenAI transcription API.',
-      );
-    }
-  }
-
-  static String _ascii(Uint8List bytes, int offset, int length) {
-    return ascii.decode(bytes.sublist(offset, offset + length));
-  }
 }
 
 class _IoSeedAsrSocket implements SeedAsrSocket {

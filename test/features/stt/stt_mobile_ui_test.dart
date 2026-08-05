@@ -393,7 +393,7 @@ class _SilentRecorder implements AudioRecordManager {
   Future<void> resume() async {}
 
   @override
-  Future<void> start({bool requireWav = false}) async {}
+  Future<void> start() async {}
 
   @override
   Future<File> stop() => throw UnimplementedError();

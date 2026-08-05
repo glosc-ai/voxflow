@@ -161,6 +161,14 @@ packages:
       url: "https://pub.flutter-io.cn"
     source: hosted
     version: "2.2.0"
+  ffmpeg_kit_extended_flutter:
+    dependency: "direct main"
+    description:
+      name: ffmpeg_kit_extended_flutter
+      sha256: d4c9262b28bff3810184a2845b69b0b32fd052b1785589f5ff3dcfe2f9ed9eab
+      url: "https://pub.flutter-io.cn"
+    source: hosted
+    version: "0.5.13"
   file:
     dependency: transitive
     description:

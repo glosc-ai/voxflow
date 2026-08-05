@@ -9,7 +9,9 @@ import 'package:voxflow/core/errors/app_exception.dart';
 import 'package:voxflow/core/logging/app_logger.dart';
 import 'package:voxflow/core/network/dio_client.dart';
 import 'package:voxflow/features/settings/models/settings_state.dart';
+import 'package:voxflow/features/stt/services/audio_normalization_service.dart';
 import 'package:voxflow/features/stt/services/seed_asr_api_service.dart';
+import 'package:voxflow/features/stt/services/seed_asr_pcm_wav.dart';
 
 void main() {
   late Directory directory;
@@ -96,36 +98,42 @@ void main() {
     expect(secondReceive, lessThan(firstAudioSend));
   });
 
-  test('SeedASR 拒绝无法直接流式发送的非 PCM WAV', () async {
+  test('SeedASR 在发送前使用规范化模块处理非 PCM WAV', () async {
     var connectCalls = 0;
+    final socket = _FakeSeedAsrSocket([
+      _responseFrame({
+        'result': {'text': ''}
+      }),
+      _responseFrame(
+        {
+          'result': {'text': 'normalized result'},
+        },
+        isFinal: true,
+      ),
+    ]);
     final settings = _seedSettings();
+    final normalized = File('${directory.path}/normalized.wav');
+    await normalized.writeAsBytes(_pcmWav(dataBytes: 3200));
+    final normalizer = _FakeAudioNormalizationService(normalized);
     final service = SeedAsrApiService(
       DioClient(settings),
+      normalizer: normalizer,
       connect: (uri, headers) async {
         connectCalls++;
-        return _FakeSeedAsrSocket(const []);
+        return socket;
       },
+      chunkInterval: Duration.zero,
     );
     final input = File('${directory.path}/sample.mp3');
     await input.writeAsBytes([1, 2, 3]);
 
-    await expectLater(
-      service.transcribe(input),
-      throwsA(
-        isA<AppException>()
-            .having(
-              (error) => error.code,
-              'code',
-              AppErrorCode.invalidFile,
-            )
-            .having(
-              (error) => error.message,
-              'message',
-              contains('PCM WAV'),
-            ),
-      ),
-    );
-    expect(connectCalls, 0);
+    final result = await service.transcribe(input);
+
+    expect(result.text, 'normalized result');
+    expect(normalizer.calls, 1);
+    expect(normalizer.released, isTrue);
+    expect(connectCalls, 1);
+    expect(await input.exists(), isTrue);
   });
 
   test('SeedASR 服务端错误不会在界面异常中回显自定义密钥', () async {
@@ -225,6 +233,31 @@ class _FakeSeedAsrSocket implements SeedAsrSocket {
   @override
   Future<void> close() async {
     closed = true;
+  }
+}
+
+class _FakeAudioNormalizationService implements AudioNormalizationService {
+  _FakeAudioNormalizationService(this.normalized);
+
+  final File normalized;
+  int calls = 0;
+  bool released = false;
+
+  @override
+  Future<T> withSeedAsrAudio<T>(
+    File source,
+    Future<T> Function(
+      File normalizedFile,
+      SeedAsrPcmWavAudio normalizedAudio,
+    ) use,
+  ) async {
+    calls++;
+    try {
+      final audio = await SeedAsrPcmWavAudio.read(normalized);
+      return await use(normalized, audio);
+    } finally {
+      released = true;
+    }
   }
 }
 
