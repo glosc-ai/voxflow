@@ -10,7 +10,7 @@
 - TTS：文本、模型、音色和语速校验，MP3 生成、播放控制、拖动、音量与另存。
 - 历史记录：Windows FFI/Android SQLite、本地倒序搜索、复制、重播和安全删除受管音频。
 - 脱敏 JSONL 日志、日志轮转、查看与导出，以及可重复运行的快速诊断脚本。
-- OpenAI 六种标准音色与已验证的 Seed TTS Speaker ID `zh_female_cancan_uranus_bigtts`。
+- OpenAI 六种标准音色与火山引擎 Seed-TTS 2.0 主表的 93 个常规 Speaker ID；`zh_female_cancan_uranus_bigtts` 保持为已验证的默认音色。
 
 这些能力构成完成基线。首个上线版本只允许补齐发布缺口和修复缺陷，不替换现有架构、技术栈或核心工作流。
 
@@ -40,7 +40,7 @@
 
 - API Key 已改由 Windows 当前用户级 DPAPI 或 Android Keystore 加密保存；普通 `SharedPreferences` 与日志不保存密钥。
 - Windows 以未签名 Release 压缩包分发，允许出现已提前说明的 SmartScreen 警告。
-- Seed TTS 首版只承诺一个已验证 Speaker ID。
+- Seed TTS 首版承诺内置 93 个官方主表常规 Speaker ID；不承诺代理服务商已为 ICL 或独立多语种表逐项开通资源。
 - 历史记录没有分页或虚拟滚动，只适用于受控的测试数据规模。
 
 ### 非当前阻断项
@@ -66,7 +66,7 @@
 
 - Windows 安装器、Windows 代码签名、自动更新与回滚。
 - 公开商店上架材料及面向公开发布的完整法律文档。
-- 更多火山 Speaker ID、动态音色目录和未验证的服务商专属参数。
+- 火山 ICL、独立多语种表、S2S、Seed-TTS 1.0 音色，动态音色目录和未验证的服务商专属参数。
 - 历史记录分页、虚拟滚动和大数据量性能优化。
 - 补齐所有 STT/TTS/历史页面边界状态的 Widget 测试和 Android 平台集成自动化测试。
 - 在升级 Flutter 工具链时处理 `record_android` 的未来兼容性警告。

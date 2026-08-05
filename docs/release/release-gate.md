@@ -22,13 +22,13 @@
 
 - API Key 使用 Windows 当前用户级 DPAPI 或 Android Keystore 加密保存，不写入普通 `SharedPreferences` 或诊断日志。
 - Windows 首版是未签名压缩包，不提供安装器、代码签名、自动更新或回滚。
-- Seed TTS 首版只承诺 `zh_female_cancan_uranus_bigtts`。
+- Seed TTS 首版内置官方主表的 93 个常规 Speaker ID，并以已验证的 `zh_female_cancan_uranus_bigtts` 为默认音色。
 - 历史记录没有分页或虚拟滚动，仅适用于受控测试数据规模。
 
 ## 明确不纳入首版
 
 - Windows 安装器与代码签名。
-- 更多火山 Speaker ID 或动态音色目录。
+- 火山 ICL、独立多语种表、S2S、Seed-TTS 1.0 音色或动态音色目录。
 - 历史分页及大数据量性能优化。
 - 全面的平台集成自动化和公开商店上架材料。
 

@@ -50,7 +50,7 @@ VoxFlow 的完成基线已经稳定，但当前产物尚不能作为可持续升
 - 网络、STT 和 TTS Provider 只能因其实际运行配置发生变化而刷新。设置页的 `isBusy`、消息、连接结果或模型目录等瞬态状态不得重建正在运行的录音、合成或播放状态。
 - API Root、API Key 或模型的有效变更应用于后续任务；已经开始的任务应使用启动时的有效配置完成或按原有错误恢复机制失败。
 - 不更改服务端 API 合约、历史数据库结构、受管文件规则或现有日志脱敏边界。
-- 首版音色目录保持为 OpenAI 六种标准音色和已验证的 `zh_female_cancan_uranus_bigtts`，不增加未验证的 Speaker ID。
+- 首版音色目录保持为 OpenAI 六种标准音色和火山引擎 Seed-TTS 2.0 主表的 93 个常规 Speaker ID；继续以已验证的 `zh_female_cancan_uranus_bigtts` 作为 ByteDance 默认音色。
 - 首版上线条件以本规格的自动化结果和两项成品验收记录为准，不能用“构建成功”替代 Android 真机验收或 Windows 成品验收。
 
 ## Testing Decisions
@@ -71,7 +71,7 @@ VoxFlow 的完成基线已经稳定，但当前产物尚不能作为可持续升
 - 重构或替换完成基线中的架构、状态管理、网络、音频、存储或页面工作流。
 - Windows 安装器、Windows 代码签名、自动更新和回滚。
 - 公开商店上架材料及公开发布版的完整法律文档。
-- 更多火山 Speaker ID、动态音色目录和未验证的服务商专属参数。
+- 火山 ICL、独立多语种表、S2S、Seed-TTS 1.0 音色，动态音色目录和未验证的服务商专属参数。
 - 历史记录分页、虚拟滚动和大数据量性能优化。
 - 补齐所有页面边界状态的 Widget 测试或 Android 平台集成自动化测试。
 - 为未来 Flutter 工具链升级处理当前不阻断构建的 `record_android` Kotlin Gradle Plugin 警告。
@@ -81,6 +81,6 @@ VoxFlow 的完成基线已经稳定，但当前产物尚不能作为可持续升
 
 - 当前 Android Release 配置仍引用 Debug 签名，且仓库尚无 GitHub Actions 发布工作流，这两项是现有事实而非新架构设计。
 - API Key 已从 `SharedPreferences` 迁移到 Windows 当前用户级 DPAPI 或 Android Keystore；旧版明文仅在安全写入并回读验证后删除。
-- Windows 未签名压缩包和单一 Seed TTS Speaker ID 均为已接受限制，不得在实现过程中扩展为新的发布子项目。
+- Windows 未签名压缩包和静态 Seed-TTS 2.0 常规音色目录均为已接受限制，不得在实现过程中扩展为新的发布子项目。
 - 最近一次快速反馈循环中，格式检查和静态分析通过，35 项自动测试全部通过；当前没有已复现的核心功能失败。
 - 完成本规格的定义是：所有上线硬门槛均有可审计结果，且不存在仍可复现的核心流程阻断缺陷。
