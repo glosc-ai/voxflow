@@ -40,4 +40,25 @@ void main() {
     );
     expect(workflow, isNot(contains('run: flutter pub get\n')));
   });
+
+  test('Android Release 从 APK 证书 DER 计算签名指纹', () {
+    final workflow = File(
+      '${Directory.current.path}${Platform.pathSeparator}.github'
+      '${Platform.pathSeparator}workflows${Platform.pathSeparator}release.yml',
+    ).readAsStringSync();
+    final androidJob = workflow.substring(
+      workflow.indexOf('  build_android:'),
+      workflow.indexOf('  build_windows:'),
+    );
+
+    expect(androidJob, contains('verify --print-certs-pem'));
+    expect(androidJob, contains('openssl x509 -inform PEM -outform DER'));
+    expect(androidJob, contains("grep -c '^-----BEGIN CERTIFICATE-----\$'"));
+    expect(androidJob, contains('Expected exactly one signing certificate'));
+    expect(androidJob, contains('Actual certificate SHA-256'));
+    expect(
+      androidJob,
+      isNot(contains("sed -n 's/^Signer #1 certificate SHA-256 digest: //p'")),
+    );
+  });
 }

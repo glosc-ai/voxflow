@@ -340,6 +340,10 @@ jobs:
             echo "::error::aapt was not found in the Android SDK."
             exit 1
           fi
+          if ! command -v openssl >/dev/null 2>&1; then
+            echo "::error::OpenSSL was not found on the Android build runner."
+            exit 1
+          fi
           normalize_digest() {
             tr -d ' :\r\n' | tr '[:lower:]' '[:upper:]'
           }
@@ -383,13 +387,33 @@ jobs:
               echo "::error::Unexpected version in $(basename "$apk"): name=$version_name code=$actual_version_code"
               exit 1
             fi
-            verification="$($apksigner verify --print-certs "$apk")"
-            actual="$(
+            verification="$($apksigner verify --print-certs-pem "$apk")"
+            certificate_pem="$(
               printf '%s\n' "$verification" |
-                sed -n 's/^Signer #1 certificate SHA-256 digest: //p' |
+                sed -n '/^-----BEGIN CERTIFICATE-----$/,/^-----END CERTIFICATE-----$/p'
+            )"
+            certificate_count="$(
+              printf '%s\n' "$certificate_pem" |
+                grep -c '^-----BEGIN CERTIFICATE-----$' || true
+            )"
+            if [[ "$certificate_count" != "1" ]]; then
+              echo "::error::Expected exactly one signing certificate for $(basename "$apk"), found $certificate_count."
+              exit 1
+            fi
+            actual="$(
+              printf '%s\n' "$certificate_pem" |
+                openssl x509 -inform PEM -outform DER |
+                sha256sum |
+                awk '{print $1}' |
                 normalize_digest
             )"
-            if [[ -z "$actual" || "$actual" != "$expected" ]]; then
+            {
+              echo "### APK signing identity: $(basename "$apk")"
+              echo ""
+              echo "- Actual certificate SHA-256: \`$actual\`"
+              echo "- Expected certificate SHA-256: \`$expected\`"
+            } >> "$GITHUB_STEP_SUMMARY"
+            if [[ ! "$actual" =~ ^[0-9A-F]{64}$ || "$actual" != "$expected" ]]; then
               echo "::error::Unexpected signing certificate for $(basename "$apk")."
               exit 1
             fi
