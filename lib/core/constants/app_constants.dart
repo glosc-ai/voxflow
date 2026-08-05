@@ -1,7 +1,7 @@
 class AppConstants {
   AppConstants._();
 
-  static const appName = '声流 VoxFlow';
+  static const appName = '声流';
   static const defaultBaseUrl = 'https://one.gloscai.com/v1';
   static const apiKeyPageUrl = 'https://www.glosc.ai/keys';
   static const defaultSttModel = 'whisper-1';

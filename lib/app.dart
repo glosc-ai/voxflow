@@ -17,7 +17,10 @@ class VoxFlowApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final platform = defaultTargetPlatform;
     final reduceMotion = WidgetsBinding
-        .instance.platformDispatcher.accessibilityFeatures.disableAnimations;
+        .instance
+        .platformDispatcher
+        .accessibilityFeatures
+        .disableAnimations;
     final themePreference = ref.watch(
       settingsProvider.select((settings) => settings.themePreference),
     );
@@ -25,10 +28,7 @@ class VoxFlowApp extends ConsumerWidget {
       settingsProvider.select((settings) => settings.localePreference),
     );
     return MaterialApp(
-      onGenerateTitle: (context) => context.l10n.text(
-        zh: '声流 VoxFlow',
-        en: 'VoxFlow',
-      ),
+      onGenerateTitle: (context) => '声流',
       debugShowCheckedModeBanner: false,
       locale: switch (localePreference) {
         AppLocalePreference.system => null,
@@ -46,16 +46,18 @@ class VoxFlowApp extends ConsumerWidget {
         AppThemePreference.light => ThemeMode.light,
         AppThemePreference.dark => ThemeMode.dark,
       },
-      themeAnimationDuration:
-          reduceMotion ? Duration.zero : const Duration(milliseconds: 200),
+      themeAnimationDuration: reduceMotion
+          ? Duration.zero
+          : const Duration(milliseconds: 200),
       themeAnimationCurve: Curves.ease,
       builder: (context, child) {
         if (platform != TargetPlatform.android) {
           return child!;
         }
         final brightness = Theme.of(context).brightness;
-        final overlayBrightness =
-            brightness == Brightness.dark ? Brightness.light : Brightness.dark;
+        final overlayBrightness = brightness == Brightness.dark
+            ? Brightness.light
+            : Brightness.dark;
         return AnnotatedRegion<SystemUiOverlayStyle>(
           value: SystemUiOverlayStyle(
             statusBarColor: Colors.transparent,

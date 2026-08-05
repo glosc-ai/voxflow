@@ -54,8 +54,7 @@ class _VoxFlowBootstrapState extends State<VoxFlowBootstrap> {
           );
         }
         return MaterialApp(
-          onGenerateTitle: (context) =>
-              context.l10n.text(zh: '声流 VoxFlow', en: 'VoxFlow'),
+          onGenerateTitle: (context) => '声流',
           debugShowCheckedModeBanner: false,
           supportedLocales: AppLocalizations.supportedLocales,
           localeListResolutionCallback:
@@ -131,10 +130,7 @@ class _VoxFlowBootstrapState extends State<VoxFlowBootstrap> {
                       : Center(
                           child: Semantics(
                             liveRegion: true,
-                            label: l10n.text(
-                              zh: '正在启动声流 VoxFlow',
-                              en: 'Starting VoxFlow',
-                            ),
+                            label: l10n.text(zh: '正在启动声流', en: 'Starting 声流'),
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
@@ -152,7 +148,7 @@ class _VoxFlowBootstrapState extends State<VoxFlowBootstrap> {
                                       AppSpacing.md,
                                     ),
                                     child: Icon(
-                                      Icons.multitrack_audio,
+                                      Icons.graphic_eq_rounded,
                                       size: 32,
                                       color: Theme.of(
                                         context,
@@ -162,7 +158,7 @@ class _VoxFlowBootstrapState extends State<VoxFlowBootstrap> {
                                 ),
                                 const SizedBox(height: AppSpacing.md),
                                 Text(
-                                  l10n.text(zh: '声流 VoxFlow', en: 'VoxFlow'),
+                                  '声流',
                                   style: Theme.of(context).textTheme.titleLarge,
                                 ),
                                 const SizedBox(height: AppSpacing.md),

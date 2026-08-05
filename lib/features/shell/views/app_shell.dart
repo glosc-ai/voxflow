@@ -488,7 +488,7 @@ class _DesktopTitleBar extends StatelessWidget {
                         TextSpan(
                           children: [
                             TextSpan(
-                              text: 'VoxFlow',
+                              text: '声流',
                               style: Theme.of(context).textTheme.bodySmall
                                   ?.copyWith(
                                     color: colors.onSurface,
@@ -738,7 +738,7 @@ class _DesktopBrand extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'VoxFlow',
+                  '声流',
                   maxLines: 1,
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     fontSize: 17.5,
