@@ -48,8 +48,8 @@ void main() {
     final notifier = SttNotifier(
       recorder: _FakeRecorder(),
       apiService: _FailingWhisperService(),
-      historyWriter: (
-          {required type, required text, required audioPath}) async {},
+      historyWriter:
+          ({required type, required text, required audioPath}) async {},
     );
     addTearDown(notifier.dispose);
 
@@ -68,8 +68,8 @@ void main() {
     final notifier = SttNotifier(
       recorder: recorder,
       apiService: WhisperApiService(DioClient(const SettingsState())),
-      historyWriter: (
-          {required type, required text, required audioPath}) async {},
+      historyWriter:
+          ({required type, required text, required audioPath}) async {},
       nowUtc: clock.read,
     );
     addTearDown(notifier.dispose);
@@ -107,10 +107,10 @@ void main() {
     final notifier = SttNotifier(
       recorder: recorder,
       apiService: service,
-      historyWriter: (
-          {required type, required text, required audioPath}) async {
-        historyAudioPath = audioPath;
-      },
+      historyWriter:
+          ({required type, required text, required audioPath}) async {
+            historyAudioPath = audioPath;
+          },
       nowUtc: _FakeClock(DateTime.utc(2026, 7, 22)).read,
       persistManagedAudio: (source, {required category}) =>
           source.copy(managed.path),
@@ -151,8 +151,8 @@ void main() {
     final notifier = SttNotifier(
       recorder: _FakeRecorder(stopFile: recording),
       apiService: _FailingWhisperService(),
-      historyWriter: (
-          {required type, required text, required audioPath}) async {},
+      historyWriter:
+          ({required type, required text, required audioPath}) async {},
       nowUtc: _FakeClock(DateTime.utc(2026, 7, 22)).read,
     );
     addTearDown(notifier.dispose);
@@ -220,10 +220,7 @@ class _FakeRecorder implements AudioRecordManager {
 }
 
 class _FailingWhisperService extends WhisperApiService {
-  _FailingWhisperService()
-      : super(
-          DioClient(const SettingsState()),
-        );
+  _FailingWhisperService() : super(DioClient(const SettingsState()));
 
   @override
   Future<TranscriptionResult> transcribe(
@@ -235,10 +232,7 @@ class _FailingWhisperService extends WhisperApiService {
 }
 
 class _FailOnceWhisperService extends WhisperApiService {
-  _FailOnceWhisperService()
-      : super(
-          DioClient(const SettingsState()),
-        );
+  _FailOnceWhisperService() : super(DioClient(const SettingsState()));
 
   int calls = 0;
 
@@ -252,9 +246,6 @@ class _FailOnceWhisperService extends WhisperApiService {
       throw StateError('temporary failure');
     }
     onUploadProgress?.call(1);
-    return const TranscriptionResult(
-      text: '重试成功',
-      segments: [],
-    );
+    return const TranscriptionResult(text: '重试成功', segments: []);
   }
 }

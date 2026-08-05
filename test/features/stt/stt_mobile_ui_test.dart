@@ -21,49 +21,52 @@ import 'package:voxflow/l10n/app_localizations.dart';
 import 'package:voxflow/widgets/mobile_design.dart';
 
 void main() {
-  testWidgets('Android STT handoff keeps the idle result preview at 200% text',
-      (tester) async {
-    final preferences = await _preferences();
-    await tester.binding.setSurfaceSize(const Size(360, 640));
-    tester.platformDispatcher.textScaleFactorTestValue = 2;
-    addTearDown(() async {
-      await tester.binding.setSurfaceSize(null);
-      tester.platformDispatcher.clearTextScaleFactorTestValue();
-    });
+  testWidgets(
+    'Android STT handoff keeps the idle result preview at 200% text',
+    (tester) async {
+      final preferences = await _preferences();
+      await tester.binding.setSurfaceSize(const Size(360, 640));
+      tester.platformDispatcher.textScaleFactorTestValue = 2;
+      addTearDown(() async {
+        await tester.binding.setSurfaceSize(null);
+        tester.platformDispatcher.clearTextScaleFactorTestValue();
+      });
 
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          sharedPreferencesProvider.overrideWithValue(preferences),
-          sttProvider.overrideWith((ref) => _TestSttNotifier()),
-        ],
-        child: _testApp(const SttScreen()),
-      ),
-    );
-    await tester.pump();
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            sharedPreferencesProvider.overrideWithValue(preferences),
+            sttProvider.overrideWith((ref) => _TestSttNotifier()),
+          ],
+          child: _testApp(const SttScreen()),
+        ),
+      );
+      await tester.pump();
 
-    expect(find.byType(AppBar), findsNothing);
-    expect(find.text('Speech to text'), findsOneWidget);
-    expect(find.text('Auto detect'), findsOneWidget);
-    expect(find.text('Start recording'), findsOneWidget);
-    expect(find.text('00:00.00'), findsOneWidget);
-    expect(
-      find.text(
-        'Timestamped transcript segments will appear here after recording.',
-      ),
-      findsOneWidget,
-    );
-    expect(
-      tester.getSize(find.byKey(const Key('startRecordingButton'))),
-      const Size.square(120),
-    );
-    expect(find.byKey(const Key('mobileSttUploadZone')), findsOneWidget);
-    expect(find.byKey(const Key('mobileSttTranscriptCard')), findsOneWidget);
-    expect(tester.takeException(), isNull);
-  });
+      expect(find.byType(AppBar), findsNothing);
+      expect(find.text('Speech to text'), findsOneWidget);
+      expect(find.text('Auto detect'), findsOneWidget);
+      expect(find.text('Start recording'), findsOneWidget);
+      expect(find.text('00:00.00'), findsOneWidget);
+      expect(
+        find.text(
+          'Timestamped transcript segments will appear here after recording.',
+        ),
+        findsOneWidget,
+      );
+      expect(
+        tester.getSize(find.byKey(const Key('startRecordingButton'))),
+        const Size.square(120),
+      );
+      expect(find.byKey(const Key('mobileSttUploadZone')), findsOneWidget);
+      expect(find.byKey(const Key('mobileSttTranscriptCard')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
-  testWidgets('mobile transcript switches formats and copies the real SRT',
-      (tester) async {
+  testWidgets('mobile transcript switches formats and copies the real SRT', (
+    tester,
+  ) async {
     final preferences = await _preferences();
     const state = SttState(
       phase: SttPhase.success,
@@ -151,8 +154,9 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('Android Tab focus gives recorder and upload a 2px focus ring',
-      (tester) async {
+  testWidgets('Android Tab focus gives recorder and upload a 2px focus ring', (
+    tester,
+  ) async {
     final preferences = await _preferences();
     await tester.binding.setSurfaceSize(const Size(412, 892));
     addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -184,84 +188,83 @@ void main() {
       of: upload,
       matching: find.byType(MobileDashedOutline),
     );
-    final uploadOutline =
-        tester.widget<MobileDashedOutline>(uploadOutlineFinder);
+    final uploadOutline = tester.widget<MobileDashedOutline>(
+      uploadOutlineFinder,
+    );
     expect(uploadOutline.color, focusColor);
     expect(uploadOutline.strokeWidth, 2);
     expect(tester.getSize(upload).height, greaterThanOrEqualTo(48));
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('mobile recorder exposes countdown recording pause and recovery',
-      (tester) async {
-    final preferences = await _preferences();
-    final notifier = _TestSttNotifier();
-    await tester.binding.setSurfaceSize(const Size(412, 892));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
+  testWidgets(
+    'mobile recorder exposes countdown recording pause and recovery',
+    (tester) async {
+      final preferences = await _preferences();
+      final notifier = _TestSttNotifier();
+      await tester.binding.setSurfaceSize(const Size(412, 892));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
 
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          sharedPreferencesProvider.overrideWithValue(preferences),
-          sttProvider.overrideWith((ref) => notifier),
-        ],
-        child: _testApp(const SttScreen()),
-      ),
-    );
-    await tester.pump();
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            sharedPreferencesProvider.overrideWithValue(preferences),
+            sttProvider.overrideWith((ref) => notifier),
+          ],
+          child: _testApp(const SttScreen()),
+        ),
+      );
+      await tester.pump();
 
-    notifier.show(
-      const SttState(phase: SttPhase.countdown, countdown: 3),
-    );
-    await tester.pump();
-    expect(find.text('3'), findsOneWidget);
-    expect(find.text('Preparing to record · tap to cancel'), findsOneWidget);
+      notifier.show(const SttState(phase: SttPhase.countdown, countdown: 3));
+      await tester.pump();
+      expect(find.text('3'), findsOneWidget);
+      expect(find.text('Preparing to record · tap to cancel'), findsOneWidget);
 
-    notifier.show(
-      const SttState(
-        phase: SttPhase.recording,
-        elapsed: Duration(milliseconds: 1250),
-      ),
-    );
-    await tester.pump();
-    expect(find.text('00:01.25'), findsOneWidget);
-    expect(find.text('Recording · tap to stop'), findsOneWidget);
-    expect(find.text('Pause'), findsOneWidget);
+      notifier.show(
+        const SttState(
+          phase: SttPhase.recording,
+          elapsed: Duration(milliseconds: 1250),
+        ),
+      );
+      await tester.pump();
+      expect(find.text('00:01.25'), findsOneWidget);
+      expect(find.text('Recording · tap to stop'), findsOneWidget);
+      expect(find.text('Pause'), findsOneWidget);
 
-    notifier.show(
-      const SttState(
-        phase: SttPhase.paused,
-        elapsed: Duration(milliseconds: 1250),
-      ),
-    );
-    await tester.pump();
-    expect(find.text('Recording paused · tap to finish'), findsOneWidget);
-    expect(find.text('Resume'), findsOneWidget);
+      notifier.show(
+        const SttState(
+          phase: SttPhase.paused,
+          elapsed: Duration(milliseconds: 1250),
+        ),
+      );
+      await tester.pump();
+      expect(find.text('Recording paused · tap to finish'), findsOneWidget);
+      expect(find.text('Resume'), findsOneWidget);
 
-    notifier.show(
-      const SttState(
-        phase: SttPhase.failure,
-        selectedFilePath: 'failed-recording.wav',
-        selectedSourceIsTemporaryRecording: true,
-        errorMessage: 'Test transcription failure.',
-      ),
-    );
-    await tester.pump();
-    expect(find.text('Test transcription failure.'), findsWidgets);
-    expect(find.text('Retry this recording'), findsOneWidget);
-    expect(find.text('Discard and start new'), findsOneWidget);
-    expect(tester.takeException(), isNull);
-  });
+      notifier.show(
+        const SttState(
+          phase: SttPhase.failure,
+          selectedFilePath: 'failed-recording.wav',
+          selectedSourceIsTemporaryRecording: true,
+          errorMessage: 'Test transcription failure.',
+        ),
+      );
+      await tester.pump();
+      expect(find.text('Test transcription failure.'), findsWidgets);
+      expect(find.text('Retry this recording'), findsOneWidget);
+      expect(find.text('Discard and start new'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
-  testWidgets('mobile transcript disables SRT without timestamped segments',
-      (tester) async {
+  testWidgets('mobile transcript disables SRT without timestamped segments', (
+    tester,
+  ) async {
     final preferences = await _preferences();
     const state = SttState(
       phase: SttPhase.success,
-      result: TranscriptionResult(
-        text: 'Plain transcript',
-        segments: [],
-      ),
+      result: TranscriptionResult(text: 'Plain transcript', segments: []),
       editedText: 'Plain transcript',
     );
     final controller = TextEditingController(text: state.editedText);
@@ -365,12 +368,12 @@ bool _primaryFocusIsWithin(Finder target) {
 
 class _TestSttNotifier extends SttNotifier {
   _TestSttNotifier([SttState initial = const SttState()])
-      : super(
-          recorder: _SilentRecorder(),
-          apiService: WhisperApiService(DioClient(const SettingsState())),
-          historyWriter: (
-              {required type, required text, required audioPath}) async {},
-        ) {
+    : super(
+        recorder: _SilentRecorder(),
+        apiService: WhisperApiService(DioClient(const SettingsState())),
+        historyWriter:
+            ({required type, required text, required audioPath}) async {},
+      ) {
     state = initial;
   }
 

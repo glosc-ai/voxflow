@@ -20,7 +20,7 @@ abstract interface class PlaybackController {
 
 class AudioPlaybackManager implements PlaybackController {
   AudioPlaybackManager({AudioPlayer? player})
-      : _player = player ?? AudioPlayer();
+    : _player = player ?? AudioPlayer();
 
   final AudioPlayer _player;
   String? _path;

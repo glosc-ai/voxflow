@@ -10,8 +10,8 @@ class AudioRecordManager {
   AudioRecordManager({
     AudioRecorder? recorder,
     PermissionService permissionService = const PermissionService(),
-  })  : _recorder = recorder ?? AudioRecorder(),
-        _permissionService = permissionService;
+  }) : _recorder = recorder ?? AudioRecorder(),
+       _permissionService = permissionService;
 
   final AudioRecorder _recorder;
   final PermissionService _permissionService;

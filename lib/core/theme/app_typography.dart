@@ -4,10 +4,7 @@ class AppTypography {
   AppTypography._();
 
   static const monoFontFamily = 'Cascadia Code';
-  static const monoFontFallback = <String>[
-    'JetBrains Mono',
-    'Consolas',
-  ];
+  static const monoFontFallback = <String>['JetBrains Mono', 'Consolas'];
 
   static TextStyle numeric(TextStyle? base) {
     return (base ?? const TextStyle()).copyWith(

@@ -62,8 +62,10 @@ void main() {
     );
     expect(actionButtons, findsNWidgets(3));
     for (final element in actionButtons.evaluate()) {
-      expect(tester.getSize(find.byElementPredicate((e) => e == element)),
-          const Size.square(48));
+      expect(
+        tester.getSize(find.byElementPredicate((e) => e == element)),
+        const Size.square(48),
+      );
     }
 
     await tester.tap(find.byKey(const Key('historyFilterTts')));
@@ -115,8 +117,9 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('Android Tab focus gives history filters and cards a 2px ring',
-      (tester) async {
+  testWidgets('Android Tab focus gives history filters and cards a 2px ring', (
+    tester,
+  ) async {
     final repository = _MemoryHistoryRepository([
       HistoryRecord(
         id: 11,
@@ -132,10 +135,7 @@ void main() {
     await _tabUntilFocused(tester, filter);
     final focusColor = tester.element(filter).semanticColors.focus;
     final filterContainer = tester.widget<AnimatedContainer>(
-      find.descendant(
-        of: filter,
-        matching: find.byType(AnimatedContainer),
-      ),
+      find.descendant(of: filter, matching: find.byType(AnimatedContainer)),
     );
     final filterBorder =
         (filterContainer.decoration! as BoxDecoration).border! as Border;

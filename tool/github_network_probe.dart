@@ -18,13 +18,13 @@ Future<void> main(List<String> arguments) async {
       ..connectionTimeout = const Duration(seconds: 10)
       ..userAgent = 'VoxFlow diagnostic probe';
     try {
-      final request = await client.headUrl(target).timeout(
-            const Duration(seconds: 15),
-          );
+      final request = await client
+          .headUrl(target)
+          .timeout(const Duration(seconds: 15));
       request.followRedirects = false;
       final response = await request.close().timeout(
-            const Duration(seconds: 15),
-          );
+        const Duration(seconds: 15),
+      );
       final remoteAddress =
           response.connectionInfo?.remoteAddress.address ?? 'unknown-address';
       await response.drain<void>().timeout(const Duration(seconds: 15));

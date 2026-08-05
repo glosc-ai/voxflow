@@ -23,17 +23,11 @@ enum AppErrorCode {
 /// Callers handling network or platform errors must sanitize it before creating
 /// an [AppMessage].
 class AppMessage {
-  const AppMessage({
-    required this.zh,
-    required this.en,
-    this.technicalDetail,
-  });
+  const AppMessage({required this.zh, required this.en, this.technicalDetail});
 
-  const AppMessage.same(
-    String message, {
-    this.technicalDetail,
-  })  : zh = message,
-        en = message;
+  const AppMessage.same(String message, {this.technicalDetail})
+    : zh = message,
+      en = message;
 
   final String zh;
   final String en;
@@ -66,13 +60,13 @@ class AppException implements Exception {
     String message, {
     String? englishMessage,
     this.technicalDetail,
-  })  : _chineseMessage = message,
-        _englishMessage = englishMessage;
+  }) : _chineseMessage = message,
+       _englishMessage = englishMessage;
 
   AppException.localized(this.code, AppMessage message)
-      : _chineseMessage = message.zh,
-        _englishMessage = message.en,
-        technicalDetail = message.technicalDetail;
+    : _chineseMessage = message.zh,
+      _englishMessage = message.en,
+      technicalDetail = message.technicalDetail;
 
   final AppErrorCode code;
   final String _chineseMessage;
@@ -89,10 +83,10 @@ class AppException implements Exception {
   String get englishMessage => localizedMessage.resolve(const Locale('en'));
 
   AppMessage get localizedMessage => AppMessage(
-        zh: _chineseMessage,
-        en: _englishMessage ?? code.defaultEnglishMessage,
-        technicalDetail: technicalDetail,
-      );
+    zh: _chineseMessage,
+    en: _englishMessage ?? code.defaultEnglishMessage,
+    technicalDetail: technicalDetail,
+  );
 
   String messageFor(Locale locale) => localizedMessage.resolve(locale);
 
@@ -102,29 +96,27 @@ class AppException implements Exception {
 
 extension on AppErrorCode {
   String get defaultEnglishMessage => switch (this) {
-        AppErrorCode.missingApiKey =>
-          'An API key is required before using this feature.',
-        AppErrorCode.invalidConfiguration =>
-          'The current configuration is invalid.',
-        AppErrorCode.permissionDenied =>
-          'The required system permission was not granted.',
-        AppErrorCode.fileNotFound => 'The requested file could not be found.',
-        AppErrorCode.invalidFile =>
-          'The selected file is invalid or unsupported.',
-        AppErrorCode.fileTooLarge => 'The selected file is too large.',
-        AppErrorCode.networkTimeout =>
-          'The request timed out. Check the network and try again.',
-        AppErrorCode.unauthorized =>
-          'The credentials are invalid or lack permission.',
-        AppErrorCode.rateLimited =>
-          'Too many requests were sent. Try again later.',
-        AppErrorCode.serviceUnavailable =>
-          'The service is temporarily unavailable. Try again later.',
-        AppErrorCode.recordingUnavailable =>
-          'Audio recording is currently unavailable.',
-        AppErrorCode.playbackFailed => 'Audio playback failed.',
-        AppErrorCode.storageFailure =>
-          'The local file or storage operation failed.',
-        AppErrorCode.unknown => 'Something went wrong. Try again in a moment.',
-      };
+    AppErrorCode.missingApiKey =>
+      'An API key is required before using this feature.',
+    AppErrorCode.invalidConfiguration =>
+      'The current configuration is invalid.',
+    AppErrorCode.permissionDenied =>
+      'The required system permission was not granted.',
+    AppErrorCode.fileNotFound => 'The requested file could not be found.',
+    AppErrorCode.invalidFile => 'The selected file is invalid or unsupported.',
+    AppErrorCode.fileTooLarge => 'The selected file is too large.',
+    AppErrorCode.networkTimeout =>
+      'The request timed out. Check the network and try again.',
+    AppErrorCode.unauthorized =>
+      'The credentials are invalid or lack permission.',
+    AppErrorCode.rateLimited => 'Too many requests were sent. Try again later.',
+    AppErrorCode.serviceUnavailable =>
+      'The service is temporarily unavailable. Try again later.',
+    AppErrorCode.recordingUnavailable =>
+      'Audio recording is currently unavailable.',
+    AppErrorCode.playbackFailed => 'Audio playback failed.',
+    AppErrorCode.storageFailure =>
+      'The local file or storage operation failed.',
+    AppErrorCode.unknown => 'Something went wrong. Try again in a moment.',
+  };
 }

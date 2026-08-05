@@ -27,14 +27,11 @@ void main() {
   test('SeedASR 使用文档约定的 WebSocket 头和二进制帧', () async {
     final socket = _FakeSeedAsrSocket([
       _responseFrame({
-        'result': {'text': ''}
+        'result': {'text': ''},
       }),
-      _responseFrame(
-        {
-          'result': {'text': 'seed result'},
-        },
-        isFinal: true,
-      ),
+      _responseFrame({
+        'result': {'text': 'seed result'},
+      }, isFinal: true),
     ]);
     Uri? connectedUri;
     Map<String, String>? connectedHeaders;
@@ -64,10 +61,7 @@ void main() {
     expect(result.segments, isEmpty);
     expect(result.duration, const Duration(milliseconds: 400));
     expect(connectedUri?.scheme, 'wss');
-    expect(
-      connectedUri?.path,
-      '/api/v3/plan/sauc/bigmodel_nostream',
-    );
+    expect(connectedUri?.path, '/api/v3/plan/sauc/bigmodel_nostream');
     expect(
       connectedHeaders?['X-Api-Resource-Id'],
       'volc.seedasr.sauc.duration',
@@ -102,14 +96,11 @@ void main() {
     var connectCalls = 0;
     final socket = _FakeSeedAsrSocket([
       _responseFrame({
-        'result': {'text': ''}
+        'result': {'text': ''},
       }),
-      _responseFrame(
-        {
-          'result': {'text': 'normalized result'},
-        },
-        isFinal: true,
-      ),
+      _responseFrame({
+        'result': {'text': 'normalized result'},
+      }, isFinal: true),
     ]);
     final settings = _seedSettings();
     final normalized = File('${directory.path}/normalized.wav');
@@ -167,7 +158,9 @@ void main() {
     expect(exception.message, contains('SeedASR'));
     expect(exception.technicalDetail, contains('[REDACTED]'));
     expect(
-        exception.englishMessage, contains('SeedASR service error 45000001.'));
+      exception.englishMessage,
+      contains('SeedASR service error 45000001.'),
+    );
     expect(exception.englishMessage, contains('Service response:'));
     expect(exception.englishMessage, isNot(contains(customKey)));
   });
@@ -211,7 +204,7 @@ SettingsState _seedSettings() {
 
 class _FakeSeedAsrSocket implements SeedAsrSocket {
   _FakeSeedAsrSocket(Iterable<Object?> responses)
-      : responses = Queue.of(responses);
+    : responses = Queue.of(responses);
 
   final Queue<Object?> responses;
   final List<Uint8List> sent = [];
@@ -246,10 +239,8 @@ class _FakeAudioNormalizationService implements AudioNormalizationService {
   @override
   Future<T> withSeedAsrAudio<T>(
     File source,
-    Future<T> Function(
-      File normalizedFile,
-      SeedAsrPcmWavAudio normalizedAudio,
-    ) use,
+    Future<T> Function(File normalizedFile, SeedAsrPcmWavAudio normalizedAudio)
+    use,
   ) async {
     calls++;
     try {
@@ -284,10 +275,7 @@ Uint8List _pcmWav({required int dataBytes}) {
   return bytes;
 }
 
-Uint8List _responseFrame(
-  Map<String, Object?> payload, {
-  bool isFinal = false,
-}) {
+Uint8List _responseFrame(Map<String, Object?> payload, {bool isFinal = false}) {
   final compressed = gzip.encode(utf8.encode(jsonEncode(payload)));
   final bytes = BytesBuilder(copy: false)
     ..add([0x11, 0x90 | (isFinal ? 0x03 : 0x01), 0x11, 0x00])
@@ -316,9 +304,7 @@ Map<String, Object?> _requestJson(Uint8List frame) {
   final payloadLength = data.getUint32(8, Endian.big);
   final compressed = frame.sublist(12, 12 + payloadLength);
   final decoded = jsonDecode(utf8.decode(gzip.decode(compressed)));
-  return (decoded as Map).map(
-    (key, value) => MapEntry(key.toString(), value),
-  );
+  return (decoded as Map).map((key, value) => MapEntry(key.toString(), value));
 }
 
 Uint8List _int32(int value) {

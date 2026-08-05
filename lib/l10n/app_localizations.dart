@@ -108,9 +108,9 @@ class _AppLocalizationsDelegate
 
   @override
   Future<AppLocalizations> load(Locale locale) {
-    return SynchronousFuture(AppLocalizations(
-      AppLocalizations.resolveLocale(locale),
-    ));
+    return SynchronousFuture(
+      AppLocalizations(AppLocalizations.resolveLocale(locale)),
+    );
   }
 
   @override

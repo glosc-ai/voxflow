@@ -14,10 +14,8 @@ import 'audio_normalization_service.dart';
 import 'seed_asr_pcm_wav.dart';
 import 'transcription_service.dart';
 
-typedef SeedAsrSocketConnector = Future<SeedAsrSocket> Function(
-  Uri uri,
-  Map<String, String> headers,
-);
+typedef SeedAsrSocketConnector =
+    Future<SeedAsrSocket> Function(Uri uri, Map<String, String> headers);
 
 abstract interface class SeedAsrSocket {
   void send(List<int> bytes);
@@ -37,11 +35,12 @@ class SeedAsrApiService implements TranscriptionService {
     this.connectTimeout = const Duration(seconds: 30),
     this.initialResponseTimeout = const Duration(seconds: 15),
     this.finalResponseTimeout = const Duration(seconds: 15),
-  })  : _client = client,
-        _validator = validator,
-        _normalizer = normalizer ??
-            FfmpegAudioNormalizationService(eventLogger: client.logger),
-        _connect = connect ?? _connectSocket;
+  }) : _client = client,
+       _validator = validator,
+       _normalizer =
+           normalizer ??
+           FfmpegAudioNormalizationService(eventLogger: client.logger),
+       _connect = connect ?? _connectSocket;
 
   static const _endpointPath = '/api/v3/plan/sauc/bigmodel_nostream';
   static const _chunkBytes = 6400;
@@ -70,11 +69,8 @@ class SeedAsrApiService implements TranscriptionService {
     await _validator.validate(file);
     return _normalizer.withSeedAsrAudio(
       file,
-      (_, normalizedAudio) => _transcribeNormalized(
-        normalizedAudio,
-        settings,
-        onUploadProgress,
-      ),
+      (_, normalizedAudio) =>
+          _transcribeNormalized(normalizedAudio, settings, onUploadProgress),
     );
   }
 
@@ -293,12 +289,7 @@ class SeedAsrApiService implements TranscriptionService {
     }
   }
 
-  void _logFailure(
-    Uri endpoint,
-    String model,
-    String reason,
-    String apiKey,
-  ) {
+  void _logFailure(Uri endpoint, String model, String reason, String apiKey) {
     unawaited(
       _client.logger.error(
         'network',
@@ -364,12 +355,7 @@ class SeedAsrApiService implements TranscriptionService {
   }) {
     final compressed = gzip.encode(payload);
     final builder = BytesBuilder(copy: false)
-      ..add([
-        0x11,
-        (messageType << 4) | (flags & 0x0f),
-        0x11,
-        0x00,
-      ])
+      ..add([0x11, (messageType << 4) | (flags & 0x0f), 0x11, 0x00])
       ..add(_int32(sequence))
       ..add(_uint32(compressed.length))
       ..add(compressed);
@@ -388,19 +374,13 @@ class SeedAsrApiService implements TranscriptionService {
       if (raw == null) {
         break;
       }
-      final response = _decodeResponse(
-        raw,
-        sensitiveValues: sensitiveValues,
-      );
+      final response = _decodeResponse(raw, sensitiveValues: sensitiveValues);
       if (response.text.isNotEmpty) {
         latestText = response.text;
       }
       finalReceived = response.isFinal;
     }
-    return _SeedAsrOutcome(
-      finalReceived: finalReceived,
-      text: latestText,
-    );
+    return _SeedAsrOutcome(finalReceived: finalReceived, text: latestText);
   }
 
   static _SeedAsrResponse _decodeResponse(
@@ -470,18 +450,16 @@ class SeedAsrApiService implements TranscriptionService {
     }
 
     _requireLength(bytes, offset, 4);
-    final payloadLength =
-        ByteData.sublistView(bytes).getUint32(offset, Endian.big);
+    final payloadLength = ByteData.sublistView(
+      bytes,
+    ).getUint32(offset, Endian.big);
     offset += 4;
     final payload = _payload(bytes, offset, payloadLength, compression);
     if (serialization != 0x01 || payload.isEmpty) {
       return _SeedAsrResponse(isFinal: isFinal, text: '');
     }
     final decoded = jsonDecode(utf8.decode(payload));
-    return _SeedAsrResponse(
-      isFinal: isFinal,
-      text: _extractText(decoded),
-    );
+    return _SeedAsrResponse(isFinal: isFinal, text: _extractText(decoded));
   }
 
   static List<int> _payload(
@@ -539,10 +517,7 @@ class _SeedAsrResponse {
 }
 
 class _SeedAsrOutcome {
-  const _SeedAsrOutcome({
-    required this.finalReceived,
-    required this.text,
-  });
+  const _SeedAsrOutcome({required this.finalReceived, required this.text});
 
   final bool finalReceived;
   final String text;
@@ -579,10 +554,7 @@ Future<SeedAsrSocket> _connectSocket(
   Uri uri,
   Map<String, String> headers,
 ) async {
-  final socket = await WebSocket.connect(
-    uri.toString(),
-    headers: headers,
-  );
+  final socket = await WebSocket.connect(uri.toString(), headers: headers);
   return _IoSeedAsrSocket(socket);
 }
 

@@ -9,8 +9,8 @@ final privacyNoticeRepositoryProvider = Provider<PrivacyNoticeRepository>(
 
 final privacyNoticeProvider =
     StateNotifierProvider<PrivacyNoticeNotifier, bool>((ref) {
-  return PrivacyNoticeNotifier(ref.watch(privacyNoticeRepositoryProvider));
-});
+      return PrivacyNoticeNotifier(ref.watch(privacyNoticeRepositoryProvider));
+    });
 
 class PrivacyNoticeNotifier extends StateNotifier<bool> {
   PrivacyNoticeNotifier(this._repository) : super(_repository.isAcknowledged());

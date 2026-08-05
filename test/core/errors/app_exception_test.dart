@@ -31,30 +31,26 @@ void main() {
     );
   });
 
-  test('English messages do not expose untranslated Chinese service detail',
-      () {
-    const message = AppMessage(
-      zh: '请求失败。',
-      en: 'The request failed.',
-      technicalDetail: '上游服务暂时不可用 code=busy',
-    );
+  test(
+    'English messages do not expose untranslated Chinese service detail',
+    () {
+      const message = AppMessage(
+        zh: '请求失败。',
+        en: 'The request failed.',
+        technicalDetail: '上游服务暂时不可用 code=busy',
+      );
 
-    expect(
-      message.resolve(const Locale('zh', 'CN')),
-      '请求失败。 服务返回：上游服务暂时不可用 code=busy',
-    );
-    expect(
-      message.resolve(const Locale('en', 'US')),
-      'The request failed.',
-    );
-  });
+      expect(
+        message.resolve(const Locale('zh', 'CN')),
+        '请求失败。 服务返回：上游服务暂时不可用 code=busy',
+      );
+      expect(message.resolve(const Locale('en', 'US')), 'The request failed.');
+    },
+  );
 
   test('settings state resolves structured feedback for the active locale', () {
     const state = SettingsState(
-      feedback: AppMessage(
-        zh: '连接失败。',
-        en: 'Connection failed.',
-      ),
+      feedback: AppMessage(zh: '连接失败。', en: 'Connection failed.'),
     );
 
     expect(state.message, '连接失败。');
@@ -77,27 +73,18 @@ void main() {
       exception.englishMessage,
       'Access is denied. Service response: code=permission_error',
     );
-    expect(
-      exception.messageFor(const Locale('en')),
-      exception.englishMessage,
-    );
+    expect(exception.messageFor(const Locale('en')), exception.englishMessage);
   });
 
   test('legacy exceptions receive a reliable English fallback by code', () {
-    const exception = AppException(
-      AppErrorCode.fileNotFound,
-      '文件不存在。',
-    );
+    const exception = AppException(AppErrorCode.fileNotFound, '文件不存在。');
 
     expect(exception.message, '文件不存在。');
     expect(exception.englishMessage, 'The requested file could not be found.');
   });
 
   test('feature states preserve bilingual errors and legacy strings', () {
-    const message = AppMessage(
-      zh: '播放失败。',
-      en: 'Playback failed.',
-    );
+    const message = AppMessage(zh: '播放失败。', en: 'Playback failed.');
     const stt = SttState(error: message);
     const tts = TtsState(error: message);
     const history = HistoryPlaybackState(error: message);

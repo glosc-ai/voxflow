@@ -10,33 +10,35 @@ import 'package:voxflow/features/tts/services/audio_playback_manager.dart';
 import 'package:voxflow/l10n/app_localizations.dart';
 
 void main() {
-  test('refresh and search failures retain cached records and retry query',
-      () async {
-    final record = _record(text: 'cached transcript');
-    final repository = _ControllableHistoryRepository(records: [record]);
-    final notifier = HistoryNotifier(repository);
-    addTearDown(notifier.dispose);
+  test(
+    'refresh and search failures retain cached records and retry query',
+    () async {
+      final record = _record(text: 'cached transcript');
+      final repository = _ControllableHistoryRepository(records: [record]);
+      final notifier = HistoryNotifier(repository);
+      addTearDown(notifier.dispose);
 
-    await notifier.load();
-    expect(notifier.state.valueOrNull, [record]);
+      await notifier.load();
+      expect(notifier.state.valueOrNull, [record]);
 
-    repository.failure = StateError('database unavailable');
-    await notifier.load();
-    expect(notifier.state.hasError, isTrue);
-    expect(notifier.state.hasValue, isTrue);
-    expect(notifier.state.valueOrNull, [record]);
+      repository.failure = StateError('database unavailable');
+      await notifier.load();
+      expect(notifier.state.hasError, isTrue);
+      expect(notifier.state.hasValue, isTrue);
+      expect(notifier.state.valueOrNull, [record]);
 
-    await notifier.load(query: 'cached');
-    expect(repository.lastQuery, 'cached');
-    expect(notifier.state.hasError, isTrue);
-    expect(notifier.state.valueOrNull, [record]);
+      await notifier.load(query: 'cached');
+      expect(repository.lastQuery, 'cached');
+      expect(notifier.state.hasError, isTrue);
+      expect(notifier.state.valueOrNull, [record]);
 
-    repository.failure = null;
-    await notifier.load();
-    expect(repository.lastQuery, 'cached');
-    expect(notifier.state.hasError, isFalse);
-    expect(notifier.state.valueOrNull, [record]);
-  });
+      repository.failure = null;
+      await notifier.load();
+      expect(repository.lastQuery, 'cached');
+      expect(notifier.state.hasError, isFalse);
+      expect(notifier.state.valueOrNull, [record]);
+    },
+  );
 
   test('first load failure without cache remains a full error', () async {
     final repository = _ControllableHistoryRepository(
@@ -52,8 +54,9 @@ void main() {
     expect(notifier.state.valueOrNull, isNull);
   });
 
-  testWidgets('cached refresh failure is non-blocking and can be retried',
-      (tester) async {
+  testWidgets('cached refresh failure is non-blocking and can be retried', (
+    tester,
+  ) async {
     final record = _record(text: 'cached transcript');
     final repository = _ControllableHistoryRepository(records: [record]);
     final notifier = HistoryNotifier(repository);
@@ -76,8 +79,9 @@ void main() {
     expect(find.byKey(const Key('historyFullErrorState')), findsNothing);
   });
 
-  testWidgets('first load failure renders the full error state',
-      (tester) async {
+  testWidgets('first load failure renders the full error state', (
+    tester,
+  ) async {
     final repository = _ControllableHistoryRepository(
       failure: StateError('database unavailable'),
     );
@@ -93,10 +97,7 @@ void main() {
   testWidgets('history date follows the en-GB regional order', (tester) async {
     final repository = _ControllableHistoryRepository(
       records: [
-        _record(
-          text: 'regional date',
-          createdAt: DateTime(2026, 1, 31, 9, 5),
-        ),
+        _record(text: 'regional date', createdAt: DateTime(2026, 1, 31, 9, 5)),
       ],
     );
     final notifier = HistoryNotifier(repository);
@@ -125,11 +126,7 @@ void main() {
     final notifier = HistoryNotifier(repository);
     await notifier.load();
 
-    await _pumpHistory(
-      tester,
-      notifier,
-      platform: TargetPlatform.windows,
-    );
+    await _pumpHistory(tester, notifier, platform: TargetPlatform.windows);
 
     expect(find.text('LIBRARY · 本地存档'), findsOneWidget);
     expect(find.text('desktop transcript'), findsOneWidget);
@@ -192,10 +189,7 @@ HistoryRecord _record({
 }
 
 class _ControllableHistoryRepository extends HistoryRepository {
-  _ControllableHistoryRepository({
-    this.records = const [],
-    this.failure,
-  });
+  _ControllableHistoryRepository({this.records = const [], this.failure});
 
   List<HistoryRecord> records;
   Object? failure;

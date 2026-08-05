@@ -2,15 +2,7 @@ import 'dart:ui' show Locale;
 
 import '../../../core/errors/app_exception.dart';
 
-enum TtsPhase {
-  idle,
-  generating,
-  ready,
-  playing,
-  paused,
-  completed,
-  failure,
-}
+enum TtsPhase { idle, generating, ready, playing, paused, completed, failure }
 
 class TtsState {
   const TtsState({

@@ -10,22 +10,12 @@ import '../logging/app_logger.dart';
 typedef SettingsReader = SettingsState Function();
 
 class DioClient {
-  DioClient(
-    SettingsState settings, {
-    Dio? dio,
-    AppLogger? logger,
-  }) : this.withSettings(
-          () => settings,
-          dio: dio,
-          logger: logger,
-        );
+  DioClient(SettingsState settings, {Dio? dio, AppLogger? logger})
+    : this.withSettings(() => settings, dio: dio, logger: logger);
 
-  DioClient.withSettings(
-    this._settingsReader, {
-    Dio? dio,
-    AppLogger? logger,
-  })  : dio = dio ?? Dio(),
-        logger = logger ?? AppLogger.instance {
+  DioClient.withSettings(this._settingsReader, {Dio? dio, AppLogger? logger})
+    : dio = dio ?? Dio(),
+      logger = logger ?? AppLogger.instance {
     final initialSettings = settings;
     this.dio.options = BaseOptions(
       baseUrl: initialSettings.baseUrl,
@@ -35,51 +25,51 @@ class DioClient {
       headers: const {'Accept': 'application/json'},
     );
     this.dio.interceptors.add(
-          InterceptorsWrapper(
-            onRequest: (options, handler) {
-              final apiKey = settings.apiKey.trim();
-              if (apiKey.isNotEmpty &&
-                  !options.headers.containsKey('Authorization')) {
-                options.headers['Authorization'] = 'Bearer $apiKey';
-              }
-              unawaited(
-                this.logger.info(
-                      'network',
-                      'request_started',
-                      fields: _requestFields(options),
-                    ),
-              );
-              handler.next(options);
-            },
-            onResponse: (response, handler) {
-              unawaited(
-                this.logger.info(
-                      'network',
-                      'request_completed',
-                      fields: _responseFields(response),
-                    ),
-              );
-              handler.next(response);
-            },
-            onError: (error, handler) {
-              final reason = extractServerReason(error);
-              unawaited(
-                this.logger.error(
-                  'network',
-                  'request_failed',
-                  fields: {
-                    ..._requestFields(error.requestOptions),
-                    'status': error.response?.statusCode,
-                    'dio_type': error.type.name,
-                    ..._requestIdFields(error.response?.headers),
-                    if (reason != null) 'reason': reason,
-                  },
-                ),
-              );
-              handler.next(error);
-            },
-          ),
-        );
+      InterceptorsWrapper(
+        onRequest: (options, handler) {
+          final apiKey = settings.apiKey.trim();
+          if (apiKey.isNotEmpty &&
+              !options.headers.containsKey('Authorization')) {
+            options.headers['Authorization'] = 'Bearer $apiKey';
+          }
+          unawaited(
+            this.logger.info(
+              'network',
+              'request_started',
+              fields: _requestFields(options),
+            ),
+          );
+          handler.next(options);
+        },
+        onResponse: (response, handler) {
+          unawaited(
+            this.logger.info(
+              'network',
+              'request_completed',
+              fields: _responseFields(response),
+            ),
+          );
+          handler.next(response);
+        },
+        onError: (error, handler) {
+          final reason = extractServerReason(error);
+          unawaited(
+            this.logger.error(
+              'network',
+              'request_failed',
+              fields: {
+                ..._requestFields(error.requestOptions),
+                'status': error.response?.statusCode,
+                'dio_type': error.type.name,
+                ..._requestIdFields(error.response?.headers),
+                if (reason != null) 'reason': reason,
+              },
+            ),
+          );
+          handler.next(error);
+        },
+      ),
+    );
   }
 
   static const _modelExtraKey = 'voxflow.request_model';
@@ -154,12 +144,8 @@ class DioClient {
     final apiKey = requestSettings.apiKey.trim();
     return Options(
       responseType: responseType,
-      headers: {
-        if (apiKey.isNotEmpty) 'Authorization': 'Bearer $apiKey',
-      },
-      extra: {
-        if (model != null) _modelExtraKey: model,
-      },
+      headers: {if (apiKey.isNotEmpty) 'Authorization': 'Bearer $apiKey'},
+      extra: {if (model != null) _modelExtraKey: model},
     );
   }
 
@@ -241,10 +227,7 @@ class DioClient {
     DioException error, {
     Iterable<String> sensitiveValues = const [],
   }) {
-    final detail = extractServerReason(
-      error,
-      sensitiveValues: sensitiveValues,
-    );
+    final detail = extractServerReason(error, sensitiveValues: sensitiveValues);
     switch (error.type) {
       case DioExceptionType.connectionTimeout:
       case DioExceptionType.sendTimeout:
@@ -315,8 +298,8 @@ class DioClient {
         final englishMessage = status == 404
             ? 'The API address is incompatible: the requested endpoint was not found.'
             : status == null
-                ? 'The API request failed.'
-                : 'The API request failed (status $status).';
+            ? 'The API request failed.'
+            : 'The API request failed (status $status).';
         return AppException(
           AppErrorCode.serviceUnavailable,
           baseMessage,

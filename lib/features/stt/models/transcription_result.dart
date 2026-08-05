@@ -23,7 +23,8 @@ class TranscriptionSegment {
   static Duration _durationFromSeconds(Object? value) {
     final seconds = value is num ? value.toDouble() : 0.0;
     return Duration(
-        microseconds: (seconds * Duration.microsecondsPerSecond).round());
+      microseconds: (seconds * Duration.microsecondsPerSecond).round(),
+    );
   }
 }
 
@@ -60,15 +61,13 @@ class TranscriptionResult {
     final rawSegments = json['segments'];
     final segments = rawSegments is List
         ? rawSegments
-            .whereType<Map>()
-            .map(
-              (item) => TranscriptionSegment.fromJson(
-                item.map(
-                  (key, value) => MapEntry(key.toString(), value),
+              .whereType<Map>()
+              .map(
+                (item) => TranscriptionSegment.fromJson(
+                  item.map((key, value) => MapEntry(key.toString(), value)),
                 ),
-              ),
-            )
-            .toList(growable: false)
+              )
+              .toList(growable: false)
         : const <TranscriptionSegment>[];
     final durationValue = json['duration'];
     return TranscriptionResult(

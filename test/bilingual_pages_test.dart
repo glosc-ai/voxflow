@@ -46,8 +46,9 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('history page renders its empty state without overflow',
-        (tester) async {
+    testWidgets('history page renders its empty state without overflow', (
+      tester,
+    ) async {
       await _pumpLocalizedPage(
         tester,
         locale: AppLocalizations.englishLocale,
@@ -115,9 +116,7 @@ Future<void> _pumpLocalizedPage(
         historyPlaybackManagerProvider.overrideWithValue(
           const _SilentPlaybackController(),
         ),
-        historyRepositoryProvider.overrideWithValue(
-          _MemoryHistoryRepository(),
-        ),
+        historyRepositoryProvider.overrideWithValue(_MemoryHistoryRepository()),
       ],
       child: MaterialApp(
         locale: locale,
@@ -198,9 +197,7 @@ class _MemoryHistoryRepository extends HistoryRepository {
       return List.unmodifiable(_records);
     }
     return _records
-        .where(
-          (record) => record.text.toLowerCase().contains(normalizedQuery),
-        )
+        .where((record) => record.text.toLowerCase().contains(normalizedQuery))
         .toList(growable: false);
   }
 }

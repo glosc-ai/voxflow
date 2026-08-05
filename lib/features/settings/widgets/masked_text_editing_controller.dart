@@ -2,7 +2,7 @@ import 'package:flutter/widgets.dart';
 
 class MaskedTextEditingController extends TextEditingController {
   MaskedTextEditingController({super.text, bool masked = true})
-      : _masked = masked;
+    : _masked = masked;
 
   bool _masked;
 

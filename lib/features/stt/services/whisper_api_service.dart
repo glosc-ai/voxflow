@@ -14,13 +14,10 @@ class WhisperApiService implements TranscriptionService {
     DioClient client, {
     AudioFileValidator validator = const AudioFileValidator(),
     TranscriptionService? seedAsrService,
-  })  : _client = client,
-        _validator = validator,
-        _seedAsrService = seedAsrService ??
-            SeedAsrApiService(
-              client,
-              validator: validator,
-            );
+  }) : _client = client,
+       _validator = validator,
+       _seedAsrService =
+           seedAsrService ?? SeedAsrApiService(client, validator: validator);
 
   final DioClient _client;
   final AudioFileValidator _validator;
@@ -47,15 +44,9 @@ class WhisperApiService implements TranscriptionService {
         'timestamp_granularities[]': 'segment',
       });
       final response = await _client.dio.post<Object?>(
-        _client.endpoint(
-          'audio/transcriptions',
-          requestSettings: settings,
-        ),
+        _client.endpoint('audio/transcriptions', requestSettings: settings),
         data: formData,
-        options: _client.requestOptions(
-          settings,
-          model: settings.sttModel,
-        ),
+        options: _client.requestOptions(settings, model: settings.sttModel),
         onSendProgress: (sent, total) {
           if (total > 0) {
             onUploadProgress?.call((sent / total).clamp(0, 1));
@@ -71,9 +62,7 @@ class WhisperApiService implements TranscriptionService {
               'The transcription service returned an unrecognized response.',
         );
       }
-      final json = data.map(
-        (key, value) => MapEntry(key.toString(), value),
-      );
+      final json = data.map((key, value) => MapEntry(key.toString(), value));
       final result = TranscriptionResult.fromJson(json);
       if (result.text.isEmpty) {
         throw const AppException(

@@ -17,17 +17,16 @@ import '../models/stt_state.dart';
 import '../services/audio_record_manager.dart';
 import '../services/whisper_api_service.dart';
 
-typedef HistoryWriter = Future<void> Function({
-  required HistoryType type,
-  required String text,
-  required String audioPath,
-});
+typedef HistoryWriter =
+    Future<void> Function({
+      required HistoryType type,
+      required String text,
+      required String audioPath,
+    });
 
 typedef UtcNow = Future<DateTime> Function();
-typedef ManagedAudioPersister = Future<File> Function(
-  File source, {
-  required String category,
-});
+typedef ManagedAudioPersister =
+    Future<File> Function(File source, {required String category});
 
 final permissionServiceProvider = Provider<PermissionService>((ref) {
   return const PermissionService();
@@ -47,11 +46,9 @@ final whisperApiServiceProvider = Provider<WhisperApiService>((ref) {
 
 final historyWriterProvider = Provider<HistoryWriter>((ref) {
   return ({required type, required text, required audioPath}) async {
-    await ref.read(historyProvider.notifier).add(
-          type: type,
-          text: text,
-          audioPath: audioPath,
-        );
+    await ref
+        .read(historyProvider.notifier)
+        .add(type: type, text: text, audioPath: audioPath);
   };
 });
 
@@ -70,13 +67,13 @@ class SttNotifier extends StateNotifier<SttState> {
     required HistoryWriter historyWriter,
     UtcNow? nowUtc,
     ManagedAudioPersister? persistManagedAudio,
-  })  : _recorder = recorder,
-        _apiService = apiService,
-        _historyWriter = historyWriter,
-        _nowUtc = nowUtc ?? PlatformClock.nowUtc,
-        _persistManagedAudio =
-            persistManagedAudio ?? PathUtils.persistManagedAudio,
-        super(const SttState());
+  }) : _recorder = recorder,
+       _apiService = apiService,
+       _historyWriter = historyWriter,
+       _nowUtc = nowUtc ?? PlatformClock.nowUtc,
+       _persistManagedAudio =
+           persistManagedAudio ?? PathUtils.persistManagedAudio,
+       super(const SttState());
 
   final AudioRecordManager _recorder;
   final WhisperApiService _apiService;
@@ -119,10 +116,7 @@ class SttNotifier extends StateNotifier<SttState> {
     } catch (error) {
       _setFailure(
         error,
-        const AppMessage(
-          zh: '无法开始录音。',
-          en: 'Unable to start recording.',
-        ),
+        const AppMessage(zh: '无法开始录音。', en: 'Unable to start recording.'),
       );
     }
   }
@@ -143,10 +137,7 @@ class SttNotifier extends StateNotifier<SttState> {
     } catch (error) {
       _setRecoverableError(
         error,
-        const AppMessage(
-          zh: '暂停录音失败。',
-          en: 'Unable to pause recording.',
-        ),
+        const AppMessage(zh: '暂停录音失败。', en: 'Unable to pause recording.'),
       );
     }
   }
@@ -163,10 +154,7 @@ class SttNotifier extends StateNotifier<SttState> {
     } catch (error) {
       _setRecoverableError(
         error,
-        const AppMessage(
-          zh: '继续录音失败。',
-          en: 'Unable to resume recording.',
-        ),
+        const AppMessage(zh: '继续录音失败。', en: 'Unable to resume recording.'),
       );
     }
   }
@@ -185,10 +173,7 @@ class SttNotifier extends StateNotifier<SttState> {
       await _recorder.cancel();
       _setFailure(
         error,
-        const AppMessage(
-          zh: '停止录音失败。',
-          en: 'Unable to stop recording.',
-        ),
+        const AppMessage(zh: '停止录音失败。', en: 'Unable to stop recording.'),
       );
     }
   }
@@ -249,10 +234,7 @@ class SttNotifier extends StateNotifier<SttState> {
     } catch (error) {
       _setFailure(
         error,
-        const AppMessage(
-          zh: '导入文件失败。',
-          en: 'Unable to import the file.',
-        ),
+        const AppMessage(zh: '导入文件失败。', en: 'Unable to import the file.'),
       );
     }
   }
@@ -279,10 +261,7 @@ class SttNotifier extends StateNotifier<SttState> {
           );
         },
       );
-      state = state.copyWith(
-        phase: SttPhase.transcribing,
-        uploadProgress: 1,
-      );
+      state = state.copyWith(phase: SttPhase.transcribing, uploadProgress: 1);
       managedFile = await _persistManagedAudio(file, category: 'stt');
       final resultWithSource = result.copyWith(sourcePath: managedFile.path);
       await _historyWriter(
@@ -334,10 +313,7 @@ class SttNotifier extends StateNotifier<SttState> {
           '待重试的音频文件不存在。',
           englishMessage: 'The audio file to retry could not be found.',
         ),
-        const AppMessage(
-          zh: '无法重试此音频。',
-          en: 'Unable to retry this audio.',
-        ),
+        const AppMessage(zh: '无法重试此音频。', en: 'Unable to retry this audio.'),
       );
       return;
     }
@@ -477,10 +453,7 @@ class SttNotifier extends StateNotifier<SttState> {
     _elapsedTimer?.cancel();
     _recordingSegmentStartedAt = null;
     final message = error is AppException ? error.localizedMessage : fallback;
-    state = state.copyWith(
-      phase: SttPhase.failure,
-      error: message,
-    );
+    state = state.copyWith(phase: SttPhase.failure, error: message);
   }
 
   void _setRecoverableError(Object error, AppMessage fallback) {

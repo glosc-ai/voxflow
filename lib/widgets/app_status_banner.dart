@@ -28,32 +28,33 @@ class AppStatusBanner extends StatelessWidget {
     final semantics = context.semanticColors;
     final (foreground, background, icon) = switch (kind) {
       AppStatusKind.info => (
-          semantics.info,
-          semantics.infoContainer,
-          Icons.info_outline,
-        ),
+        semantics.info,
+        semantics.infoContainer,
+        Icons.info_outline,
+      ),
       AppStatusKind.success => (
-          semantics.success,
-          semantics.successContainer,
-          Icons.check_circle_outline,
-        ),
+        semantics.success,
+        semantics.successContainer,
+        Icons.check_circle_outline,
+      ),
       AppStatusKind.warning => (
-          semantics.warning,
-          semantics.warningContainer,
-          Icons.warning_amber_rounded,
-        ),
+        semantics.warning,
+        semantics.warningContainer,
+        Icons.warning_amber_rounded,
+      ),
       AppStatusKind.error => (
-          colors.error,
-          colors.errorContainer,
-          Icons.error_outline,
-        ),
+        colors.error,
+        colors.errorContainer,
+        Icons.error_outline,
+      ),
     };
     return Semantics(
       liveRegion: true,
       container: true,
-      label: [title, message]
-          .whereType<String>()
-          .join(context.l10n.text(zh: '。', en: '. ')),
+      label: [
+        title,
+        message,
+      ].whereType<String>().join(context.l10n.text(zh: '。', en: '. ')),
       child: DecoratedBox(
         decoration: BoxDecoration(
           color: background,
@@ -64,7 +65,8 @@ class AppStatusBanner extends StatelessWidget {
           padding: const EdgeInsets.all(AppSpacing.md),
           child: LayoutBuilder(
             builder: (context, constraints) {
-              final stackAction = action != null &&
+              final stackAction =
+                  action != null &&
                   (constraints.maxWidth < 420 ||
                       MediaQuery.textScalerOf(context).scale(1) >= 1.6);
               final messageContent = Row(
@@ -79,9 +81,7 @@ class AppStatusBanner extends StatelessWidget {
                         if (title != null) ...[
                           Text(
                             title!,
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodyMedium
+                            style: Theme.of(context).textTheme.bodyMedium
                                 ?.copyWith(
                                   color: foreground,
                                   fontWeight: FontWeight.w600,
@@ -92,10 +92,9 @@ class AppStatusBanner extends StatelessWidget {
                         Text(
                           message,
                           key: messageKey,
-                          style:
-                              Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                    color: foreground,
-                                  ),
+                          style: Theme.of(
+                            context,
+                          ).textTheme.bodyMedium?.copyWith(color: foreground),
                         ),
                       ],
                     ),

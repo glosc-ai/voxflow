@@ -49,8 +49,9 @@ Future<void> main(List<String> arguments) async {
       }
 
       failures++;
-      final cause =
-          _singleLine(error.error ?? error.message ?? error.type.name);
+      final cause = _singleLine(
+        error.error ?? error.message ?? error.type.name,
+      );
       _emit(
         '[dio-models-probe] $attempt/$attempts unreachable: '
         '${error.type.name}; $cause '

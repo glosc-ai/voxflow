@@ -24,7 +24,8 @@ class AppSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    final hasHeader = title != null ||
+    final hasHeader =
+        title != null ||
         description != null ||
         leading != null ||
         trailing != null;
@@ -35,7 +36,8 @@ class AppSection extends StatelessWidget {
         border: Border.all(color: colors.outlineVariant),
       ),
       child: Padding(
-        padding: padding ??
+        padding:
+            padding ??
             EdgeInsets.all(
               MediaQuery.sizeOf(context).width < AppBreakpoints.compact ||
                       Theme.of(context).platform == TargetPlatform.android
@@ -48,7 +50,8 @@ class AppSection extends StatelessWidget {
             if (hasHeader) ...[
               LayoutBuilder(
                 builder: (context, constraints) {
-                  final stackTrailing = trailing != null &&
+                  final stackTrailing =
+                      trailing != null &&
                       (constraints.maxWidth < 480 ||
                           MediaQuery.textScalerOf(context).scale(1) >= 1.6);
                   final titleBlock = Row(
@@ -56,10 +59,7 @@ class AppSection extends StatelessWidget {
                     children: [
                       if (leading != null) ...[
                         IconTheme(
-                          data: IconThemeData(
-                            color: colors.primary,
-                            size: 20,
-                          ),
+                          data: IconThemeData(color: colors.primary, size: 20),
                           child: leading!,
                         ),
                         const SizedBox(width: AppSpacing.sm),

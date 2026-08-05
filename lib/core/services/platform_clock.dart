@@ -11,13 +11,11 @@ class PlatformClock {
       return DateTime.now().toUtc();
     }
     try {
-      final microseconds =
-          await _channel.invokeMethod<int>('nowUtcMicroseconds');
+      final microseconds = await _channel.invokeMethod<int>(
+        'nowUtcMicroseconds',
+      );
       if (microseconds != null) {
-        return DateTime.fromMicrosecondsSinceEpoch(
-          microseconds,
-          isUtc: true,
-        );
+        return DateTime.fromMicrosecondsSinceEpoch(microseconds, isUtc: true);
       }
     } on MissingPluginException {
       // Unit tests and non-runner hosts use the Dart clock fallback.

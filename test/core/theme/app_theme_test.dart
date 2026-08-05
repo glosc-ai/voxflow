@@ -63,8 +63,10 @@ void main() {
     expect(light.scaffoldBackgroundColor, AppColors.desktopLightCanvas);
     expect(light.colorScheme.surface, AppColors.desktopLightSurface);
     expect(light.colorScheme.onSurface, AppColors.desktopLightTextPrimary);
-    expect(light.colorScheme.onSurfaceVariant,
-        AppColors.desktopLightTextSecondary);
+    expect(
+      light.colorScheme.onSurfaceVariant,
+      AppColors.desktopLightTextSecondary,
+    );
     expect(light.colorScheme.outlineVariant, AppColors.desktopLightBorder);
     expect(light.colorScheme.primary, AppColors.desktopLightAccent);
     expect(light.colorScheme.error, AppColors.desktopLightDanger);
@@ -77,7 +79,9 @@ void main() {
     expect(dark.colorScheme.surface, AppColors.desktopDarkSurface);
     expect(dark.colorScheme.onSurface, AppColors.desktopDarkTextPrimary);
     expect(
-        dark.colorScheme.onSurfaceVariant, AppColors.desktopDarkTextSecondary);
+      dark.colorScheme.onSurfaceVariant,
+      AppColors.desktopDarkTextSecondary,
+    );
     expect(dark.colorScheme.outlineVariant, AppColors.desktopDarkBorder);
     expect(dark.colorScheme.primary, AppColors.desktopDarkAccent);
     expect(dark.colorScheme.error, AppColors.desktopDarkDanger);
@@ -144,9 +148,11 @@ void main() {
 double _contrast(Color first, Color second) {
   final firstLuminance = first.computeLuminance();
   final secondLuminance = second.computeLuminance();
-  final lighter =
-      firstLuminance > secondLuminance ? firstLuminance : secondLuminance;
-  final darker =
-      firstLuminance > secondLuminance ? secondLuminance : firstLuminance;
+  final lighter = firstLuminance > secondLuminance
+      ? firstLuminance
+      : secondLuminance;
+  final darker = firstLuminance > secondLuminance
+      ? secondLuminance
+      : firstLuminance;
   return (lighter + 0.05) / (darker + 0.05);
 }

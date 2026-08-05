@@ -19,8 +19,9 @@ import 'package:voxflow/features/tts/views/tts_screen.dart';
 import 'package:voxflow/l10n/app_localizations.dart';
 
 void main() {
-  testWidgets('Android TTS uses the mobile handoff at 200% text scale',
-      (tester) async {
+  testWidgets('Android TTS uses the mobile handoff at 200% text scale', (
+    tester,
+  ) async {
     await _pumpTtsScreen(
       tester,
       locale: AppLocalizations.englishLocale,
@@ -44,8 +45,9 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('large text keeps the full Seed TTS Speaker ID visible',
-      (tester) async {
+  testWidgets('large text keeps the full Seed TTS Speaker ID visible', (
+    tester,
+  ) async {
     await _pumpTtsScreen(
       tester,
       locale: AppLocalizations.englishLocale,
@@ -67,8 +69,9 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('TTS clear confirmation is localized and keyboard-safe',
-      (tester) async {
+  testWidgets('TTS clear confirmation is localized and keyboard-safe', (
+    tester,
+  ) async {
     await _pumpTtsScreen(
       tester,
       locale: AppLocalizations.englishLocale,
@@ -128,10 +131,7 @@ void main() {
       platform: TargetPlatform.android,
     );
 
-    await tester.enterText(
-      find.byKey(const Key('ttsTextField')),
-      '未保存的草稿',
-    );
+    await tester.enterText(find.byKey(const Key('ttsTextField')), '未保存的草稿');
     final clearButton = find.byTooltip('清空文字');
     await tester.ensureVisible(clearButton);
     await tester.pumpAndSettle();
@@ -139,22 +139,17 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('清空输入文字？'), findsOneWidget);
-    expect(
-      find.text('未保存的输入将被永久删除且无法撤销。已生成或已保存的音频不会受影响。'),
-      findsOneWidget,
-    );
+    expect(find.text('未保存的输入将被永久删除且无法撤销。已生成或已保存的音频不会受影响。'), findsOneWidget);
     expect(find.text('取消'), findsOneWidget);
     expect(
-      find.descendant(
-        of: find.byType(AlertDialog),
-        matching: find.text('清空'),
-      ),
+      find.descendant(of: find.byType(AlertDialog), matching: find.text('清空')),
       findsOneWidget,
     );
   });
 
-  testWidgets('generate button loading state keeps size and spinner contrast',
-      (tester) async {
+  testWidgets('generate button loading state keeps size and spinner contrast', (
+    tester,
+  ) async {
     final notifier = _TestTtsNotifier();
     await _pumpTtsScreen(
       tester,
@@ -176,9 +171,7 @@ void main() {
     await tester.pump();
 
     final indicatorFinder = find.byKey(const Key('ttsGeneratingIndicator'));
-    final indicator = tester.widget<CircularProgressIndicator>(
-      indicatorFinder,
-    );
+    final indicator = tester.widget<CircularProgressIndicator>(indicatorFinder);
     final indicatorContext = tester.element(indicatorFinder);
     final theme = Theme.of(indicatorContext);
 
@@ -187,8 +180,9 @@ void main() {
     expect(tester.getSize(labelStackFinder), labelStackSize);
   });
 
-  testWidgets('generated audio opens and dismisses the mobile player dock',
-      (tester) async {
+  testWidgets('generated audio opens and dismisses the mobile player dock', (
+    tester,
+  ) async {
     await _pumpTtsScreen(
       tester,
       locale: AppLocalizations.englishLocale,
@@ -232,8 +226,9 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('mobile player is unavailable while replacing existing audio',
-      (tester) async {
+  testWidgets('mobile player is unavailable while replacing existing audio', (
+    tester,
+  ) async {
     final notifier = _TestTtsNotifier(ready: true);
     await _pumpTtsScreen(
       tester,
@@ -309,10 +304,10 @@ class _TestTtsNotifier extends TtsNotifier {
     bool ready = false,
     super.model = 'tts-1',
   }) : super(
-          apiService: TtsApiService(DioClient(const SettingsState())),
-          playback: const _SilentPlaybackController(),
-          historyWriter: ({required text, required audioPath}) async {},
-        ) {
+         apiService: TtsApiService(DioClient(const SettingsState())),
+         playback: const _SilentPlaybackController(),
+         historyWriter: ({required text, required audioPath}) async {},
+       ) {
     if (generating) {
       state = const TtsState(phase: TtsPhase.generating);
     } else if (ready) {

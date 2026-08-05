@@ -55,24 +55,21 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
     final cachedRecords = history.valueOrNull;
     final useDesktopLayout =
         Theme.of(context).platform == TargetPlatform.windows &&
-            MediaQuery.sizeOf(context).width >= 760;
+        MediaQuery.sizeOf(context).width >= 760;
     final useMobileLayout =
         Theme.of(context).platform == TargetPlatform.android;
     final loadErrorMessage = history.hasError
         ? history.error is AppException
-            ? l10n.appError(history.error! as AppException)
-            : l10n.text(
-                zh: '无法加载历史记录。',
-                en: 'History could not be loaded.',
-              )
+              ? l10n.appError(history.error! as AppException)
+              : l10n.text(zh: '无法加载历史记录。', en: 'History could not be loaded.')
         : null;
     ref.listen<String?>(
       historyPlaybackProvider.select((value) => value.errorMessageFor(locale)),
       (previous, next) {
         if (next != null && next != previous) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(next)),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(next)));
         }
       },
     );
@@ -95,132 +92,130 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                 playback: playback,
               )
             : useMobileLayout
-                ? _buildMobilePage(
-                    history: history,
-                    cachedRecords: cachedRecords,
-                    loadErrorMessage: loadErrorMessage,
-                    playback: playback,
-                  )
-                : Scaffold(
-                    appBar: AppBar(
-                      toolbarHeight: AppTheme.responsiveAppBarHeight(
-                        context,
-                        largeTextMaxLines: 1,
-                      ),
-                      title: Text(
-                        l10n.text(zh: '历史记录', en: 'History'),
-                        maxLines: 1,
-                      ),
-                      actions: [
-                        IconButton(
-                          tooltip: l10n.text(zh: '刷新', en: 'Refresh'),
-                          onPressed: ref.read(historyProvider.notifier).load,
-                          icon: const Icon(Icons.refresh),
-                        ),
-                      ],
+            ? _buildMobilePage(
+                history: history,
+                cachedRecords: cachedRecords,
+                loadErrorMessage: loadErrorMessage,
+                playback: playback,
+              )
+            : Scaffold(
+                appBar: AppBar(
+                  toolbarHeight: AppTheme.responsiveAppBarHeight(
+                    context,
+                    largeTextMaxLines: 1,
+                  ),
+                  title: Text(
+                    l10n.text(zh: '历史记录', en: 'History'),
+                    maxLines: 1,
+                  ),
+                  actions: [
+                    IconButton(
+                      tooltip: l10n.text(zh: '刷新', en: 'Refresh'),
+                      onPressed: ref.read(historyProvider.notifier).load,
+                      icon: const Icon(Icons.refresh),
                     ),
-                    body: FocusTraversalGroup(
-                      child: Center(
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 960),
-                          child: Padding(
-                            padding: AppLayout.pagePadding(context),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                Text(
-                                  usesLargeText
-                                      ? l10n.text(
-                                          zh: '查找并管理本机历史记录。',
-                                          en: 'Find and manage local history.',
-                                        )
-                                      : l10n.text(
-                                          zh: '查找转录与语音合成记录，并管理保存在本机的关联音频。',
-                                          en: 'Find transcripts and generated speech, and manage associated audio stored on this device.',
-                                        ),
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .bodyMedium
-                                      ?.copyWith(
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .onSurfaceVariant,
-                                      ),
-                                ),
-                                const SizedBox(height: AppSpacing.md),
-                                TextField(
-                                  key: const Key('historySearchField'),
-                                  controller: _searchController,
-                                  focusNode: _searchFocusNode,
-                                  textInputAction: TextInputAction.search,
-                                  onChanged: (_) => setState(() {}),
-                                  onSubmitted: _submitSearch,
-                                  decoration: InputDecoration(
-                                    labelText: l10n.text(
-                                      zh: '搜索历史记录',
-                                      en: 'Search history',
+                  ],
+                ),
+                body: FocusTraversalGroup(
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 960),
+                      child: Padding(
+                        padding: AppLayout.pagePadding(context),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Text(
+                              usesLargeText
+                                  ? l10n.text(
+                                      zh: '查找并管理本机历史记录。',
+                                      en: 'Find and manage local history.',
+                                    )
+                                  : l10n.text(
+                                      zh: '查找转录与语音合成记录，并管理保存在本机的关联音频。',
+                                      en: 'Find transcripts and generated speech, and manage associated audio stored on this device.',
                                     ),
-                                    hintText: l10n.text(
-                                      zh: '搜索转录或合成文字',
-                                      en: 'Search transcripts or generated text',
-                                    ),
-                                    prefixIcon: const Icon(Icons.search),
-                                    suffixIcon: _searchController.text.isEmpty
-                                        ? null
-                                        : IconButton(
-                                            tooltip: l10n.text(
-                                              zh: '清空搜索',
-                                              en: 'Clear search',
-                                            ),
-                                            onPressed: _clearSearch,
-                                            icon: const Icon(Icons.clear),
-                                          ),
+                              style: Theme.of(context).textTheme.bodyMedium
+                                  ?.copyWith(
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onSurfaceVariant,
                                   ),
-                                ),
-                                const SizedBox(height: AppSpacing.sm),
-                                Expanded(
-                                  child: cachedRecords != null
-                                      ? _HistoryResults(
-                                          records: cachedRecords,
-                                          isRefreshing: history.isLoading,
-                                          loadErrorMessage: loadErrorMessage,
-                                          onRetry: ref
-                                              .read(historyProvider.notifier)
-                                              .load,
-                                          query: _activeQuery,
-                                          playback: playback,
-                                          onClearSearch: _clearSearch,
-                                          onPlay: (record) => ref
-                                              .read(historyPlaybackProvider
-                                                  .notifier)
-                                              .toggle(record),
-                                          onCopy: (record) =>
-                                              _copy(record.text),
-                                          onDelete: _delete,
-                                        )
-                                      : history.isLoading
-                                          ? _LoadingState(
-                                              isSearch: _activeQuery.isNotEmpty,
-                                            )
-                                          : _ErrorState(
-                                              message: loadErrorMessage ??
-                                                  l10n.text(
-                                                    zh: '无法加载历史记录。',
-                                                    en: 'History could not be loaded.',
-                                                  ),
-                                              onRetry: ref
-                                                  .read(
-                                                      historyProvider.notifier)
-                                                  .load,
-                                            ),
-                                ),
-                              ],
                             ),
-                          ),
+                            const SizedBox(height: AppSpacing.md),
+                            TextField(
+                              key: const Key('historySearchField'),
+                              controller: _searchController,
+                              focusNode: _searchFocusNode,
+                              textInputAction: TextInputAction.search,
+                              onChanged: (_) => setState(() {}),
+                              onSubmitted: _submitSearch,
+                              decoration: InputDecoration(
+                                labelText: l10n.text(
+                                  zh: '搜索历史记录',
+                                  en: 'Search history',
+                                ),
+                                hintText: l10n.text(
+                                  zh: '搜索转录或合成文字',
+                                  en: 'Search transcripts or generated text',
+                                ),
+                                prefixIcon: const Icon(Icons.search),
+                                suffixIcon: _searchController.text.isEmpty
+                                    ? null
+                                    : IconButton(
+                                        tooltip: l10n.text(
+                                          zh: '清空搜索',
+                                          en: 'Clear search',
+                                        ),
+                                        onPressed: _clearSearch,
+                                        icon: const Icon(Icons.clear),
+                                      ),
+                              ),
+                            ),
+                            const SizedBox(height: AppSpacing.sm),
+                            Expanded(
+                              child: cachedRecords != null
+                                  ? _HistoryResults(
+                                      records: cachedRecords,
+                                      isRefreshing: history.isLoading,
+                                      loadErrorMessage: loadErrorMessage,
+                                      onRetry: ref
+                                          .read(historyProvider.notifier)
+                                          .load,
+                                      query: _activeQuery,
+                                      playback: playback,
+                                      onClearSearch: _clearSearch,
+                                      onPlay: (record) => ref
+                                          .read(
+                                            historyPlaybackProvider.notifier,
+                                          )
+                                          .toggle(record),
+                                      onCopy: (record) => _copy(record.text),
+                                      onDelete: _delete,
+                                    )
+                                  : history.isLoading
+                                  ? _LoadingState(
+                                      isSearch: _activeQuery.isNotEmpty,
+                                    )
+                                  : _ErrorState(
+                                      message:
+                                          loadErrorMessage ??
+                                          l10n.text(
+                                            zh: '无法加载历史记录。',
+                                            en: 'History could not be loaded.',
+                                          ),
+                                      onRetry: ref
+                                          .read(historyProvider.notifier)
+                                          .load,
+                                    ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
                   ),
+                ),
+              ),
       ),
     );
   }
@@ -339,10 +334,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                   SliverToBoxAdapter(
                     child: Semantics(
                       liveRegion: true,
-                      label: l10n.text(
-                        zh: '正在更新历史记录',
-                        en: 'Updating history',
-                      ),
+                      label: l10n.text(zh: '正在更新历史记录', en: 'Updating history'),
                       child: const LinearProgressIndicator(
                         key: Key('historyRefreshProgress'),
                         minHeight: 2,
@@ -368,9 +360,8 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                       query: _activeQuery,
                       onClearSearch: _clearSearch,
                       hasTypeFilter: _filter != _HistoryFilter.all,
-                      onClearTypeFilter: () => setState(
-                        () => _filter = _HistoryFilter.all,
-                      ),
+                      onClearTypeFilter: () =>
+                          setState(() => _filter = _HistoryFilter.all),
                     ),
                   )
                 else
@@ -385,7 +376,8 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                         child: _MobileHistoryCard(
                           key: ValueKey('mobileHistoryCard:${record.id}'),
                           record: record,
-                          isPlaying: playback.recordId == record.id &&
+                          isPlaying:
+                              playback.recordId == record.id &&
                               playback.isPlaying,
                           onPlay: () => ref
                               .read(historyPlaybackProvider.notifier)
@@ -405,7 +397,8 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
               else
                 SliverToBoxAdapter(
                   child: _MobileHistoryErrorState(
-                    message: loadErrorMessage ??
+                    message:
+                        loadErrorMessage ??
                         l10n.text(
                           zh: '无法加载历史记录。',
                           en: 'History could not be loaded.',
@@ -451,7 +444,8 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                 children: [
                   LayoutBuilder(
                     builder: (context, constraints) {
-                      final stackHeader = constraints.maxWidth < 560 ||
+                      final stackHeader =
+                          constraints.maxWidth < 560 ||
                           MediaQuery.textScalerOf(context).scale(1) >= 1.6;
                       final title = Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -461,9 +455,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                               zh: 'LIBRARY · 本地存档',
                               en: 'LIBRARY · LOCAL ARCHIVE',
                             ),
-                            style: Theme.of(context)
-                                .textTheme
-                                .labelSmall
+                            style: Theme.of(context).textTheme.labelSmall
                                 ?.copyWith(
                                   color: colors.primary,
                                   fontWeight: FontWeight.w700,
@@ -473,9 +465,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                           const SizedBox(height: AppSpacing.xs),
                           Text(
                             l10n.text(zh: '历史记录', en: 'History'),
-                            style: Theme.of(context)
-                                .textTheme
-                                .headlineMedium
+                            style: Theme.of(context).textTheme.headlineMedium
                                 ?.copyWith(
                                   fontWeight: FontWeight.w600,
                                   letterSpacing: -0.6,
@@ -510,7 +500,8 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                   const SizedBox(height: AppSpacing.lg),
                   LayoutBuilder(
                     builder: (context, constraints) {
-                      final stackControls = constraints.maxWidth < 680 ||
+                      final stackControls =
+                          constraints.maxWidth < 680 ||
                           MediaQuery.textScalerOf(context).scale(1) >= 1.6;
                       final searchField = TextField(
                         key: const Key('historySearchField'),
@@ -585,23 +576,20 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                             onDelete: _delete,
                             desktop: true,
                             hasTypeFilter: _filter != _HistoryFilter.all,
-                            onClearTypeFilter: () => setState(
-                              () => _filter = _HistoryFilter.all,
-                            ),
+                            onClearTypeFilter: () =>
+                                setState(() => _filter = _HistoryFilter.all),
                           )
                         : history.isLoading
-                            ? _LoadingState(
-                                isSearch: _activeQuery.isNotEmpty,
-                              )
-                            : _ErrorState(
-                                message: loadErrorMessage ??
-                                    l10n.text(
-                                      zh: '无法加载历史记录。',
-                                      en: 'History could not be loaded.',
-                                    ),
-                                onRetry:
-                                    ref.read(historyProvider.notifier).load,
-                              ),
+                        ? _LoadingState(isSearch: _activeQuery.isNotEmpty)
+                        : _ErrorState(
+                            message:
+                                loadErrorMessage ??
+                                l10n.text(
+                                  zh: '无法加载历史记录。',
+                                  en: 'History could not be loaded.',
+                                ),
+                            onRetry: ref.read(historyProvider.notifier).load,
+                          ),
                   ),
                 ],
               ),
@@ -640,10 +628,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(l10n.text(
-              zh: '文字已复制。',
-              en: 'Text copied.',
-            )),
+            content: Text(l10n.text(zh: '文字已复制。', en: 'Text copied.')),
           ),
         );
       }
@@ -651,10 +636,12 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(l10n.text(
-              zh: '无法复制文字，请重试。',
-              en: 'Text could not be copied. Try again.',
-            )),
+            content: Text(
+              l10n.text(
+                zh: '无法复制文字，请重试。',
+                en: 'Text could not be copied. Try again.',
+              ),
+            ),
           ),
         );
       }
@@ -668,10 +655,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
       context: context,
       builder: (context) => AlertDialog(
         icon: Icon(Icons.delete_outline, color: colors.error),
-        title: Text(l10n.text(
-          zh: '删除历史记录？',
-          en: 'Delete history item?',
-        )),
+        title: Text(l10n.text(zh: '删除历史记录？', en: 'Delete history item?')),
         content: Text(
           l10n.text(
             zh: '将从历史记录中移除此项目。若音频位于声流管理目录，也会同时删除关联音频。此操作无法撤销。',
@@ -715,23 +699,20 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
       final warning = await ref.read(historyProvider.notifier).delete(record);
       if (mounted) {
         final feedback = warning == null
-            ? l10n.text(
-                zh: '历史记录已删除。',
-                en: 'History item deleted.',
-              )
+            ? l10n.text(zh: '历史记录已删除。', en: 'History item deleted.')
             : l10n.text(
                 zh: warning,
                 en: 'The history item was deleted, but its audio file could not be removed.',
               );
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(feedback)),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(feedback)));
       }
     } on AppException catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.appError(error))),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(l10n.appError(error))));
       }
     }
   }
@@ -788,10 +769,7 @@ class _HistoryResults extends StatelessWidget {
         if (loadErrorMessage != null) ...[
           AppStatusBanner(
             kind: AppStatusKind.error,
-            title: l10n.text(
-              zh: '历史记录未更新',
-              en: 'History was not updated',
-            ),
+            title: l10n.text(zh: '历史记录未更新', en: 'History was not updated'),
             message: loadErrorMessage!,
             messageKey: const Key('historyRefreshErrorMessage'),
             action: OutlinedButton.icon(
@@ -805,10 +783,7 @@ class _HistoryResults extends StatelessWidget {
         ] else if (isRefreshing) ...[
           Semantics(
             liveRegion: true,
-            label: l10n.text(
-              zh: '正在更新历史记录',
-              en: 'Updating history',
-            ),
+            label: l10n.text(zh: '正在更新历史记录', en: 'Updating history'),
             child: const LinearProgressIndicator(
               key: Key('historyRefreshProgress'),
               minHeight: 2,
@@ -831,9 +806,9 @@ class _HistoryResults extends StatelessWidget {
                 child: Text(
                   resultLabel,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        fontWeight: FontWeight.w500,
-                      ),
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ),
             ],
@@ -849,20 +824,20 @@ class _HistoryResults extends StatelessWidget {
                   onClearTypeFilter: onClearTypeFilter,
                 )
               : desktop
-                  ? _DesktopHistoryGrid(
-                      records: records,
-                      playback: playback,
-                      onPlay: onPlay,
-                      onCopy: onCopy,
-                      onDelete: onDelete,
-                    )
-                  : _HistoryList(
-                      records: records,
-                      playback: playback,
-                      onPlay: onPlay,
-                      onCopy: onCopy,
-                      onDelete: onDelete,
-                    ),
+              ? _DesktopHistoryGrid(
+                  records: records,
+                  playback: playback,
+                  onPlay: onPlay,
+                  onCopy: onCopy,
+                  onDelete: onDelete,
+                )
+              : _HistoryList(
+                  records: records,
+                  playback: playback,
+                  onPlay: onPlay,
+                  onCopy: onCopy,
+                  onDelete: onDelete,
+                ),
         ),
       ],
     );
@@ -870,10 +845,7 @@ class _HistoryResults extends StatelessWidget {
 }
 
 class _MobileHistoryFilters extends StatelessWidget {
-  const _MobileHistoryFilters({
-    required this.value,
-    required this.onChanged,
-  });
+  const _MobileHistoryFilters({required this.value, required this.onChanged});
 
   final _HistoryFilter value;
   final ValueChanged<_HistoryFilter> onChanged;
@@ -960,8 +932,8 @@ class _MobileHistoryFilterChipState extends State<_MobileHistoryFilterChip> {
                 color: _focused
                     ? context.semanticColors.focus
                     : widget.selected
-                        ? colors.onSurface
-                        : colors.outlineVariant,
+                    ? colors.onSurface
+                    : colors.outlineVariant,
                 width: _focused ? 2 : 1,
               ),
             ),
@@ -982,10 +954,7 @@ class _MobileHistoryFilterChipState extends State<_MobileHistoryFilterChip> {
 }
 
 class _MobileHistoryResultSummary extends StatelessWidget {
-  const _MobileHistoryResultSummary({
-    required this.count,
-    required this.query,
-  });
+  const _MobileHistoryResultSummary({required this.count, required this.query});
 
   final int count;
   final String query;
@@ -1017,9 +986,9 @@ class _MobileHistoryResultSummary extends StatelessWidget {
             child: Text(
               label,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: colors.onSurfaceVariant,
-                    fontWeight: FontWeight.w500,
-                  ),
+                color: colors.onSurfaceVariant,
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ),
         ],
@@ -1046,33 +1015,24 @@ class _MobileHistoryEmptyState extends StatelessWidget {
     final colors = Theme.of(context).colorScheme;
     final isSearch = query.isNotEmpty;
     final title = isSearch
-        ? context.l10n.text(
-            zh: '未找到匹配的历史记录',
-            en: 'No matching history',
-          )
+        ? context.l10n.text(zh: '未找到匹配的历史记录', en: 'No matching history')
         : hasTypeFilter
-            ? context.l10n.text(
-                zh: '此类型暂无记录',
-                en: 'No items of this type',
-              )
-            : context.l10n.text(
-                zh: '暂无历史记录',
-                en: 'No history yet',
-              );
+        ? context.l10n.text(zh: '此类型暂无记录', en: 'No items of this type')
+        : context.l10n.text(zh: '暂无历史记录', en: 'No history yet');
     final message = isSearch
         ? context.l10n.text(
             zh: '没有找到包含“$query”的记录。请检查关键词或清除搜索。',
             en: 'No items contain “$query”. Check the search term or clear the search.',
           )
         : hasTypeFilter
-            ? context.l10n.text(
-                zh: '当前筛选条件下没有记录，请切换类型查看其他本地存档。',
-                en: 'There are no records for this filter. Choose another type to view local items.',
-              )
-            : context.l10n.text(
-                zh: '还没有历史记录。完成一次转录或语音合成后会显示在这里。',
-                en: 'Completed transcripts and generated speech will appear here.',
-              );
+        ? context.l10n.text(
+            zh: '当前筛选条件下没有记录，请切换类型查看其他本地存档。',
+            en: 'There are no records for this filter. Choose another type to view local items.',
+          )
+        : context.l10n.text(
+            zh: '还没有历史记录。完成一次转录或语音合成后会显示在这里。',
+            en: 'Completed transcripts and generated speech will appear here.',
+          );
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: AppSpacing.xl),
       child: Center(
@@ -1108,8 +1068,8 @@ class _MobileHistoryEmptyState extends StatelessWidget {
                 message,
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: colors.onSurfaceVariant,
-                    ),
+                  color: colors.onSurfaceVariant,
+                ),
               ),
               if (isSearch) ...[
                 const SizedBox(height: AppSpacing.md),
@@ -1125,9 +1085,7 @@ class _MobileHistoryEmptyState extends StatelessWidget {
                 OutlinedButton.icon(
                   onPressed: onClearTypeFilter,
                   icon: const Icon(Icons.filter_alt_off_outlined),
-                  label: Text(
-                    context.l10n.text(zh: '显示全部', en: 'Show all'),
-                  ),
+                  label: Text(context.l10n.text(zh: '显示全部', en: 'Show all')),
                 ),
               ],
             ],
@@ -1146,14 +1104,8 @@ class _MobileHistoryLoadingState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final message = isSearch
-        ? context.l10n.text(
-            zh: '正在搜索历史记录…',
-            en: 'Searching history…',
-          )
-        : context.l10n.text(
-            zh: '正在加载历史记录…',
-            en: 'Loading history…',
-          );
+        ? context.l10n.text(zh: '正在搜索历史记录…', en: 'Searching history…')
+        : context.l10n.text(zh: '正在加载历史记录…', en: 'Loading history…');
     return Semantics(
       liveRegion: true,
       label: message,
@@ -1171,8 +1123,8 @@ class _MobileHistoryLoadingState extends StatelessWidget {
               message,
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
           ],
         ),
@@ -1201,10 +1153,7 @@ class _MobileHistoryErrorState extends StatelessWidget {
       key: const Key('historyFullErrorState'),
       liveRegion: true,
       container: true,
-      label: context.l10n.text(
-        zh: '$title。$message',
-        en: '$title. $message',
-      ),
+      label: context.l10n.text(zh: '$title。$message', en: '$title. $message'),
       child: MobileSurfaceCard(
         color: colors.errorContainer,
         borderColor: colors.error.withValues(alpha: 0.28),
@@ -1224,16 +1173,16 @@ class _MobileHistoryErrorState extends StatelessWidget {
                       Text(
                         title,
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: colors.onErrorContainer,
-                              fontWeight: FontWeight.w600,
-                            ),
+                          color: colors.onErrorContainer,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                       const SizedBox(height: AppSpacing.xxs),
                       Text(
                         message,
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: colors.onErrorContainer,
-                            ),
+                          color: colors.onErrorContainer,
+                        ),
                       ),
                     ],
                   ),
@@ -1290,10 +1239,7 @@ class _MobileHistoryCardState extends State<_MobileHistoryCard> {
     final colors = theme.colorScheme;
     final semanticColors = context.semanticColors;
     final textScale = MediaQuery.textScalerOf(context).scale(1);
-    final presentation = _MobileHistoryText.from(
-      context,
-      widget.record.text,
-    );
+    final presentation = _MobileHistoryText.from(context, widget.record.text);
     final typeCode = widget.record.type == HistoryType.stt ? 'STT' : 'TTS';
     final typeLabel = _historyTypeLabel(context, widget.record.type);
     final typeColor = widget.record.type == HistoryType.stt
@@ -1523,15 +1469,16 @@ class _MobileHistoryTypeTag extends StatelessWidget {
             ],
             Text(
               label,
-              style: AppTypography.numeric(
-                Theme.of(context).textTheme.labelSmall,
-              ).copyWith(
-                color: foreground,
-                fontSize: 10.5,
-                height: 1.35,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.7,
-              ),
+              style:
+                  AppTypography.numeric(
+                    Theme.of(context).textTheme.labelSmall,
+                  ).copyWith(
+                    color: foreground,
+                    fontSize: 10.5,
+                    height: 1.35,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.7,
+                  ),
             ),
           ],
         ),
@@ -1549,13 +1496,12 @@ class _MobileHistoryMetadata extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       label,
-      style: AppTypography.numeric(
-        Theme.of(context).textTheme.labelSmall,
-      ).copyWith(
-        color: Theme.of(context).colorScheme.onSurfaceVariant,
-        fontSize: 10.5,
-        height: 1.45,
-      ),
+      style: AppTypography.numeric(Theme.of(context).textTheme.labelSmall)
+          .copyWith(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+            fontSize: 10.5,
+            height: 1.45,
+          ),
     );
   }
 }
@@ -1655,10 +1601,7 @@ class _MobileHistoryText {
         .toList(growable: false);
     if (lines.isEmpty) {
       return _MobileHistoryText(
-        title: context.l10n.text(
-          zh: '无文字内容',
-          en: 'No text content',
-        ),
+        title: context.l10n.text(zh: '无文字内容', en: 'No text content'),
       );
     }
     final excerpt = lines.length > 1 ? lines.skip(1).join(' ') : null;
@@ -1670,10 +1613,7 @@ class _MobileHistoryText {
 }
 
 class _DesktopHistoryFilters extends StatelessWidget {
-  const _DesktopHistoryFilters({
-    required this.value,
-    required this.onChanged,
-  });
+  const _DesktopHistoryFilters({required this.value, required this.onChanged});
 
   final _HistoryFilter value;
   final ValueChanged<_HistoryFilter> onChanged;
@@ -1751,8 +1691,9 @@ class _DesktopFilterChipState extends State<_DesktopFilterChip> {
               color: widget.selected ? colors.onSurface : colors.surface,
               borderRadius: BorderRadius.circular(999),
               border: Border.all(
-                color:
-                    widget.selected ? colors.onSurface : colors.outlineVariant,
+                color: widget.selected
+                    ? colors.onSurface
+                    : colors.outlineVariant,
               ),
               boxShadow: _hovered && !widget.selected
                   ? [
@@ -1777,9 +1718,9 @@ class _DesktopFilterChipState extends State<_DesktopFilterChip> {
                   child: Text(
                     widget.label,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: foreground,
-                          fontWeight: FontWeight.w600,
-                        ),
+                      color: foreground,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
               ),
@@ -1928,8 +1869,9 @@ class _DesktopHistoryCardState extends State<_DesktopHistoryCard> {
     final l10n = context.l10n;
     final textScale = MediaQuery.textScalerOf(context).scale(1);
     final reduceMotion = MediaQuery.disableAnimationsOf(context);
-    final duration =
-        reduceMotion ? Duration.zero : const Duration(milliseconds: 200);
+    final duration = reduceMotion
+        ? Duration.zero
+        : const Duration(milliseconds: 200);
     final typeLabel = widget.record.type == HistoryType.stt ? 'STT' : 'TTS';
     final typeColor = widget.record.type == HistoryType.stt
         ? colors.primary
@@ -2002,19 +1944,17 @@ class _DesktopHistoryCardState extends State<_DesktopHistoryCard> {
                                 ),
                                 child: Text(
                                   typeLabel,
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .labelSmall
+                                  style: Theme.of(context).textTheme.labelSmall
                                       ?.copyWith(
-                                    color: typeColor,
-                                    fontWeight: FontWeight.w700,
-                                    letterSpacing: 0.8,
-                                    fontFamily: 'Cascadia Code',
-                                    fontFamilyFallback: const [
-                                      'JetBrains Mono',
-                                      'Consolas',
-                                    ],
-                                  ),
+                                        color: typeColor,
+                                        fontWeight: FontWeight.w700,
+                                        letterSpacing: 0.8,
+                                        fontFamily: 'Cascadia Code',
+                                        fontFamilyFallback: const [
+                                          'JetBrains Mono',
+                                          'Consolas',
+                                        ],
+                                      ),
                                 ),
                               ),
                             ),
@@ -2028,9 +1968,7 @@ class _DesktopHistoryCardState extends State<_DesktopHistoryCard> {
                               const SizedBox(width: AppSpacing.xxs),
                               Text(
                                 l10n.text(zh: '正在播放', en: 'Playing'),
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .labelSmall
+                                style: Theme.of(context).textTheme.labelSmall
                                     ?.copyWith(
                                       color: colors.primary,
                                       fontWeight: FontWeight.w600,
@@ -2050,11 +1988,11 @@ class _DesktopHistoryCardState extends State<_DesktopHistoryCard> {
                           overflow: textScale >= 1.3
                               ? TextOverflow.visible
                               : TextOverflow.ellipsis,
-                          style:
-                              Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                    color: colors.onSurfaceVariant,
-                                    height: 1.6,
-                                  ),
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(
+                                color: colors.onSurfaceVariant,
+                                height: 1.6,
+                              ),
                         ),
                       ),
                       const SizedBox(height: AppSpacing.sm),
@@ -2064,18 +2002,18 @@ class _DesktopHistoryCardState extends State<_DesktopHistoryCard> {
                         child: Text(
                           formattedDate,
                           textAlign: TextAlign.end,
-                          style:
-                              Theme.of(context).textTheme.labelSmall?.copyWith(
-                            color: colors.onSurfaceVariant,
-                            fontFamily: 'Cascadia Code',
-                            fontFamilyFallback: const [
-                              'JetBrains Mono',
-                              'Consolas',
-                            ],
-                            fontFeatures: const [
-                              FontFeature.tabularFigures(),
-                            ],
-                          ),
+                          style: Theme.of(context).textTheme.labelSmall
+                              ?.copyWith(
+                                color: colors.onSurfaceVariant,
+                                fontFamily: 'Cascadia Code',
+                                fontFamilyFallback: const [
+                                  'JetBrains Mono',
+                                  'Consolas',
+                                ],
+                                fontFeatures: const [
+                                  FontFeature.tabularFigures(),
+                                ],
+                              ),
                         ),
                       ),
                     ],
@@ -2204,10 +2142,8 @@ class _HistoryList extends StatelessWidget {
         child: ListView.separated(
           padding: EdgeInsets.zero,
           itemCount: records.length,
-          separatorBuilder: (context, index) => Divider(
-            height: 1,
-            color: colors.outlineVariant,
-          ),
+          separatorBuilder: (context, index) =>
+              Divider(height: 1, color: colors.outlineVariant),
           itemBuilder: (context, index) {
             final record = records[index];
             return _HistoryListItem(
@@ -2376,9 +2312,9 @@ class _RecordTypeLine extends StatelessWidget {
         Text(
           label,
           style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                color: colors.primary,
-                fontWeight: FontWeight.w600,
-              ),
+            color: colors.primary,
+            fontWeight: FontWeight.w600,
+          ),
         ),
         if (isPlaying)
           DecoratedBox(
@@ -2403,9 +2339,9 @@ class _RecordTypeLine extends StatelessWidget {
                   Text(
                     context.l10n.text(zh: '正在播放', en: 'Playing'),
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: colors.onPrimaryContainer,
-                          fontWeight: FontWeight.w500,
-                        ),
+                      color: colors.onPrimaryContainer,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ],
               ),
@@ -2553,14 +2489,14 @@ class _EmptyState extends StatelessWidget {
                                 en: 'No matching history',
                               )
                             : isFiltered
-                                ? context.l10n.text(
-                                    zh: '此类型暂无记录',
-                                    en: 'No items of this type',
-                                  )
-                                : context.l10n.text(
-                                    zh: '暂无历史记录',
-                                    en: 'No history yet',
-                                  ),
+                            ? context.l10n.text(
+                                zh: '此类型暂无记录',
+                                en: 'No items of this type',
+                              )
+                            : context.l10n.text(
+                                zh: '暂无历史记录',
+                                en: 'No history yet',
+                              ),
                         textAlign: TextAlign.center,
                         style: Theme.of(context).textTheme.titleMedium,
                       ),
@@ -2572,38 +2508,36 @@ class _EmptyState extends StatelessWidget {
                                 en: 'No items contain “$query”. Check the search term or clear the search.',
                               )
                             : isFiltered
-                                ? context.l10n.text(
-                                    zh: '当前筛选条件下没有记录，请切换类型查看其他本地存档。',
-                                    en: 'There are no records for this filter. Choose another type to view local items.',
-                                  )
-                                : context.l10n.text(
-                                    zh: '还没有历史记录。完成一次转录或语音合成后会显示在这里。',
-                                    en: 'Completed transcripts and generated speech will appear here.',
-                                  ),
+                            ? context.l10n.text(
+                                zh: '当前筛选条件下没有记录，请切换类型查看其他本地存档。',
+                                en: 'There are no records for this filter. Choose another type to view local items.',
+                              )
+                            : context.l10n.text(
+                                zh: '还没有历史记录。完成一次转录或语音合成后会显示在这里。',
+                                en: 'Completed transcripts and generated speech will appear here.',
+                              ),
                         textAlign: TextAlign.center,
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: colors.onSurfaceVariant,
-                            ),
+                          color: colors.onSurfaceVariant,
+                        ),
                       ),
                       if (isSearch) ...[
                         const SizedBox(height: AppSpacing.md),
                         OutlinedButton.icon(
                           onPressed: onClearSearch,
                           icon: const Icon(Icons.clear),
-                          label: Text(context.l10n.text(
-                            zh: '清空搜索',
-                            en: 'Clear search',
-                          )),
+                          label: Text(
+                            context.l10n.text(zh: '清空搜索', en: 'Clear search'),
+                          ),
                         ),
                       ] else if (isFiltered && onClearTypeFilter != null) ...[
                         const SizedBox(height: AppSpacing.md),
                         OutlinedButton.icon(
                           onPressed: onClearTypeFilter,
                           icon: const Icon(Icons.filter_alt_off_outlined),
-                          label: Text(context.l10n.text(
-                            zh: '显示全部',
-                            en: 'Show all',
-                          )),
+                          label: Text(
+                            context.l10n.text(zh: '显示全部', en: 'Show all'),
+                          ),
                         ),
                       ],
                     ],
@@ -2626,14 +2560,8 @@ class _LoadingState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final message = isSearch
-        ? context.l10n.text(
-            zh: '正在搜索历史记录…',
-            en: 'Searching history…',
-          )
-        : context.l10n.text(
-            zh: '正在加载历史记录…',
-            en: 'Loading history…',
-          );
+        ? context.l10n.text(zh: '正在搜索历史记录…', en: 'Searching history…')
+        : context.l10n.text(zh: '正在加载历史记录…', en: 'Loading history…');
     return Semantics(
       liveRegion: true,
       label: message,
@@ -2649,8 +2577,8 @@ class _LoadingState extends StatelessWidget {
             Text(
               message,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
           ],
         ),
@@ -2690,8 +2618,9 @@ class _ErrorState extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: colors.errorContainer,
                   borderRadius: BorderRadius.circular(AppRadii.large),
-                  border:
-                      Border.all(color: colors.error.withValues(alpha: 0.28)),
+                  border: Border.all(
+                    color: colors.error.withValues(alpha: 0.28),
+                  ),
                 ),
                 child: Padding(
                   padding: const EdgeInsets.all(AppSpacing.md),
@@ -2713,9 +2642,7 @@ class _ErrorState extends StatelessWidget {
                               children: [
                                 Text(
                                   title,
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .bodyMedium
+                                  style: Theme.of(context).textTheme.bodyMedium
                                       ?.copyWith(
                                         color: colors.onErrorContainer,
                                         fontWeight: FontWeight.w600,
@@ -2724,9 +2651,7 @@ class _ErrorState extends StatelessWidget {
                                 const SizedBox(height: AppSpacing.xxs),
                                 Text(
                                   message,
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .bodyMedium
+                                  style: Theme.of(context).textTheme.bodyMedium
                                       ?.copyWith(
                                         color: colors.onErrorContainer,
                                       ),
@@ -2746,10 +2671,7 @@ class _ErrorState extends StatelessWidget {
                           ),
                           onPressed: onRetry,
                           icon: const Icon(Icons.refresh),
-                          label: Text(context.l10n.text(
-                            zh: '重试',
-                            en: 'Retry',
-                          )),
+                          label: Text(context.l10n.text(zh: '重试', en: 'Retry')),
                         ),
                       ),
                     ],

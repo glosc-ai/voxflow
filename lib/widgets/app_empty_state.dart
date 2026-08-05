@@ -34,11 +34,7 @@ class AppEmptyState extends StatelessWidget {
                 ),
                 child: Padding(
                   padding: const EdgeInsets.all(AppSpacing.sm),
-                  child: Icon(
-                    icon,
-                    size: 32,
-                    color: colors.onPrimaryContainer,
-                  ),
+                  child: Icon(icon, size: 32, color: colors.onPrimaryContainer),
                 ),
               ),
               const SizedBox(height: AppSpacing.md),
@@ -52,8 +48,8 @@ class AppEmptyState extends StatelessWidget {
                 message,
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: colors.onSurfaceVariant,
-                    ),
+                  color: colors.onSurfaceVariant,
+                ),
               ),
               if (action != null) ...[
                 const SizedBox(height: AppSpacing.md),

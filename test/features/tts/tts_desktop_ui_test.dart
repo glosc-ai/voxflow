@@ -15,8 +15,9 @@ import 'package:voxflow/features/tts/views/tts_screen.dart';
 import 'package:voxflow/l10n/app_localizations.dart';
 
 void main() {
-  testWidgets('desktop TTS dock adapts at 200% text without overflow',
-      (tester) async {
+  testWidgets('desktop TTS dock adapts at 200% text without overflow', (
+    tester,
+  ) async {
     SharedPreferences.setMockInitialValues({});
     final preferences = await SharedPreferences.getInstance();
     final notifier = _ReadyTtsNotifier();
@@ -72,12 +73,12 @@ void main() {
 
 class _ReadyTtsNotifier extends TtsNotifier {
   _ReadyTtsNotifier()
-      : super(
-          apiService: TtsApiService(DioClient(const SettingsState())),
-          playback: const _SilentPlaybackController(),
-          historyWriter: ({required text, required audioPath}) async {},
-          model: 'tts-1',
-        ) {
+    : super(
+        apiService: TtsApiService(DioClient(const SettingsState())),
+        playback: const _SilentPlaybackController(),
+        historyWriter: ({required text, required audioPath}) async {},
+        model: 'tts-1',
+      ) {
     state = const TtsState(
       phase: TtsPhase.ready,
       audioPath: 'generated.mp3',

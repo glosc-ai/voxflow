@@ -18,8 +18,9 @@ import 'package:voxflow/features/stt/views/stt_screen.dart';
 import 'package:voxflow/l10n/app_localizations.dart';
 
 void main() {
-  testWidgets('desktop Space shortcut does not capture the transcript editor',
-      (tester) async {
+  testWidgets('desktop Space shortcut does not capture the transcript editor', (
+    tester,
+  ) async {
     SharedPreferences.setMockInitialValues({});
     final preferences = await SharedPreferences.getInstance();
     final notifier = _ShortcutSttNotifier();
@@ -66,8 +67,9 @@ void main() {
     );
   });
 
-  testWidgets('desktop STT supports 200% text without overflow',
-      (tester) async {
+  testWidgets('desktop STT supports 200% text without overflow', (
+    tester,
+  ) async {
     SharedPreferences.setMockInitialValues({});
     final preferences = await SharedPreferences.getInstance();
     await tester.binding.setSurfaceSize(const Size(1200, 800));
@@ -96,9 +98,11 @@ void main() {
 
     expect(find.text('Speech to text'), findsOneWidget);
     expect(
-        find.text(
-            'Timestamped transcript segments will appear here after recording.'),
-        findsOneWidget);
+      find.text(
+        'Timestamped transcript segments will appear here after recording.',
+      ),
+      findsOneWidget,
+    );
     expect(find.byKey(const Key('startRecordingButton')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
@@ -106,12 +110,12 @@ void main() {
 
 class _ShortcutSttNotifier extends SttNotifier {
   _ShortcutSttNotifier()
-      : super(
-          recorder: _SilentRecorder(),
-          apiService: WhisperApiService(DioClient(const SettingsState())),
-          historyWriter: (
-              {required type, required text, required audioPath}) async {},
-        ) {
+    : super(
+        recorder: _SilentRecorder(),
+        apiService: WhisperApiService(DioClient(const SettingsState())),
+        historyWriter:
+            ({required type, required text, required audioPath}) async {},
+      ) {
     state = const SttState(
       phase: SttPhase.paused,
       result: TranscriptionResult(
@@ -142,12 +146,12 @@ class _ShortcutSttNotifier extends SttNotifier {
 
 class _IdleSttNotifier extends SttNotifier {
   _IdleSttNotifier()
-      : super(
-          recorder: _SilentRecorder(),
-          apiService: WhisperApiService(DioClient(const SettingsState())),
-          historyWriter: (
-              {required type, required text, required audioPath}) async {},
-        );
+    : super(
+        recorder: _SilentRecorder(),
+        apiService: WhisperApiService(DioClient(const SettingsState())),
+        historyWriter:
+            ({required type, required text, required audioPath}) async {},
+      );
 }
 
 class _SilentRecorder implements AudioRecordManager {

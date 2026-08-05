@@ -48,10 +48,7 @@ void main() {
         r'C:\exports\transcript.txt',
       );
       expect(
-        TranscriptExporter.ensureExtension(
-          r'C:\exports\transcript.TXT',
-          'txt',
-        ),
+        TranscriptExporter.ensureExtension(r'C:\exports\transcript.TXT', 'txt'),
         r'C:\exports\transcript.TXT',
       );
     });
@@ -121,8 +118,9 @@ void main() {
   });
 
   test('SeedASR 使用专属传输而不是 Whisper multipart', () async {
-    final directory =
-        await Directory.systemTemp.createTemp('voxflow_seed_asr_');
+    final directory = await Directory.systemTemp.createTemp(
+      'voxflow_seed_asr_',
+    );
     addTearDown(() => directory.delete(recursive: true));
     final file = File('${directory.path}${Platform.pathSeparator}sample.wav');
     await file.writeAsBytes([1, 2, 3]);
@@ -158,10 +156,7 @@ class _FakeTranscriptionService implements TranscriptionService {
   }) async {
     calls++;
     onUploadProgress?.call(1);
-    return const TranscriptionResult(
-      text: 'seed-asr-result',
-      segments: [],
-    );
+    return const TranscriptionResult(text: 'seed-asr-result', segments: []);
   }
 }
 

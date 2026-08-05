@@ -200,25 +200,31 @@ class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
   }
 
   @override
-  AppSemanticColors lerp(
-    covariant AppSemanticColors? other,
-    double t,
-  ) {
+  AppSemanticColors lerp(covariant AppSemanticColors? other, double t) {
     if (other == null) {
       return this;
     }
     return AppSemanticColors(
       success: Color.lerp(success, other.success, t)!,
-      successContainer:
-          Color.lerp(successContainer, other.successContainer, t)!,
+      successContainer: Color.lerp(
+        successContainer,
+        other.successContainer,
+        t,
+      )!,
       info: Color.lerp(info, other.info, t)!,
       infoContainer: Color.lerp(infoContainer, other.infoContainer, t)!,
       warning: Color.lerp(warning, other.warning, t)!,
-      warningContainer:
-          Color.lerp(warningContainer, other.warningContainer, t)!,
+      warningContainer: Color.lerp(
+        warningContainer,
+        other.warningContainer,
+        t,
+      )!,
       recording: Color.lerp(recording, other.recording, t)!,
-      recordingContainer:
-          Color.lerp(recordingContainer, other.recordingContainer, t)!,
+      recordingContainer: Color.lerp(
+        recordingContainer,
+        other.recordingContainer,
+        t,
+      )!,
       focus: Color.lerp(focus, other.focus, t)!,
       surfaceSubtle: Color.lerp(surfaceSubtle, other.surfaceSubtle, t)!,
       surfaceSelected: Color.lerp(surfaceSelected, other.surfaceSelected, t)!,
@@ -291,10 +297,7 @@ class AppSurfaceEffects extends ThemeExtension<AppSurfaceEffects> {
   }
 
   @override
-  AppSurfaceEffects lerp(
-    covariant AppSurfaceEffects? other,
-    double t,
-  ) {
+  AppSurfaceEffects lerp(covariant AppSurfaceEffects? other, double t) {
     if (other == null) {
       return this;
     }

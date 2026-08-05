@@ -30,11 +30,11 @@ class MobileLayout {
   }
 
   static EdgeInsets pagePadding(BuildContext context) => EdgeInsets.fromLTRB(
-        horizontalPadding,
-        topPadding,
-        horizontalPadding,
-        bottomClearance(context),
-      );
+    horizontalPadding,
+    topPadding,
+    horizontalPadding,
+    bottomClearance(context),
+  );
 }
 
 class MobileMotion {
@@ -44,10 +44,7 @@ class MobileMotion {
   static const entrance = Duration(milliseconds: 260);
   static const entranceCurve = Cubic(0.2, 0.8, 0.2, 1);
 
-  static Duration duration(
-    BuildContext context, [
-    Duration value = standard,
-  ]) {
+  static Duration duration(BuildContext context, [Duration value = standard]) {
     return MediaQuery.disableAnimationsOf(context) ? Duration.zero : value;
   }
 }
@@ -197,11 +194,7 @@ class MobilePill extends StatelessWidget {
 }
 
 class MobileSectionLabel extends StatelessWidget {
-  const MobileSectionLabel({
-    super.key,
-    required this.title,
-    this.meta,
-  });
+  const MobileSectionLabel({super.key, required this.title, this.meta});
 
   final String title;
   final String? meta;
@@ -217,9 +210,9 @@ class MobileSectionLabel extends StatelessWidget {
             child: Text(
               title,
               style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    fontSize: 14.5,
-                    fontWeight: FontWeight.w600,
-                  ),
+                fontSize: 14.5,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
           if (meta != null) ...[
@@ -228,12 +221,13 @@ class MobileSectionLabel extends StatelessWidget {
               child: Text(
                 meta!,
                 textAlign: TextAlign.end,
-                style: AppTypography.numeric(
-                  Theme.of(context).textTheme.labelSmall,
-                ).copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  fontSize: 10.5,
-                ),
+                style:
+                    AppTypography.numeric(
+                      Theme.of(context).textTheme.labelSmall,
+                    ).copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      fontSize: 10.5,
+                    ),
               ),
             ),
           ],
@@ -287,10 +281,7 @@ class _DashedRoundedRectPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final path = Path()
       ..addRRect(
-        RRect.fromRectAndRadius(
-          Offset.zero & size,
-          Radius.circular(radius),
-        ),
+        RRect.fromRectAndRadius(Offset.zero & size, Radius.circular(radius)),
       );
     final paint = Paint()
       ..style = PaintingStyle.stroke
@@ -300,10 +291,7 @@ class _DashedRoundedRectPainter extends CustomPainter {
     for (final metric in path.computeMetrics()) {
       var distance = 0.0;
       while (distance < metric.length) {
-        canvas.drawPath(
-          metric.extractPath(distance, distance + 6),
-          paint,
-        );
+        canvas.drawPath(metric.extractPath(distance, distance + 6), paint);
         distance += 10;
       }
     }

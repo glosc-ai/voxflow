@@ -53,9 +53,9 @@ class _SttScreenState extends ConsumerState<SttScreen> {
       sttProvider.select((value) => value.errorMessageFor(locale)),
       (previous, next) {
         if (next != null && next != previous) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(next)),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(next)));
         }
       },
     );
@@ -71,13 +71,15 @@ class _SttScreenState extends ConsumerState<SttScreen> {
       },
     );
 
-    final compactAppBar = MediaQuery.sizeOf(context).width < 560 ||
+    final compactAppBar =
+        MediaQuery.sizeOf(context).width < 560 ||
         MediaQuery.textScalerOf(context).scale(1) >= 1.3;
 
     return LayoutBuilder(
       builder: (context, pageConstraints) {
         final platform = Theme.of(context).platform;
-        final useDesktop = platform == TargetPlatform.windows &&
+        final useDesktop =
+            platform == TargetPlatform.windows &&
             pageConstraints.maxWidth >= 760;
         final useMobile = platform == TargetPlatform.android;
         return Scaffold(
@@ -106,8 +108,10 @@ class _SttScreenState extends ConsumerState<SttScreen> {
                         Padding(
                           padding: const EdgeInsets.only(right: AppSpacing.xs),
                           child: Tooltip(
-                            message:
-                                l10n.text(zh: '新建转录', en: 'New transcript'),
+                            message: l10n.text(
+                              zh: '新建转录',
+                              en: 'New transcript',
+                            ),
                             child: TextButton.icon(
                               onPressed: _startNewTranscript,
                               icon: const Icon(Icons.add_circle_outline),
@@ -121,11 +125,15 @@ class _SttScreenState extends ConsumerState<SttScreen> {
                 ),
           body: CallbackShortcuts(
             bindings: <ShortcutActivator, VoidCallback>{
-              const SingleActivator(LogicalKeyboardKey.keyO, control: true):
-                  () {
+              const SingleActivator(
+                LogicalKeyboardKey.keyO,
+                control: true,
+              ): () {
                 if (state.canStart && state.result == null) {
                   unawaited(
-                    ref.read(sttProvider.notifier).pickAndTranscribe(
+                    ref
+                        .read(sttProvider.notifier)
+                        .pickAndTranscribe(
                           dialogTitle: l10n.text(
                             zh: '选择音频或视频文件',
                             en: 'Choose an audio or video file',
@@ -158,67 +166,67 @@ class _SttScreenState extends ConsumerState<SttScreen> {
                       onNewTranscript: _startNewTranscript,
                     )
                   : useMobile
-                      ? MobileSttWorkspace(
-                          state: state,
-                          controller: _resultController,
-                          onExport: _export,
-                          onNewTranscript: _startNewTranscript,
-                        )
-                      : SingleChildScrollView(
-                          padding: AppLayout.pagePadding(context),
-                          child: Center(
-                            child: ConstrainedBox(
-                              constraints: const BoxConstraints(maxWidth: 960),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  if (errorMessage != null) ...[
-                                    AppStatusBanner(
-                                      kind: AppStatusKind.error,
-                                      title: l10n.text(
-                                        zh: '转录未完成',
-                                        en: 'Transcription not completed',
-                                      ),
-                                      message: errorMessage,
-                                      action: state.canRetrySelectedSource
-                                          ? TextButton.icon(
-                                              key: const Key(
-                                                'retrySelectedSttSourceButton',
-                                              ),
-                                              onPressed: ref
-                                                  .read(sttProvider.notifier)
-                                                  .retrySelectedSource,
-                                              icon: const Icon(Icons.refresh),
-                                              label: Text(
-                                                state.selectedSourceIsTemporaryRecording
-                                                    ? l10n.text(
-                                                        zh: '重试此录音',
-                                                        en: 'Retry this recording',
-                                                      )
-                                                    : l10n.text(
-                                                        zh: '重试此文件',
-                                                        en: 'Retry this file',
-                                                      ),
-                                              ),
-                                            )
-                                          : null,
-                                    ),
-                                    const SizedBox(height: AppSpacing.md),
-                                  ],
-                                  if (state.result == null)
-                                    _InputWorkspace(state: state)
-                                  else
-                                    _ResultSection(
-                                      state: state,
-                                      controller: _resultController,
-                                      onExport: _export,
-                                    ),
-                                  const SizedBox(height: AppSpacing.xl),
-                                ],
-                              ),
-                            ),
+                  ? MobileSttWorkspace(
+                      state: state,
+                      controller: _resultController,
+                      onExport: _export,
+                      onNewTranscript: _startNewTranscript,
+                    )
+                  : SingleChildScrollView(
+                      padding: AppLayout.pagePadding(context),
+                      child: Center(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 960),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              if (errorMessage != null) ...[
+                                AppStatusBanner(
+                                  kind: AppStatusKind.error,
+                                  title: l10n.text(
+                                    zh: '转录未完成',
+                                    en: 'Transcription not completed',
+                                  ),
+                                  message: errorMessage,
+                                  action: state.canRetrySelectedSource
+                                      ? TextButton.icon(
+                                          key: const Key(
+                                            'retrySelectedSttSourceButton',
+                                          ),
+                                          onPressed: ref
+                                              .read(sttProvider.notifier)
+                                              .retrySelectedSource,
+                                          icon: const Icon(Icons.refresh),
+                                          label: Text(
+                                            state.selectedSourceIsTemporaryRecording
+                                                ? l10n.text(
+                                                    zh: '重试此录音',
+                                                    en: 'Retry this recording',
+                                                  )
+                                                : l10n.text(
+                                                    zh: '重试此文件',
+                                                    en: 'Retry this file',
+                                                  ),
+                                          ),
+                                        )
+                                      : null,
+                                ),
+                                const SizedBox(height: AppSpacing.md),
+                              ],
+                              if (state.result == null)
+                                _InputWorkspace(state: state)
+                              else
+                                _ResultSection(
+                                  state: state,
+                                  controller: _resultController,
+                                  onExport: _export,
+                                ),
+                              const SizedBox(height: AppSpacing.xl),
+                            ],
                           ),
                         ),
+                      ),
+                    ),
             ),
           ),
         );
@@ -232,14 +240,16 @@ class _SttScreenState extends ConsumerState<SttScreen> {
         FocusManager.instance.primaryFocus == widget.pageFocusNode) {
       return true;
     }
-    var interactive = focusContext.widget is EditableText ||
+    var interactive =
+        focusContext.widget is EditableText ||
         focusContext.widget is ButtonStyleButton ||
         focusContext.widget is IconButton ||
         focusContext.widget is InkWell ||
         focusContext.widget is PopupMenuButton;
     focusContext.visitAncestorElements((element) {
       final ancestor = element.widget;
-      interactive = interactive ||
+      interactive =
+          interactive ||
           ancestor is EditableText ||
           ancestor is ButtonStyleButton ||
           ancestor is IconButton ||
@@ -265,23 +275,17 @@ class _SttScreenState extends ConsumerState<SttScreen> {
           SnackBar(
             content: Text(
               isSrt
-                  ? context.l10n.text(
-                      zh: 'SRT 已导出。',
-                      en: 'SRT exported.',
-                    )
-                  : context.l10n.text(
-                      zh: 'TXT 已导出。',
-                      en: 'TXT exported.',
-                    ),
+                  ? context.l10n.text(zh: 'SRT 已导出。', en: 'SRT exported.')
+                  : context.l10n.text(zh: 'TXT 已导出。', en: 'TXT exported.'),
             ),
           ),
         );
       }
     } on AppException catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(context.l10n.appError(error))),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(context.l10n.appError(error))));
       }
     }
   }
@@ -302,10 +306,7 @@ class _SttScreenState extends ConsumerState<SttScreen> {
                     zh: '放弃尚未转录的录音？',
                     en: 'Discard the untranscribed recording?',
                   )
-                : l10n.text(
-                    zh: '放弃未导出的修改？',
-                    en: 'Discard unexported changes?',
-                  ),
+                : l10n.text(zh: '放弃未导出的修改？', en: 'Discard unexported changes?'),
           ),
           content: Text(
             discardsTemporaryRecording
@@ -328,14 +329,8 @@ class _SttScreenState extends ConsumerState<SttScreen> {
               onPressed: () => Navigator.pop(context, true),
               child: Text(
                 discardsTemporaryRecording
-                    ? l10n.text(
-                        zh: '放弃并新建',
-                        en: 'Discard and start new',
-                      )
-                    : l10n.text(
-                        zh: '新建转录',
-                        en: 'New transcript',
-                      ),
+                    ? l10n.text(zh: '放弃并新建', en: 'Discard and start new')
+                    : l10n.text(zh: '新建转录', en: 'New transcript'),
               ),
             ),
           ],
@@ -394,28 +389,20 @@ class _InputWorkspace extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
-                      child: _SubtlePanel(
-                        child: _RecordingPanel(state: state),
-                      ),
+                      child: _SubtlePanel(child: _RecordingPanel(state: state)),
                     ),
                     const SizedBox(width: AppSpacing.md),
                     Expanded(
-                      child: _SubtlePanel(
-                        child: _ImportPanel(state: state),
-                      ),
+                      child: _SubtlePanel(child: _ImportPanel(state: state)),
                     ),
                   ],
                 )
               : Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    _SubtlePanel(
-                      child: _RecordingPanel(state: state),
-                    ),
+                    _SubtlePanel(child: _RecordingPanel(state: state)),
                     const SizedBox(height: AppSpacing.md),
-                    _SubtlePanel(
-                      child: _ImportPanel(state: state),
-                    ),
+                    _SubtlePanel(child: _ImportPanel(state: state)),
                   ],
                 );
 
@@ -506,9 +493,7 @@ class _RecordingPanel extends ConsumerWidget {
                             color: state.phase == SttPhase.recording
                                 ? context.semanticColors.recording
                                 : colors.onSurface,
-                            fontFeatures: const [
-                              FontFeature.tabularFigures(),
-                            ],
+                            fontFeatures: const [FontFeature.tabularFigures()],
                           ),
                         ),
                       ),
@@ -529,10 +514,7 @@ class _RecordingPanel extends ConsumerWidget {
                     onPressed: notifier.startRecording,
                     icon: const Icon(Icons.mic),
                     label: Text(
-                      context.l10n.text(
-                        zh: '开始录音',
-                        en: 'Start recording',
-                      ),
+                      context.l10n.text(zh: '开始录音', en: 'Start recording'),
                     ),
                   ),
                 if (state.phase == SttPhase.recording)
@@ -555,10 +537,9 @@ class _RecordingPanel extends ConsumerWidget {
                     ),
                     onPressed: notifier.stopRecording,
                     icon: const Icon(Icons.stop),
-                    label: Text(context.l10n.text(
-                      zh: '停止并转录',
-                      en: 'Stop and transcribe',
-                    )),
+                    label: Text(
+                      context.l10n.text(zh: '停止并转录', en: 'Stop and transcribe'),
+                    ),
                   ),
               ],
             ),
@@ -580,28 +561,29 @@ class _RecordingStateIcon extends StatelessWidget {
     final semantics = context.semanticColors;
     final isRecording = state.phase == SttPhase.recording;
     final foreground = isRecording ? semantics.recording : colors.primary;
-    final background =
-        isRecording ? semantics.recordingContainer : colors.primaryContainer;
+    final background = isRecording
+        ? semantics.recordingContainer
+        : colors.primaryContainer;
 
     final Widget content = switch (state.phase) {
       SttPhase.countdown => Text(
-          '${state.countdown}',
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                color: colors.onPrimaryContainer,
-              ),
-        ),
+        '${state.countdown}',
+        style: Theme.of(
+          context,
+        ).textTheme.titleLarge?.copyWith(color: colors.onPrimaryContainer),
+      ),
       SttPhase.paused => Icon(Icons.pause, color: foreground, size: 24),
       SttPhase.recording => Stack(
-          alignment: Alignment.center,
-          children: [
-            Icon(Icons.mic, color: foreground, size: 24),
-            Positioned(
-              right: 0,
-              top: 0,
-              child: Icon(Icons.circle, color: foreground, size: 8),
-            ),
-          ],
-        ),
+        alignment: Alignment.center,
+        children: [
+          Icon(Icons.mic, color: foreground, size: 24),
+          Positioned(
+            right: 0,
+            top: 0,
+            child: Icon(Icons.circle, color: foreground, size: 8),
+          ),
+        ],
+      ),
       _ => Icon(Icons.mic_none, color: foreground, size: 24),
     };
 
@@ -634,7 +616,8 @@ class _ImportPanel extends ConsumerWidget {
     );
     final colors = Theme.of(context).colorScheme;
     final textScale = MediaQuery.textScalerOf(context).scale(1);
-    final description = fileName ??
+    final description =
+        fileName ??
         (seedAsrSelected
             ? context.l10n.text(
                 zh: '支持 MP3、MP4、MPEG、MPGA、M4A、WAV、WEBM；SeedASR 会自动转换，最大 25 MB',
@@ -693,8 +676,8 @@ class _ImportPanel extends ConsumerWidget {
                             ? TextOverflow.visible
                             : TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: colors.onSurfaceVariant,
-                            ),
+                          color: colors.onSurfaceVariant,
+                        ),
                       ),
                     ),
                   ],
@@ -715,18 +698,17 @@ class _ImportPanel extends ConsumerWidget {
                   ),
             child: OutlinedButton.icon(
               onPressed: state.canStart
-                  ? () => ref.read(sttProvider.notifier).pickAndTranscribe(
-                        dialogTitle: context.l10n.text(
-                          zh: '选择音频或视频文件',
-                          en: 'Choose an audio or video file',
-                        ),
-                      )
+                  ? () => ref
+                        .read(sttProvider.notifier)
+                        .pickAndTranscribe(
+                          dialogTitle: context.l10n.text(
+                            zh: '选择音频或视频文件',
+                            en: 'Choose an audio or video file',
+                          ),
+                        )
                   : null,
               icon: const Icon(Icons.folder_open),
-              label: Text(context.l10n.text(
-                zh: '选择文件',
-                en: 'Choose file',
-              )),
+              label: Text(context.l10n.text(zh: '选择文件', en: 'Choose file')),
             ),
           ),
         ],
@@ -747,19 +729,16 @@ class _ProcessingStatus extends StatelessWidget {
     final hasUploadProgress = uploading && progress > 0;
     final percent = (progress * 100).round();
     final progressLabel = hasUploadProgress
-        ? context.l10n.text(
-            zh: '已上传 $percent%',
-            en: '$percent% uploaded',
-          )
+        ? context.l10n.text(zh: '已上传 $percent%', en: '$percent% uploaded')
         : uploading
-            ? context.l10n.text(
-                zh: '正在准备并上传所选文件。',
-                en: 'Preparing and uploading the selected file.',
-              )
-            : context.l10n.text(
-                zh: '正在识别语音并整理转录结果。',
-                en: 'Recognizing speech and preparing the transcript.',
-              );
+        ? context.l10n.text(
+            zh: '正在准备并上传所选文件。',
+            en: 'Preparing and uploading the selected file.',
+          )
+        : context.l10n.text(
+            zh: '正在识别语音并整理转录结果。',
+            en: 'Recognizing speech and preparing the transcript.',
+          );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -767,27 +746,15 @@ class _ProcessingStatus extends StatelessWidget {
         AppStatusBanner(
           kind: AppStatusKind.info,
           title: uploading
-              ? context.l10n.text(
-                  zh: '正在上传音频…',
-                  en: 'Uploading audio…',
-                )
-              : context.l10n.text(
-                  zh: 'AI 正在转录…',
-                  en: 'Transcribing…',
-                ),
+              ? context.l10n.text(zh: '正在上传音频…', en: 'Uploading audio…')
+              : context.l10n.text(zh: 'AI 正在转录…', en: 'Transcribing…'),
           message: progressLabel,
         ),
         const SizedBox(height: AppSpacing.sm),
         Semantics(
           label: uploading
-              ? context.l10n.text(
-                  zh: '音频上传进度',
-                  en: 'Audio upload progress',
-                )
-              : context.l10n.text(
-                  zh: '语音转录进度',
-                  en: 'Transcription progress',
-                ),
+              ? context.l10n.text(zh: '音频上传进度', en: 'Audio upload progress')
+              : context.l10n.text(zh: '语音转录进度', en: 'Transcription progress'),
           value: hasUploadProgress
               ? '$percent%'
               : context.l10n.text(zh: '处理中', en: 'Processing'),
@@ -850,8 +817,8 @@ class _ResultSection extends ConsumerWidget {
                     child: Text(
                       segmentLabel,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: colors.onSurfaceVariant,
-                          ),
+                        color: colors.onSurfaceVariant,
+                      ),
                     ),
                   ),
                 ],
@@ -894,13 +861,11 @@ class _ResultSection extends ConsumerWidget {
             alignment: WrapAlignment.end,
             children: [
               OutlinedButton.icon(
-                onPressed:
-                    state.canExport ? () => onExport(isSrt: false) : null,
+                onPressed: state.canExport
+                    ? () => onExport(isSrt: false)
+                    : null,
                 icon: const Icon(Icons.description_outlined),
-                label: Text(context.l10n.text(
-                  zh: '导出 TXT',
-                  en: 'Export TXT',
-                )),
+                label: Text(context.l10n.text(zh: '导出 TXT', en: 'Export TXT')),
               ),
               Tooltip(
                 message: state.canExportSrt
@@ -913,13 +878,13 @@ class _ResultSection extends ConsumerWidget {
                         en: 'No timestamped segments were returned',
                       ),
                 child: FilledButton.tonalIcon(
-                  onPressed:
-                      state.canExportSrt ? () => onExport(isSrt: true) : null,
+                  onPressed: state.canExportSrt
+                      ? () => onExport(isSrt: true)
+                      : null,
                   icon: const Icon(Icons.subtitles),
-                  label: Text(context.l10n.text(
-                    zh: '导出 SRT',
-                    en: 'Export SRT',
-                  )),
+                  label: Text(
+                    context.l10n.text(zh: '导出 SRT', en: 'Export SRT'),
+                  ),
                 ),
               ),
             ],
@@ -931,10 +896,7 @@ class _ResultSection extends ConsumerWidget {
 }
 
 class _AdaptiveActions extends StatelessWidget {
-  const _AdaptiveActions({
-    required this.children,
-    required this.alignment,
-  });
+  const _AdaptiveActions({required this.children, required this.alignment});
 
   final List<Widget> children;
   final WrapAlignment alignment;
@@ -975,8 +937,10 @@ class _AdaptiveActions extends StatelessWidget {
 
 String _recordingStatus(BuildContext context, SttState state) {
   return switch (state.phase) {
-    SttPhase.countdown =>
-      context.l10n.text(zh: '准备录音', en: 'Preparing to record'),
+    SttPhase.countdown => context.l10n.text(
+      zh: '准备录音',
+      en: 'Preparing to record',
+    ),
     SttPhase.recording => context.l10n.text(zh: '正在录音', en: 'Recording'),
     SttPhase.paused => context.l10n.text(zh: '录音已暂停', en: 'Recording paused'),
     _ => context.l10n.text(zh: '录制新音频', en: 'Record new audio'),
@@ -994,7 +958,8 @@ String _spokenDuration(BuildContext context, Duration duration) {
   final seconds = duration.inSeconds.remainder(60);
   return context.l10n.text(
     zh: '$minutes 分 $seconds 秒',
-    en: '$minutes ${minutes == 1 ? 'minute' : 'minutes'} '
+    en:
+        '$minutes ${minutes == 1 ? 'minute' : 'minutes'} '
         '$seconds ${seconds == 1 ? 'second' : 'seconds'}',
   );
 }

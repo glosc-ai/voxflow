@@ -11,15 +11,14 @@ import '../models/tts_request.dart';
 typedef AudioBytesWriter = Future<File> Function(Uint8List bytes);
 
 class TtsApiService {
-  TtsApiService(
-    this._client, {
-    AudioBytesWriter? writer,
-  }) : _writer = writer ??
-            ((bytes) => PathUtils.writeManagedAudio(
-                  bytes,
-                  category: 'tts',
-                  extension: 'mp3',
-                ));
+  TtsApiService(this._client, {AudioBytesWriter? writer})
+    : _writer =
+          writer ??
+          ((bytes) => PathUtils.writeManagedAudio(
+            bytes,
+            category: 'tts',
+            extension: 'mp3',
+          ));
 
   final DioClient _client;
   final AudioBytesWriter _writer;
@@ -29,10 +28,7 @@ class TtsApiService {
     final validRequest = request.validated();
     try {
       final response = await _client.dio.post<List<int>>(
-        _client.endpoint(
-          'audio/speech',
-          requestSettings: settings,
-        ),
+        _client.endpoint('audio/speech', requestSettings: settings),
         data: validRequest.toJson(),
         options: _client.requestOptions(
           settings,

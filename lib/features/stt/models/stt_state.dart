@@ -100,7 +100,7 @@ class SttState {
       selectedSourceIsTemporaryRecording: clearSelectedFile
           ? false
           : (selectedSourceIsTemporaryRecording ??
-              this.selectedSourceIsTemporaryRecording),
+                this.selectedSourceIsTemporaryRecording),
       result: clearResult ? null : (result ?? this.result),
       editedText: editedText ?? this.editedText,
       error: nextError,

@@ -12,8 +12,9 @@ class TranscriptExporter {
   static String toText(String text) => text.trim();
 
   static String ensureExtension(String filePath, String extension) {
-    final normalizedExtension =
-        extension.startsWith('.') ? extension.substring(1) : extension;
+    final normalizedExtension = extension.startsWith('.')
+        ? extension.substring(1)
+        : extension;
     if (normalizedExtension.isEmpty) {
       return filePath;
     }
@@ -79,9 +80,11 @@ class TranscriptExporter {
   static String _timestamp(Duration duration) {
     final totalMilliseconds = duration.inMilliseconds.clamp(0, 359999999);
     final hours = totalMilliseconds ~/ Duration.millisecondsPerHour;
-    final minutes = (totalMilliseconds % Duration.millisecondsPerHour) ~/
+    final minutes =
+        (totalMilliseconds % Duration.millisecondsPerHour) ~/
         Duration.millisecondsPerMinute;
-    final seconds = (totalMilliseconds % Duration.millisecondsPerMinute) ~/
+    final seconds =
+        (totalMilliseconds % Duration.millisecondsPerMinute) ~/
         Duration.millisecondsPerSecond;
     final milliseconds = totalMilliseconds % Duration.millisecondsPerSecond;
     return '${hours.toString().padLeft(2, '0')}:'

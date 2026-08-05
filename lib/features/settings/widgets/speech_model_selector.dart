@@ -47,14 +47,8 @@ class _SpeechModelSelectorState extends ConsumerState<SpeechModelSelector> {
     return PopupMenuButton<String>(
       enabled: enabled,
       tooltip: widget.kind == SpeechModelKind.stt
-          ? context.l10n.text(
-              zh: '选择转录模型',
-              en: 'Choose transcription model',
-            )
-          : context.l10n.text(
-              zh: '选择合成模型',
-              en: 'Choose speech model',
-            ),
+          ? context.l10n.text(zh: '选择转录模型', en: 'Choose transcription model')
+          : context.l10n.text(zh: '选择合成模型', en: 'Choose speech model'),
       initialValue: current,
       position: PopupMenuPosition.under,
       constraints: BoxConstraints(
@@ -82,10 +76,7 @@ class _SpeechModelSelectorState extends ConsumerState<SpeechModelSelector> {
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       fontFamily: 'Cascadia Code',
-                      fontFamilyFallback: const [
-                        'JetBrains Mono',
-                        'Consolas',
-                      ],
+                      fontFamilyFallback: const ['JetBrains Mono', 'Consolas'],
                     ),
                   ),
                 ),
@@ -152,10 +143,7 @@ class _SpeechModelSelectorState extends ConsumerState<SpeechModelSelector> {
                           ? colors.onSurfaceVariant
                           : colors.onSurfaceVariant.withValues(alpha: 0.55),
                       fontFamily: 'Cascadia Code',
-                      fontFamilyFallback: const [
-                        'JetBrains Mono',
-                        'Consolas',
-                      ],
+                      fontFamilyFallback: const ['JetBrains Mono', 'Consolas'],
                       fontFeatures: const [FontFeature.tabularFigures()],
                     ),
                   ),

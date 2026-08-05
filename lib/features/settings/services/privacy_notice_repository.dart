@@ -13,10 +13,7 @@ class PrivacyNoticeRepository {
     try {
       return _preferences.getBool(_acknowledgedKey) ?? false;
     } catch (_) {
-      throw const AppException(
-        AppErrorCode.storageFailure,
-        '无法读取数据与隐私说明状态。',
-      );
+      throw const AppException(AppErrorCode.storageFailure, '无法读取数据与隐私说明状态。');
     }
   }
 
@@ -24,18 +21,12 @@ class PrivacyNoticeRepository {
     try {
       final saved = await _preferences.setBool(_acknowledgedKey, true);
       if (!saved) {
-        throw const AppException(
-          AppErrorCode.storageFailure,
-          '无法保存数据与隐私说明状态。',
-        );
+        throw const AppException(AppErrorCode.storageFailure, '无法保存数据与隐私说明状态。');
       }
     } on AppException {
       rethrow;
     } catch (_) {
-      throw const AppException(
-        AppErrorCode.storageFailure,
-        '无法保存数据与隐私说明状态。',
-      );
+      throw const AppException(AppErrorCode.storageFailure, '无法保存数据与隐私说明状态。');
     }
   }
 }

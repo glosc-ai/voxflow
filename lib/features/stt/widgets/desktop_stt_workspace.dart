@@ -155,10 +155,7 @@ class _DesktopSttWorkspaceState extends ConsumerState<DesktopSttWorkspace> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            context.l10n.text(
-              zh: '转录内容已复制。',
-              en: 'Transcript copied.',
-            ),
+            context.l10n.text(zh: '转录内容已复制。', en: 'Transcript copied.'),
           ),
         ),
       );
@@ -194,9 +191,9 @@ class _DesktopPageHeader extends StatelessWidget {
         Text(
           context.l10n.text(zh: '语音转文字', en: 'Speech to text'),
           style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-                letterSpacing: -0.5,
-              ),
+            fontWeight: FontWeight.w600,
+            letterSpacing: -0.5,
+          ),
         ),
       ],
     );
@@ -206,10 +203,7 @@ class _DesktopPageHeader extends StatelessWidget {
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
         _LanguagePill(
-          label: context.l10n.text(
-            zh: '中文 · 普通话',
-            en: 'Auto language',
-          ),
+          label: context.l10n.text(zh: '中文 · 普通话', en: 'Auto language'),
         ),
         SpeechModelSelector(
           key: const Key('desktopSttModelSelector'),
@@ -260,9 +254,7 @@ class _LanguagePill extends StatelessWidget {
       ),
       decoration: ShapeDecoration(
         color: colors.surface,
-        shape: StadiumBorder(
-          side: BorderSide(color: colors.outlineVariant),
-        ),
+        shape: StadiumBorder(side: BorderSide(color: colors.outlineVariant)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -329,10 +321,7 @@ class _DesktopRecorderCard extends ConsumerWidget {
                   color: isRecording ? colors.tertiary : colors.onSurface,
                   fontWeight: FontWeight.w500,
                   fontFamily: 'Cascadia Code',
-                  fontFamilyFallback: const [
-                    'JetBrains Mono',
-                    'Consolas',
-                  ],
+                  fontFamilyFallback: const ['JetBrains Mono', 'Consolas'],
                   fontFeatures: const [FontFeature.tabularFigures()],
                 ),
               ),
@@ -347,9 +336,9 @@ class _DesktopRecorderCard extends ConsumerWidget {
                   )
                 : status,
             textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: colors.onSurfaceVariant,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: colors.onSurfaceVariant),
           ),
           _LiveWave(active: isRecording),
           const SizedBox(height: AppSpacing.sm),
@@ -364,24 +353,18 @@ class _DesktopRecorderCard extends ConsumerWidget {
                   TextButton.icon(
                     onPressed: notifier.pauseRecording,
                     icon: const Icon(Icons.pause, size: 17),
-                    label: Text(
-                      context.l10n.text(zh: '暂停', en: 'Pause'),
-                    ),
+                    label: Text(context.l10n.text(zh: '暂停', en: 'Pause')),
                   )
                 else
                   TextButton.icon(
                     onPressed: notifier.resumeRecording,
                     icon: const Icon(Icons.play_arrow, size: 17),
-                    label: Text(
-                      context.l10n.text(zh: '继续', en: 'Resume'),
-                    ),
+                    label: Text(context.l10n.text(zh: '继续', en: 'Resume')),
                   ),
                 TextButton.icon(
                   onPressed: notifier.cancelRecording,
                   icon: const Icon(Icons.close, size: 17),
-                  label: Text(
-                    context.l10n.text(zh: '放弃录音', en: 'Discard'),
-                  ),
+                  label: Text(context.l10n.text(zh: '放弃录音', en: 'Discard')),
                 ),
               ],
             ),
@@ -399,8 +382,8 @@ class _DesktopRecorderCard extends ConsumerWidget {
                       en: 'Shortcut to start / stop',
                     ),
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: colors.onSurfaceVariant,
-                        ),
+                      color: colors.onSurfaceVariant,
+                    ),
                   ),
                 ),
               ],
@@ -419,10 +402,7 @@ class _DesktopRecorderCard extends ConsumerWidget {
 }
 
 class _DesktopRecordButton extends StatefulWidget {
-  const _DesktopRecordButton({
-    required this.state,
-    required this.onPressed,
-  });
+  const _DesktopRecordButton({required this.state, required this.onPressed});
 
   final SttState state;
   final Future<void> Function()? onPressed;
@@ -443,17 +423,17 @@ class _DesktopRecordButtonState extends State<_DesktopRecordButton> {
     final reducedMotion = MediaQuery.disableAnimationsOf(context);
     final semanticLabel = switch (state.phase) {
       SttPhase.countdown => context.l10n.text(
-          zh: '取消录音倒计时',
-          en: 'Cancel recording countdown',
-        ),
+        zh: '取消录音倒计时',
+        en: 'Cancel recording countdown',
+      ),
       SttPhase.recording || SttPhase.paused => context.l10n.text(
-          zh: '停止录音并转录',
-          en: 'Stop recording and transcribe',
-        ),
+        zh: '停止录音并转录',
+        en: 'Stop recording and transcribe',
+      ),
       _ when state.result != null => context.l10n.text(
-          zh: '新建转录',
-          en: 'New transcript',
-        ),
+        zh: '新建转录',
+        en: 'New transcript',
+      ),
       _ => context.l10n.text(zh: '开始录音', en: 'Start recording'),
     };
 
@@ -518,28 +498,28 @@ class _DesktopRecordButtonState extends State<_DesktopRecordButton> {
   Widget _recordIcon(Color color) {
     return switch (widget.state.phase) {
       SttPhase.countdown => Text(
-          '${widget.state.countdown}',
-          style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-            color: color,
-            fontWeight: FontWeight.w600,
-            fontFeatures: const [FontFeature.tabularFigures()],
-          ),
+        '${widget.state.countdown}',
+        style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+          color: color,
+          fontWeight: FontWeight.w600,
+          fontFeatures: const [FontFeature.tabularFigures()],
         ),
+      ),
       SttPhase.uploading || SttPhase.transcribing => SizedBox.square(
-          dimension: 36,
-          child: CircularProgressIndicator(strokeWidth: 2.5, color: color),
-        ),
+        dimension: 36,
+        child: CircularProgressIndicator(strokeWidth: 2.5, color: color),
+      ),
       _ when widget.state.result != null => Stack(
-          clipBehavior: Clip.none,
-          children: [
-            Icon(Icons.mic_none_rounded, size: 44, color: color),
-            Positioned(
-              right: -5,
-              top: -5,
-              child: Icon(Icons.add_circle, size: 19, color: color),
-            ),
-          ],
-        ),
+        clipBehavior: Clip.none,
+        children: [
+          Icon(Icons.mic_none_rounded, size: 44, color: color),
+          Positioned(
+            right: -5,
+            top: -5,
+            child: Icon(Icons.add_circle, size: 19, color: color),
+          ),
+        ],
+      ),
       _ => Icon(Icons.mic_none_rounded, size: 44, color: color),
     };
   }
@@ -699,7 +679,8 @@ class _LiveWaveState extends State<_LiveWave>
               for (var index = 0; index < 18; index++)
                 Container(
                   width: 3,
-                  height: 6 +
+                  height:
+                      6 +
                       17 *
                           ((math.sin(
                                     _controller.value * math.pi * 2 +
@@ -733,8 +714,9 @@ class _UploadZone extends ConsumerWidget {
       ref.watch(settingsProvider).sttModel,
     );
     final filePath = state.selectedFilePath;
-    final fileName =
-        filePath == null ? null : File(filePath).uri.pathSegments.last;
+    final fileName = filePath == null
+        ? null
+        : File(filePath).uri.pathSegments.last;
     final detail = seedAsrSelected
         ? context.l10n.text(
             zh: 'MP3 / MP4 / MPEG / MPGA / M4A / WAV / WEBM · SeedASR 自动转换 · 最大 25 MB',
@@ -745,7 +727,8 @@ class _UploadZone extends ConsumerWidget {
             en: 'MP3 / MP4 / M4A / WAV / WEBM · up to 25 MB',
           );
     final enabled = state.canStart;
-    final label = fileName ??
+    final label =
+        fileName ??
         context.l10n.text(
           zh: '或上传音频、视频文件转写',
           en: 'Or upload audio or video to transcribe',
@@ -762,12 +745,14 @@ class _UploadZone extends ConsumerWidget {
           color: Colors.transparent,
           child: InkWell(
             onTap: enabled
-                ? () => ref.read(sttProvider.notifier).pickAndTranscribe(
-                      dialogTitle: context.l10n.text(
-                        zh: '选择音频或视频文件',
-                        en: 'Choose an audio or video file',
-                      ),
-                    )
+                ? () => ref
+                      .read(sttProvider.notifier)
+                      .pickAndTranscribe(
+                        dialogTitle: context.l10n.text(
+                          zh: '选择音频或视频文件',
+                          en: 'Choose an audio or video file',
+                        ),
+                      )
                 : null,
             borderRadius: BorderRadius.circular(13),
             child: Padding(
@@ -795,23 +780,25 @@ class _UploadZone extends ConsumerWidget {
                           label,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style:
-                              Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: enabled
-                                        ? colors.onSurfaceVariant
-                                        : colors.onSurfaceVariant
-                                            .withValues(alpha: 0.5),
-                                  ),
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: enabled
+                                    ? colors.onSurfaceVariant
+                                    : colors.onSurfaceVariant.withValues(
+                                        alpha: 0.5,
+                                      ),
+                              ),
                         ),
                         Text(
                           detail,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style:
-                              Theme.of(context).textTheme.labelSmall?.copyWith(
-                                    color: colors.onSurfaceVariant
-                                        .withValues(alpha: 0.78),
-                                  ),
+                          style: Theme.of(context).textTheme.labelSmall
+                              ?.copyWith(
+                                color: colors.onSurfaceVariant.withValues(
+                                  alpha: 0.78,
+                                ),
+                              ),
                         ),
                       ],
                     ),
@@ -845,14 +832,8 @@ class _DesktopProcessingStatus extends StatelessWidget {
           AppStatusBanner(
             kind: AppStatusKind.info,
             title: uploading
-                ? context.l10n.text(
-                    zh: '正在上传音频…',
-                    en: 'Uploading audio…',
-                  )
-                : context.l10n.text(
-                    zh: 'AI 正在转录…',
-                    en: 'Transcribing…',
-                  ),
+                ? context.l10n.text(zh: '正在上传音频…', en: 'Uploading audio…')
+                : context.l10n.text(zh: 'AI 正在转录…', en: 'Transcribing…'),
             message: hasProgress
                 ? context.l10n.text(
                     zh: '已上传 $percent%',
@@ -926,8 +907,8 @@ class _DesktopTranscriptCard extends ConsumerWidget {
                     Text(
                       context.l10n.text(zh: '转录结果', en: 'Transcript'),
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                     const SizedBox(width: AppSpacing.sm),
                     Flexible(
@@ -940,9 +921,7 @@ class _DesktopTranscriptCard extends ConsumerWidget {
                             'JetBrains Mono',
                             'Consolas',
                           ],
-                          fontFeatures: const [
-                            FontFeature.tabularFigures(),
-                          ],
+                          fontFeatures: const [FontFeature.tabularFigures()],
                         ),
                       ),
                     ),
@@ -1096,22 +1075,14 @@ class _TranscriptSkeleton extends StatelessWidget {
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(13),
               border: Border.all(
-                  color: Theme.of(context).colorScheme.outlineVariant),
+                color: Theme.of(context).colorScheme.outlineVariant,
+              ),
             ),
             child: Column(
               children: [
-                const _SkeletonRow(
-                  time: '00:00 → 00:04',
-                  widthFactor: 0.86,
-                ),
-                const _SkeletonRow(
-                  time: '00:04 → 00:08',
-                  widthFactor: 0.62,
-                ),
-                const _SkeletonRow(
-                  time: '00:08 → 00:12',
-                  widthFactor: 0.74,
-                ),
+                const _SkeletonRow(time: '00:00 → 00:04', widthFactor: 0.86),
+                const _SkeletonRow(time: '00:04 → 00:08', widthFactor: 0.62),
+                const _SkeletonRow(time: '00:08 → 00:12', widthFactor: 0.74),
                 const SizedBox(height: AppSpacing.xs),
                 Text(
                   context.l10n.text(
@@ -1210,9 +1181,7 @@ class _SegmentList extends StatelessWidget {
                           'JetBrains Mono',
                           'Consolas',
                         ],
-                        fontFeatures: const [
-                          FontFeature.tabularFigures(),
-                        ],
+                        fontFeatures: const [FontFeature.tabularFigures()],
                       ),
                     ),
                   ),
@@ -1220,9 +1189,9 @@ class _SegmentList extends StatelessWidget {
                   Expanded(
                     child: Text(
                       segments[index].text,
-                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                            height: 1.65,
-                          ),
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodyLarge?.copyWith(height: 1.65),
                     ),
                   ),
                 ],
@@ -1285,8 +1254,9 @@ class _DesktopSurface extends StatelessWidget {
         boxShadow: [
           BoxShadow(
             color: colors.shadow.withValues(
-              alpha:
-                  Theme.of(context).brightness == Brightness.dark ? 0.24 : 0.04,
+              alpha: Theme.of(context).brightness == Brightness.dark
+                  ? 0.24
+                  : 0.04,
             ),
             blurRadius: 16,
             offset: const Offset(0, 4),
@@ -1308,10 +1278,7 @@ class _DashedBorderPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final path = Path()
       ..addRRect(
-        RRect.fromRectAndRadius(
-          Offset.zero & size,
-          Radius.circular(radius),
-        ),
+        RRect.fromRectAndRadius(Offset.zero & size, Radius.circular(radius)),
       );
     final paint = Paint()
       ..color = color
@@ -1336,29 +1303,23 @@ class _DashedBorderPainter extends CustomPainter {
 String _recordingStatus(BuildContext context, SttState state) {
   return switch (state.phase) {
     SttPhase.countdown => context.l10n.text(
-        zh: '准备录音…',
-        en: 'Preparing to record…',
-      ),
+      zh: '准备录音…',
+      en: 'Preparing to record…',
+    ),
     SttPhase.recording => context.l10n.text(
-        zh: '正在录音 · 再次点击停止',
-        en: 'Recording · select again to stop',
-      ),
-    SttPhase.paused => context.l10n.text(
-        zh: '录音已暂停',
-        en: 'Recording paused',
-      ),
+      zh: '正在录音 · 再次点击停止',
+      en: 'Recording · select again to stop',
+    ),
+    SttPhase.paused => context.l10n.text(zh: '录音已暂停', en: 'Recording paused'),
     SttPhase.uploading => context.l10n.text(
-        zh: '正在上传音频',
-        en: 'Uploading audio',
-      ),
+      zh: '正在上传音频',
+      en: 'Uploading audio',
+    ),
     SttPhase.transcribing => context.l10n.text(
-        zh: '正在整理转录结果',
-        en: 'Preparing transcript',
-      ),
-    _ => context.l10n.text(
-        zh: '点击开始录音',
-        en: 'Select to start recording',
-      ),
+      zh: '正在整理转录结果',
+      en: 'Preparing transcript',
+    ),
+    _ => context.l10n.text(zh: '点击开始录音', en: 'Select to start recording'),
   };
 }
 
@@ -1374,7 +1335,8 @@ String _spokenDuration(BuildContext context, Duration duration) {
   final seconds = duration.inSeconds.remainder(60);
   return context.l10n.text(
     zh: '$minutes 分 $seconds 秒',
-    en: '$minutes ${minutes == 1 ? 'minute' : 'minutes'} '
+    en:
+        '$minutes ${minutes == 1 ? 'minute' : 'minutes'} '
         '$seconds ${seconds == 1 ? 'second' : 'seconds'}',
   );
 }
