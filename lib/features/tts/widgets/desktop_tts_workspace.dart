@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/constants/app_constants.dart';
+import '../../../core/constants/volcengine_tts_voice_catalog.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../widgets/inline_error_banner.dart';
@@ -17,7 +18,7 @@ class DesktopTtsWorkspace extends ConsumerWidget {
     required this.state,
     required this.controller,
     required this.voiceOptions,
-    required this.usesSeedTtsSpeakerIds,
+    required this.usesBytedanceSpeakerIds,
     required this.errorMessage,
     required this.showPlayer,
     required this.onSynthesize,
@@ -30,7 +31,7 @@ class DesktopTtsWorkspace extends ConsumerWidget {
   final TtsState state;
   final TextEditingController controller;
   final List<String> voiceOptions;
-  final bool usesSeedTtsSpeakerIds;
+  final bool usesBytedanceSpeakerIds;
   final String? errorMessage;
   final bool showPlayer;
   final VoidCallback onSynthesize;
@@ -69,13 +70,13 @@ class DesktopTtsWorkspace extends ConsumerWidget {
                   const SizedBox(height: AppSpacing.xxl),
                   _VoiceHeading(
                     count: voiceOptions.length,
-                    usesSeedTtsSpeakerIds: usesSeedTtsSpeakerIds,
+                    usesBytedanceSpeakerIds: usesBytedanceSpeakerIds,
                   ),
                   const SizedBox(height: AppSpacing.sm),
                   _VoiceCards(
                     state: state,
                     voices: voiceOptions,
-                    usesSeedTtsSpeakerIds: usesSeedTtsSpeakerIds,
+                    usesBytedanceSpeakerIds: usesBytedanceSpeakerIds,
                   ),
                   const SizedBox(height: AppSpacing.lg),
                   _SynthesisControls(
@@ -133,9 +134,9 @@ class _DesktopTtsHeader extends StatelessWidget {
         Text(
           context.l10n.text(zh: '文字转语音', en: 'Text to speech'),
           style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-                letterSpacing: -0.5,
-              ),
+            fontWeight: FontWeight.w600,
+            letterSpacing: -0.5,
+          ),
         ),
       ],
     );
@@ -222,9 +223,9 @@ class _DesktopTextCard extends StatelessWidget {
                     AppSpacing.sm,
                   ),
                 ),
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      height: 1.7,
-                    ),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyLarge?.copyWith(height: 1.7),
               ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(
@@ -238,12 +239,11 @@ class _DesktopTextCard extends StatelessWidget {
                     Tooltip(
                       message: context.l10n.text(zh: '清空文字', en: 'Clear text'),
                       child: TextButton.icon(
-                        onPressed:
-                            value.text.isEmpty || isGenerating ? null : onClear,
+                        onPressed: value.text.isEmpty || isGenerating
+                            ? null
+                            : onClear,
                         icon: const Icon(Icons.clear_all, size: 17),
-                        label: Text(
-                          context.l10n.text(zh: '清空', en: 'Clear'),
-                        ),
+                        label: Text(context.l10n.text(zh: '清空', en: 'Clear')),
                       ),
                     ),
                     const Spacer(),
@@ -258,16 +258,15 @@ class _DesktopTextCard extends StatelessWidget {
                           color: nearLimit
                               ? colors.error
                               : colors.onSurfaceVariant,
-                          fontWeight:
-                              nearLimit ? FontWeight.w600 : FontWeight.w500,
+                          fontWeight: nearLimit
+                              ? FontWeight.w600
+                              : FontWeight.w500,
                           fontFamily: 'Cascadia Code',
                           fontFamilyFallback: const [
                             'JetBrains Mono',
                             'Consolas',
                           ],
-                          fontFeatures: const [
-                            FontFeature.tabularFigures(),
-                          ],
+                          fontFeatures: const [FontFeature.tabularFigures()],
                         ),
                       ),
                     ),
@@ -285,11 +284,11 @@ class _DesktopTextCard extends StatelessWidget {
 class _VoiceHeading extends StatelessWidget {
   const _VoiceHeading({
     required this.count,
-    required this.usesSeedTtsSpeakerIds,
+    required this.usesBytedanceSpeakerIds,
   });
 
   final int count;
-  final bool usesSeedTtsSpeakerIds;
+  final bool usesBytedanceSpeakerIds;
 
   @override
   Widget build(BuildContext context) {
@@ -299,20 +298,20 @@ class _VoiceHeading extends StatelessWidget {
       children: [
         Text(
           context.l10n.text(zh: '选择音色', en: 'Choose a voice'),
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
         ),
-        if (usesSeedTtsSpeakerIds) ...[
+        if (usesBytedanceSpeakerIds) ...[
           const SizedBox(height: AppSpacing.xxs),
           Text(
             context.l10n.text(
-              zh: 'Seed TTS 使用火山模型专属 Speaker ID。',
-              en: 'Seed TTS uses a model-specific Volcengine Speaker ID.',
+              zh: 'ByteDance Seed-TTS 2.0 使用火山引擎 Speaker ID。',
+              en: 'ByteDance Seed-TTS 2.0 uses Volcengine Speaker IDs.',
             ),
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: colors.onSurfaceVariant,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: colors.onSurfaceVariant),
           ),
         ],
       ],
@@ -354,12 +353,12 @@ class _VoiceCards extends ConsumerStatefulWidget {
   const _VoiceCards({
     required this.state,
     required this.voices,
-    required this.usesSeedTtsSpeakerIds,
+    required this.usesBytedanceSpeakerIds,
   });
 
   final TtsState state;
   final List<String> voices;
-  final bool usesSeedTtsSpeakerIds;
+  final bool usesBytedanceSpeakerIds;
 
   @override
   ConsumerState<_VoiceCards> createState() => _VoiceCardsState();
@@ -378,11 +377,11 @@ class _VoiceCardsState extends ConsumerState<_VoiceCards> {
   Widget build(BuildContext context) {
     final state = widget.state;
     final voices = widget.voices;
-    final usesSeedTtsSpeakerIds = widget.usesSeedTtsSpeakerIds;
+    final usesBytedanceSpeakerIds = widget.usesBytedanceSpeakerIds;
     final inheritedBehavior = ScrollConfiguration.of(context);
     final largeText = MediaQuery.textScalerOf(context).scale(1) >= 1.6;
     return SizedBox(
-      height: largeText ? (usesSeedTtsSpeakerIds ? 420 : 340) : 172,
+      height: largeText ? (usesBytedanceSpeakerIds ? 420 : 340) : 172,
       child: ScrollConfiguration(
         behavior: inheritedBehavior.copyWith(
           dragDevices: {
@@ -409,7 +408,7 @@ class _VoiceCardsState extends ConsumerState<_VoiceCards> {
                 voice: voice,
                 selected: state.voice == voice,
                 enabled: !state.isGenerating,
-                usesSeedTtsSpeakerIds: usesSeedTtsSpeakerIds,
+                usesBytedanceSpeakerIds: usesBytedanceSpeakerIds,
                 onSelected: () =>
                     ref.read(ttsProvider.notifier).setVoice(voice),
               );
@@ -426,14 +425,14 @@ class _VoiceCard extends StatefulWidget {
     required this.voice,
     required this.selected,
     required this.enabled,
-    required this.usesSeedTtsSpeakerIds,
+    required this.usesBytedanceSpeakerIds,
     required this.onSelected,
   });
 
   final String voice;
   final bool selected;
   final bool enabled;
-  final bool usesSeedTtsSpeakerIds;
+  final bool usesBytedanceSpeakerIds;
   final VoidCallback onSelected;
 
   @override
@@ -460,8 +459,9 @@ class _VoiceCardState extends State<_VoiceCard> {
       child: ExcludeSemantics(
         child: AnimatedScale(
           scale: _hovered && widget.enabled ? 1.015 : 1,
-          duration:
-              reducedMotion ? Duration.zero : const Duration(milliseconds: 120),
+          duration: reducedMotion
+              ? Duration.zero
+              : const Duration(milliseconds: 120),
           child: MouseRegion(
             onEnter: (_) => setState(() => _hovered = true),
             onExit: (_) => setState(() => _hovered = false),
@@ -470,8 +470,9 @@ class _VoiceCardState extends State<_VoiceCard> {
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(19),
                 side: BorderSide(
-                  color:
-                      widget.selected ? colors.primary : colors.outlineVariant,
+                  color: widget.selected
+                      ? colors.primary
+                      : colors.outlineVariant,
                 ),
               ),
               elevation: _hovered ? 3 : 1,
@@ -480,7 +481,7 @@ class _VoiceCardState extends State<_VoiceCard> {
                 onTap: widget.enabled ? widget.onSelected : null,
                 borderRadius: BorderRadius.circular(19),
                 child: Container(
-                  width: widget.usesSeedTtsSpeakerIds
+                  width: widget.usesBytedanceSpeakerIds
                       ? (largeText ? 340 : 280)
                       : (largeText ? 220 : 160),
                   constraints: const BoxConstraints(minHeight: 126),
@@ -506,11 +507,9 @@ class _VoiceCardState extends State<_VoiceCard> {
                               metadata.name,
                               maxLines: largeText
                                   ? 3
-                                  : (widget.usesSeedTtsSpeakerIds ? 2 : 1),
+                                  : (widget.usesBytedanceSpeakerIds ? 2 : 1),
                               overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .titleMedium
+                              style: Theme.of(context).textTheme.titleMedium
                                   ?.copyWith(fontWeight: FontWeight.w600),
                             ),
                           ),
@@ -547,8 +546,8 @@ class _VoiceCardState extends State<_VoiceCard> {
                         maxLines: largeText ? 4 : 2,
                         overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: colors.onSurfaceVariant,
-                            ),
+                          color: colors.onSurfaceVariant,
+                        ),
                       ),
                     ],
                   ),
@@ -633,9 +632,7 @@ class _SynthesisControls extends ConsumerWidget {
                           'JetBrains Mono',
                           'Consolas',
                         ],
-                        fontFeatures: const [
-                          FontFeature.tabularFigures(),
-                        ],
+                        fontFeatures: const [FontFeature.tabularFigures()],
                       ),
                     ),
                   ),
@@ -671,17 +668,9 @@ class _SynthesisControls extends ConsumerWidget {
                     alignment: Alignment.center,
                     children: [
                       Text(
-                        context.l10n.text(
-                          zh: '合成语音',
-                          en: 'Generate speech',
-                        ),
+                        context.l10n.text(zh: '合成语音', en: 'Generate speech'),
                       ),
-                      Text(
-                        context.l10n.text(
-                          zh: '正在合成…',
-                          en: 'Generating…',
-                        ),
-                      ),
+                      Text(context.l10n.text(zh: '正在合成…', en: 'Generating…')),
                     ],
                   ),
                 ),
@@ -698,10 +687,7 @@ class _SynthesisControls extends ConsumerWidget {
                   style: Theme.of(context).textTheme.labelSmall?.copyWith(
                     color: colors.onSurfaceVariant,
                     fontFamily: 'Cascadia Code',
-                    fontFamilyFallback: const [
-                      'JetBrains Mono',
-                      'Consolas',
-                    ],
+                    fontFamilyFallback: const ['JetBrains Mono', 'Consolas'],
                     fontFeatures: const [FontFeature.tabularFigures()],
                   ),
                 ),
@@ -713,9 +699,9 @@ class _SynthesisControls extends ConsumerWidget {
                 zh: '快捷键：Ctrl+Enter',
                 en: 'Shortcut: Ctrl+Enter',
               ),
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: colors.onSurfaceVariant,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: colors.onSurfaceVariant),
             ),
           ],
         );
@@ -747,8 +733,9 @@ class _DesktopPlayerDock extends ConsumerWidget {
     );
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0, end: 1),
-      duration:
-          reducedMotion ? Duration.zero : const Duration(milliseconds: 300),
+      duration: reducedMotion
+          ? Duration.zero
+          : const Duration(milliseconds: 300),
       curve: Curves.easeOutCubic,
       builder: (context, progress, child) => Opacity(
         opacity: progress,
@@ -761,7 +748,8 @@ class _DesktopPlayerDock extends ConsumerWidget {
         constraints: const BoxConstraints(maxWidth: 760),
         child: LayoutBuilder(
           builder: (context, constraints) {
-            final compact = constraints.maxWidth < 680 ||
+            final compact =
+                constraints.maxWidth < 680 ||
                 MediaQuery.textScalerOf(context).scale(1) >= 1.5;
             final playButton = Semantics(
               button: true,
@@ -780,9 +768,8 @@ class _DesktopPlayerDock extends ConsumerWidget {
               value: position.toDouble(),
               max: durationMilliseconds.toDouble(),
               isPlaying: state.isPlaying,
-              onChanged: (value) => notifier.seek(
-                Duration(milliseconds: value.round()),
-              ),
+              onChanged: (value) =>
+                  notifier.seek(Duration(milliseconds: value.round())),
             );
             final time = Semantics(
               label: context.l10n.text(
@@ -827,33 +814,32 @@ class _DesktopPlayerDock extends ConsumerWidget {
               ),
             );
             Widget volume(double width) => SizedBox(
-                  width: width,
-                  child: Row(
-                    children: [
-                      Icon(
-                        state.volume == 0
-                            ? Icons.volume_off_outlined
-                            : Icons.volume_up_outlined,
-                        size: 18,
-                        color: colors.onSurfaceVariant,
-                      ),
-                      Expanded(
-                        child: Slider(
-                          value: state.volume,
-                          min: 0,
-                          max: 1,
-                          divisions: 20,
-                          semanticFormatterCallback: (volume) =>
-                              context.l10n.text(
-                            zh: '音量 ${(volume * 100).round()}%',
-                            en: 'Volume ${(volume * 100).round()}%',
-                          ),
-                          onChanged: notifier.setVolume,
-                        ),
-                      ),
-                    ],
+              width: width,
+              child: Row(
+                children: [
+                  Icon(
+                    state.volume == 0
+                        ? Icons.volume_off_outlined
+                        : Icons.volume_up_outlined,
+                    size: 18,
+                    color: colors.onSurfaceVariant,
                   ),
-                );
+                  Expanded(
+                    child: Slider(
+                      value: state.volume,
+                      min: 0,
+                      max: 1,
+                      divisions: 20,
+                      semanticFormatterCallback: (volume) => context.l10n.text(
+                        zh: '音量 ${(volume * 100).round()}%',
+                        en: 'Volume ${(volume * 100).round()}%',
+                      ),
+                      onChanged: notifier.setVolume,
+                    ),
+                  ),
+                ],
+              ),
+            );
             final saveButton = IconButton(
               tooltip: context.l10n.text(zh: '保存 MP3', en: 'Save MP3'),
               onPressed: onSave,
@@ -1009,8 +995,9 @@ class _DesktopSurface extends StatelessWidget {
         boxShadow: [
           BoxShadow(
             color: colors.shadow.withValues(
-              alpha:
-                  Theme.of(context).brightness == Brightness.dark ? 0.24 : 0.04,
+              alpha: Theme.of(context).brightness == Brightness.dark
+                  ? 0.24
+                  : 0.04,
             ),
             blurRadius: 16,
             offset: const Offset(0, 4),
@@ -1023,36 +1010,43 @@ class _DesktopSurface extends StatelessWidget {
 }
 
 _VoiceMetadata _voiceMetadata(BuildContext context, String voice) {
+  final volcengineVoice = VolcengineTtsVoiceCatalog.findBySpeakerId(voice);
+  if (volcengineVoice != null) {
+    return _VoiceMetadata(
+      name: volcengineVoice.displayName,
+      description: '${volcengineVoice.language} · ${volcengineVoice.scenario}',
+    );
+  }
   final isZh = Localizations.localeOf(context).languageCode == 'zh';
   return switch (voice) {
     'alloy' => _VoiceMetadata(
-        name: 'Alloy',
-        description: isZh ? '中性 · 通用助手' : 'Neutral · general assistant',
-      ),
+      name: 'Alloy',
+      description: isZh ? '中性 · 通用助手' : 'Neutral · general assistant',
+    ),
     'echo' => _VoiceMetadata(
-        name: 'Echo',
-        description: isZh ? '男声 · 旁白' : 'Masculine · narration',
-      ),
+      name: 'Echo',
+      description: isZh ? '男声 · 旁白' : 'Masculine · narration',
+    ),
     'fable' => _VoiceMetadata(
-        name: 'Fable',
-        description: isZh ? '叙事 · 故事' : 'Expressive · storytelling',
-      ),
+      name: 'Fable',
+      description: isZh ? '叙事 · 故事' : 'Expressive · storytelling',
+    ),
     'onyx' => _VoiceMetadata(
-        name: 'Onyx',
-        description: isZh ? '男声 · 沉稳' : 'Deep · composed',
-      ),
+      name: 'Onyx',
+      description: isZh ? '男声 · 沉稳' : 'Deep · composed',
+    ),
     'nova' => _VoiceMetadata(
-        name: 'Nova',
-        description: isZh ? '女声 · 清亮' : 'Bright · clear',
-      ),
+      name: 'Nova',
+      description: isZh ? '女声 · 清亮' : 'Bright · clear',
+    ),
     'shimmer' => _VoiceMetadata(
-        name: 'Shimmer',
-        description: isZh ? '女声 · 轻柔' : 'Soft · calm',
-      ),
+      name: 'Shimmer',
+      description: isZh ? '女声 · 轻柔' : 'Soft · calm',
+    ),
     _ => _VoiceMetadata(
-        name: voice,
-        description: isZh ? '模型专属音色' : 'Model-specific voice',
-      ),
+      name: voice,
+      description: isZh ? '模型专属音色' : 'Model-specific voice',
+    ),
   };
 }
 

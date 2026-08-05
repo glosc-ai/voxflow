@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/constants/app_constants.dart';
+import '../../../core/constants/volcengine_tts_voice_catalog.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
@@ -20,7 +21,7 @@ class MobileTtsWorkspace extends ConsumerWidget {
     required this.state,
     required this.controller,
     required this.voiceOptions,
-    required this.usesSeedTtsSpeakerIds,
+    required this.usesBytedanceSpeakerIds,
     required this.errorMessage,
     required this.showPlayer,
     required this.onSynthesize,
@@ -32,7 +33,7 @@ class MobileTtsWorkspace extends ConsumerWidget {
   final TtsState state;
   final TextEditingController controller;
   final List<String> voiceOptions;
-  final bool usesSeedTtsSpeakerIds;
+  final bool usesBytedanceSpeakerIds;
   final String? errorMessage;
   final bool showPlayer;
   final VoidCallback onSynthesize;
@@ -50,10 +51,7 @@ class MobileTtsWorkspace extends ConsumerWidget {
       bottom: basePagePadding.bottom + (playerVisible ? 190 : 0),
     );
     final effectivePlayerBottom = math
-        .max(
-          MobileLayout.playerBottom + safeBottom,
-          scaffoldBottom + 14,
-        )
+        .max(MobileLayout.playerBottom + safeBottom, scaffoldBottom + 14)
         .toDouble();
     return Stack(
       key: const Key('mobileTtsWorkspace'),
@@ -72,10 +70,7 @@ class MobileTtsWorkspace extends ConsumerWidget {
                       zh: 'Text to Speech · 语音合成',
                       en: 'Text to Speech · Synthesis',
                     ),
-                    title: context.l10n.text(
-                      zh: '文字转语音',
-                      en: 'Text to speech',
-                    ),
+                    title: context.l10n.text(zh: '文字转语音', en: 'Text to speech'),
                     accessories: [
                       SpeechModelSelector(
                         kind: SpeechModelKind.tts,
@@ -93,10 +88,7 @@ class MobileTtsWorkspace extends ConsumerWidget {
                     onClear: onClear,
                   ),
                   MobileSectionLabel(
-                    title: context.l10n.text(
-                      zh: '选择音色',
-                      en: 'Choose a voice',
-                    ),
+                    title: context.l10n.text(zh: '选择音色', en: 'Choose a voice'),
                     meta: context.l10n.text(
                       zh: '横向滑动',
                       en: 'Swipe horizontally',
@@ -105,9 +97,9 @@ class MobileTtsWorkspace extends ConsumerWidget {
                   _MobileVoiceList(
                     state: state,
                     voices: voiceOptions,
-                    usesSeedTtsSpeakerIds: usesSeedTtsSpeakerIds,
+                    usesBytedanceSpeakerIds: usesBytedanceSpeakerIds,
                   ),
-                  if (usesSeedTtsSpeakerIds)
+                  if (usesBytedanceSpeakerIds)
                     Padding(
                       padding: const EdgeInsets.only(
                         left: 2,
@@ -116,14 +108,12 @@ class MobileTtsWorkspace extends ConsumerWidget {
                       ),
                       child: Text(
                         context.l10n.text(
-                          zh: 'Seed TTS 使用火山模型专属 Speaker ID。',
-                          en: 'Seed TTS uses model-specific Volcengine Speaker IDs.',
+                          zh: 'ByteDance Seed-TTS 2.0 使用火山引擎 Speaker ID。',
+                          en: 'ByteDance Seed-TTS 2.0 uses Volcengine Speaker IDs.',
                         ),
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .onSurfaceVariant,
-                            ),
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
                       ),
                     ),
                   const SizedBox(height: AppSpacing.sm),
@@ -211,14 +201,12 @@ class _MobileTextEditor extends StatelessWidget {
                 runSpacing: AppSpacing.xxs,
                 children: [
                   Tooltip(
-                    message: context.l10n.text(
-                      zh: '清空文字',
-                      en: 'Clear text',
-                    ),
+                    message: context.l10n.text(zh: '清空文字', en: 'Clear text'),
                     child: TextButton(
                       key: const Key('clearTtsTextButton'),
-                      onPressed:
-                          value.text.isEmpty || isGenerating ? null : onClear,
+                      onPressed: value.text.isEmpty || isGenerating
+                          ? null
+                          : onClear,
                       style: TextButton.styleFrom(
                         minimumSize: const Size(48, 44),
                         padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -239,7 +227,7 @@ class _MobileTextEditor extends StatelessWidget {
                               ? [colors.error, colors.error]
                               : [
                                   colors.primary,
-                                  context.semanticColors.success
+                                  context.semanticColors.success,
                                 ],
                         ).createShader(bounds),
                         child: Text(
@@ -263,8 +251,8 @@ class _MobileTextEditor extends StatelessWidget {
                       en: 'Text is read-only while speech is generated; selection and copy remain available.',
                     ),
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: colors.onSurfaceVariant,
-                        ),
+                      color: colors.onSurfaceVariant,
+                    ),
                   ),
                 ),
             ],
@@ -279,12 +267,12 @@ class _MobileVoiceList extends ConsumerStatefulWidget {
   const _MobileVoiceList({
     required this.state,
     required this.voices,
-    required this.usesSeedTtsSpeakerIds,
+    required this.usesBytedanceSpeakerIds,
   });
 
   final TtsState state;
   final List<String> voices;
-  final bool usesSeedTtsSpeakerIds;
+  final bool usesBytedanceSpeakerIds;
 
   @override
   ConsumerState<_MobileVoiceList> createState() => _MobileVoiceListState();
@@ -303,7 +291,7 @@ class _MobileVoiceListState extends ConsumerState<_MobileVoiceList> {
   Widget build(BuildContext context) {
     final state = widget.state;
     final voices = widget.voices;
-    final usesSeedTtsSpeakerIds = widget.usesSeedTtsSpeakerIds;
+    final usesBytedanceSpeakerIds = widget.usesBytedanceSpeakerIds;
     final largeText = MediaQuery.textScalerOf(context).scale(1) >= 1.8;
     return Semantics(
       container: true,
@@ -313,8 +301,8 @@ class _MobileVoiceListState extends ConsumerState<_MobileVoiceList> {
       ),
       child: SizedBox(
         height: largeText
-            ? (usesSeedTtsSpeakerIds ? 420 : 340)
-            : (usesSeedTtsSpeakerIds ? 168 : 160),
+            ? (usesBytedanceSpeakerIds ? 420 : 340)
+            : (usesBytedanceSpeakerIds ? 168 : 160),
         child: Scrollbar(
           key: const Key('mobileTtsVoiceScrollbar'),
           controller: _scrollController,
@@ -333,7 +321,7 @@ class _MobileVoiceListState extends ConsumerState<_MobileVoiceList> {
                 voice: voice,
                 selected: voice == state.voice,
                 enabled: !state.isGenerating,
-                modelSpecific: usesSeedTtsSpeakerIds,
+                modelSpecific: usesBytedanceSpeakerIds,
                 onTap: () => ref.read(ttsProvider.notifier).setVoice(voice),
               );
             },
@@ -369,7 +357,8 @@ class _MobileVoiceCard extends StatelessWidget {
       button: true,
       selected: selected,
       enabled: enabled,
-      label: '${metadata.name}, ${metadata.description}',
+      label:
+          '${metadata.name}, ${modelSpecific ? '$voice, ' : ''}${metadata.description}',
       onTap: enabled ? onTap : null,
       child: ExcludeSemantics(
         child: Material(
@@ -385,7 +374,9 @@ class _MobileVoiceCard extends StatelessWidget {
             borderRadius: BorderRadius.circular(AppRadii.mobileCard),
             child: AnimatedContainer(
               duration: MobileMotion.duration(context),
-              width: largeText ? (modelSpecific ? 248 : 196) : 138,
+              width: largeText
+                  ? (modelSpecific ? 248 : 196)
+                  : (modelSpecific ? 220 : 168),
               constraints: const BoxConstraints(minHeight: 112),
               padding: const EdgeInsets.fromLTRB(14, 13, 14, 12),
               decoration: BoxDecoration(
@@ -408,34 +399,53 @@ class _MobileVoiceCard extends StatelessWidget {
                       Expanded(
                         child: Text(
                           metadata.name,
-                          maxLines: preserveSpeakerId ? null : 2,
-                          overflow: preserveSpeakerId
-                              ? TextOverflow.visible
-                              : TextOverflow.ellipsis,
-                          style:
-                              Theme.of(context).textTheme.titleSmall?.copyWith(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w600,
-                                  ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.titleSmall
+                              ?.copyWith(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                              ),
                         ),
                       ),
                       AnimatedOpacity(
                         opacity: selected ? 1 : 0,
                         duration: MobileMotion.duration(context),
-                        child:
-                            Icon(Icons.check, size: 14, color: colors.primary),
+                        child: Icon(
+                          Icons.check,
+                          size: 14,
+                          color: colors.primary,
+                        ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 3),
+                  if (modelSpecific) ...[
+                    Text(
+                      voice,
+                      maxLines: preserveSpeakerId ? null : 2,
+                      overflow: preserveSpeakerId
+                          ? TextOverflow.visible
+                          : TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: colors.onSurfaceVariant,
+                        fontFamily: 'Cascadia Code',
+                        fontFamilyFallback: const [
+                          'JetBrains Mono',
+                          'Consolas',
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                  ],
                   Text(
                     metadata.description,
                     maxLines: 3,
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: colors.onSurfaceVariant,
-                          fontSize: 11.5,
-                        ),
+                      color: colors.onSurfaceVariant,
+                      fontSize: 11.5,
+                    ),
                   ),
                   const Spacer(),
                   Wrap(
@@ -450,14 +460,13 @@ class _MobileVoiceCard extends StatelessWidget {
                           ),
                           decoration: BoxDecoration(
                             color: colors.onSurface.withValues(alpha: 0.05),
-                            borderRadius:
-                                BorderRadius.circular(AppRadii.mobileBadge),
+                            borderRadius: BorderRadius.circular(
+                              AppRadii.mobileBadge,
+                            ),
                           ),
                           child: Text(
                             tag,
-                            style: Theme.of(context)
-                                .textTheme
-                                .labelSmall
+                            style: Theme.of(context).textTheme.labelSmall
                                 ?.copyWith(
                                   color: colors.onSurfaceVariant,
                                   fontSize: 10.5,
@@ -509,10 +518,7 @@ class _MobileSynthesisControls extends ConsumerWidget {
                     children: [
                       Expanded(
                         child: Text(
-                          context.l10n.text(
-                            zh: '合成语速',
-                            en: 'Synthesis speed',
-                          ),
+                          context.l10n.text(zh: '合成语速', en: 'Synthesis speed'),
                           style: Theme.of(context).textTheme.titleSmall,
                         ),
                       ),
@@ -558,14 +564,8 @@ class _MobileSynthesisControls extends ConsumerWidget {
                 index: state.isGenerating ? 1 : 0,
                 alignment: Alignment.center,
                 children: [
-                  Text(context.l10n.text(
-                    zh: '生成语音',
-                    en: 'Generate speech',
-                  )),
-                  Text(context.l10n.text(
-                    zh: '正在合成…',
-                    en: 'Generating…',
-                  )),
+                  Text(context.l10n.text(zh: '生成语音', en: 'Generate speech')),
+                  Text(context.l10n.text(zh: '正在合成…', en: 'Generating…')),
                 ],
               ),
             ),
@@ -643,7 +643,8 @@ class _MobilePlayerDock extends ConsumerWidget {
       padding: const EdgeInsets.fromLTRB(10, 10, 8, 10),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final stacked = constraints.maxWidth < 360 ||
+          final stacked =
+              constraints.maxWidth < 360 ||
               MediaQuery.textScalerOf(context).scale(1) >= 1.4;
           final playButton = IconButton.filled(
             tooltip: state.isPlaying
@@ -653,19 +654,15 @@ class _MobilePlayerDock extends ConsumerWidget {
             icon: Icon(state.isPlaying ? Icons.pause : Icons.play_arrow),
           );
           final closeButton = IconButton(
-            tooltip: context.l10n.text(
-              zh: '关闭播放器',
-              en: 'Close player',
-            ),
+            tooltip: context.l10n.text(zh: '关闭播放器', en: 'Close player'),
             onPressed: onDismiss,
             icon: const Icon(Icons.close, size: 20),
           );
           final wave = _MobileWaveProgress(
             value: position.toDouble(),
             max: durationMilliseconds.toDouble(),
-            onChanged: (value) => notifier.seek(
-              Duration(milliseconds: value.round()),
-            ),
+            onChanged: (value) =>
+                notifier.seek(Duration(milliseconds: value.round())),
           );
           final time = Text(
             '${_durationWithTenths(state.position)} / ${_durationWithTenths(state.duration)}',
@@ -679,8 +676,8 @@ class _MobilePlayerDock extends ConsumerWidget {
           );
           final nextRate = rateIndex < 0
               ? 1.0
-              : TtsNotifier.supportedPlaybackRates[
-                  (rateIndex + 1) % TtsNotifier.supportedPlaybackRates.length];
+              : TtsNotifier.supportedPlaybackRates[(rateIndex + 1) %
+                    TtsNotifier.supportedPlaybackRates.length];
           final currentRateText = '${_compactNumber(state.playbackRate)}×';
           final nextRateText = '${_compactNumber(nextRate)}×';
           final playbackRate = Semantics(
@@ -765,11 +762,7 @@ class _MobilePlayerDock extends ConsumerWidget {
                   crossAxisAlignment: WrapCrossAlignment.center,
                   spacing: AppSpacing.xs,
                   runSpacing: AppSpacing.xxs,
-                  children: [
-                    time,
-                    playbackRate,
-                    saveButton,
-                  ],
+                  children: [time, playbackRate, saveButton],
                 ),
                 volume,
               ],
@@ -824,9 +817,7 @@ class _MobileWaveProgress extends StatelessWidget {
     return Semantics(
       slider: true,
       label: context.l10n.text(zh: '播放进度', en: 'Playback position'),
-      value: _duration(
-        Duration(milliseconds: normalizedValue.round()),
-      ),
+      value: _duration(Duration(milliseconds: normalizedValue.round())),
       child: SizedBox(
         key: const Key('ttsWaveProgressHitTarget'),
         height: 48,
@@ -884,65 +875,70 @@ _MobileVoiceMetadata _voiceMetadata(
   bool modelSpecific,
 ) {
   final l10n = context.l10n;
+  final volcengineVoice = VolcengineTtsVoiceCatalog.findBySpeakerId(voice);
+  if (volcengineVoice != null) {
+    return _MobileVoiceMetadata(
+      name: volcengineVoice.displayName,
+      description: volcengineVoice.language,
+      tags: [volcengineVoice.scenario],
+    );
+  }
   return switch (voice.toLowerCase()) {
     'alloy' => _MobileVoiceMetadata(
-        name: 'Alloy',
-        description: l10n.text(
-          zh: '中性 · 通用',
-          en: 'Neutral · versatile',
-        ),
-        tags: [
-          l10n.text(zh: '通用', en: 'General'),
-          l10n.text(zh: '助手', en: 'Assistant')
-        ],
-      ),
+      name: 'Alloy',
+      description: l10n.text(zh: '中性 · 通用', en: 'Neutral · versatile'),
+      tags: [
+        l10n.text(zh: '通用', en: 'General'),
+        l10n.text(zh: '助手', en: 'Assistant'),
+      ],
+    ),
     'echo' => _MobileVoiceMetadata(
-        name: 'Echo',
-        description: l10n.text(zh: '男声 · 旁白', en: 'Masculine · narration'),
-        tags: [
-          l10n.text(zh: '旁白', en: 'Narration'),
-          l10n.text(zh: '纪实', en: 'Documentary')
-        ],
-      ),
+      name: 'Echo',
+      description: l10n.text(zh: '男声 · 旁白', en: 'Masculine · narration'),
+      tags: [
+        l10n.text(zh: '旁白', en: 'Narration'),
+        l10n.text(zh: '纪实', en: 'Documentary'),
+      ],
+    ),
     'fable' => _MobileVoiceMetadata(
-        name: 'Fable',
-        description: l10n.text(zh: '叙事 · 故事', en: 'Expressive · storytelling'),
-        tags: [
-          l10n.text(zh: '有声书', en: 'Audiobook'),
-          l10n.text(zh: '故事', en: 'Story')
-        ],
-      ),
+      name: 'Fable',
+      description: l10n.text(zh: '叙事 · 故事', en: 'Expressive · storytelling'),
+      tags: [
+        l10n.text(zh: '有声书', en: 'Audiobook'),
+        l10n.text(zh: '故事', en: 'Story'),
+      ],
+    ),
     'onyx' => _MobileVoiceMetadata(
-        name: 'Onyx',
-        description: l10n.text(zh: '男声 · 沉稳', en: 'Deep · composed'),
-        tags: [
-          l10n.text(zh: '新闻', en: 'News'),
-          l10n.text(zh: '播报', en: 'Broadcast')
-        ],
-      ),
+      name: 'Onyx',
+      description: l10n.text(zh: '男声 · 沉稳', en: 'Deep · composed'),
+      tags: [
+        l10n.text(zh: '新闻', en: 'News'),
+        l10n.text(zh: '播报', en: 'Broadcast'),
+      ],
+    ),
     'nova' => _MobileVoiceMetadata(
-        name: 'Nova',
-        description: l10n.text(zh: '女声 · 清亮', en: 'Bright · clear'),
-        tags: [
-          l10n.text(zh: '课程', en: 'Course'),
-          l10n.text(zh: '导学', en: 'Guide')
-        ],
-      ),
+      name: 'Nova',
+      description: l10n.text(zh: '女声 · 清亮', en: 'Bright · clear'),
+      tags: [
+        l10n.text(zh: '课程', en: 'Course'),
+        l10n.text(zh: '导学', en: 'Guide'),
+      ],
+    ),
     'shimmer' => _MobileVoiceMetadata(
-        name: 'Shimmer',
-        description: l10n.text(zh: '女声 · 轻柔', en: 'Soft · calm'),
-        tags: [
-          l10n.text(zh: '冥想', en: 'Meditation'),
-          l10n.text(zh: '耳语', en: 'Whisper')
-        ],
-      ),
+      name: 'Shimmer',
+      description: l10n.text(zh: '女声 · 轻柔', en: 'Soft · calm'),
+      tags: [
+        l10n.text(zh: '冥想', en: 'Meditation'),
+        l10n.text(zh: '耳语', en: 'Whisper'),
+      ],
+    ),
     _ => _MobileVoiceMetadata(
-        name: voice,
-        description: modelSpecific
-            ? l10n.text(zh: '模型专属 Speaker ID', en: 'Model-specific Speaker ID')
-            : l10n.text(zh: '模型提供的音色', en: 'Voice provided by the model'),
-        tags: [l10n.text(zh: '在线', en: 'Online')],
-      ),
+      name: voice,
+      description: modelSpecific
+          ? l10n.text(zh: '模型专属 Speaker ID', en: 'Model-specific Speaker ID')
+          : l10n.text(zh: '模型提供的音色', en: 'Voice provided by the model'),
+      tags: [l10n.text(zh: '在线', en: 'Online')],
+    ),
   };
 }
 

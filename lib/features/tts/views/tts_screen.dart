@@ -49,17 +49,14 @@ class _TtsScreenState extends ConsumerState<TtsScreen> {
     final voiceOptions = notifier.availableVoices;
     final locale = Localizations.localeOf(context);
     final errorMessage = state.errorMessageFor(locale);
-    final pageTitle = context.l10n.text(
-      zh: '文字转语音',
-      en: 'Text to speech',
-    );
+    final pageTitle = context.l10n.text(zh: '文字转语音', en: 'Text to speech');
     ref.listen<String?>(
       ttsProvider.select((value) => value.errorMessageFor(locale)),
       (previous, next) {
         if (next != null && next != previous) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(next)),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(next)));
         }
       },
     );
@@ -73,13 +70,16 @@ class _TtsScreenState extends ConsumerState<TtsScreen> {
     return LayoutBuilder(
       builder: (context, pageConstraints) {
         final platform = Theme.of(context).platform;
-        final useDesktop = platform == TargetPlatform.windows &&
+        final useDesktop =
+            platform == TargetPlatform.windows &&
             pageConstraints.maxWidth >= 760;
         final useMobile = platform == TargetPlatform.android;
-        final showDesktopPlayer = useDesktop &&
+        final showDesktopPlayer =
+            useDesktop &&
             state.hasAudio &&
             _dismissedAudioPath != state.audioPath;
-        final showMobilePlayer = useMobile &&
+        final showMobilePlayer =
+            useMobile &&
             state.hasAudio &&
             _dismissedAudioPath != state.audioPath;
         return Scaffold(
@@ -91,18 +91,16 @@ class _TtsScreenState extends ConsumerState<TtsScreen> {
                     context,
                     largeTextMaxLines: 2,
                   ),
-                  title: Text(
-                    pageTitle,
-                    maxLines: 2,
-                    softWrap: true,
-                  ),
+                  title: Text(pageTitle, maxLines: 2, softWrap: true),
                 ),
           body: CallbackShortcuts(
             bindings: {
               const SingleActivator(LogicalKeyboardKey.enter, control: true):
                   synthesize,
-              const SingleActivator(LogicalKeyboardKey.numpadEnter,
-                  control: true): synthesize,
+              const SingleActivator(
+                LogicalKeyboardKey.numpadEnter,
+                control: true,
+              ): synthesize,
               if (showDesktopPlayer || showMobilePlayer)
                 const SingleActivator(LogicalKeyboardKey.escape): () {
                   unawaited(_dismissDesktopPlayer());
@@ -120,7 +118,8 @@ class _TtsScreenState extends ConsumerState<TtsScreen> {
                         state: state,
                         controller: _textController,
                         voiceOptions: voiceOptions,
-                        usesSeedTtsSpeakerIds: notifier.usesSeedTtsSpeakerIds,
+                        usesBytedanceSpeakerIds:
+                            notifier.usesBytedanceSpeakerIds,
                         errorMessage: errorMessage,
                         showPlayer: showDesktopPlayer,
                         onSynthesize: synthesize,
@@ -129,93 +128,93 @@ class _TtsScreenState extends ConsumerState<TtsScreen> {
                         onDismissPlayer: _dismissDesktopPlayer,
                       )
                     : useMobile
-                        ? MobileTtsWorkspace(
-                            state: state,
-                            controller: _textController,
-                            voiceOptions: voiceOptions,
-                            usesSeedTtsSpeakerIds:
-                                notifier.usesSeedTtsSpeakerIds,
-                            errorMessage: errorMessage,
-                            showPlayer: showMobilePlayer,
-                            onSynthesize: synthesize,
-                            onClear: _confirmClearText,
-                            onSave: _saveDesktopAudio,
-                            onDismissPlayer: _dismissDesktopPlayer,
-                          )
-                        : SafeArea(
-                            top: false,
-                            child: LayoutBuilder(
-                              builder: (context, constraints) {
-                                final platform = Theme.of(context).platform;
-                                final stacked =
-                                    platform != TargetPlatform.windows ||
-                                        AppLayout.useStackedLayout(context);
-                                final editor = _TextEditorSection(
-                                  controller: _textController,
-                                  isGenerating: state.isGenerating,
-                                  expanded: !stacked,
-                                  onClear: _confirmClearText,
-                                );
-                                final parameters = _VoiceParametersSection(
-                                  state: state,
-                                  voiceOptions: voiceOptions,
-                                  usesSeedTtsSpeakerIds:
-                                      notifier.usesSeedTtsSpeakerIds,
-                                  showKeyboardHint:
-                                      platform == TargetPlatform.windows,
-                                  onSynthesize: synthesize,
-                                );
+                    ? MobileTtsWorkspace(
+                        state: state,
+                        controller: _textController,
+                        voiceOptions: voiceOptions,
+                        usesBytedanceSpeakerIds:
+                            notifier.usesBytedanceSpeakerIds,
+                        errorMessage: errorMessage,
+                        showPlayer: showMobilePlayer,
+                        onSynthesize: synthesize,
+                        onClear: _confirmClearText,
+                        onSave: _saveDesktopAudio,
+                        onDismissPlayer: _dismissDesktopPlayer,
+                      )
+                    : SafeArea(
+                        top: false,
+                        child: LayoutBuilder(
+                          builder: (context, constraints) {
+                            final platform = Theme.of(context).platform;
+                            final stacked =
+                                platform != TargetPlatform.windows ||
+                                AppLayout.useStackedLayout(context);
+                            final editor = _TextEditorSection(
+                              controller: _textController,
+                              isGenerating: state.isGenerating,
+                              expanded: !stacked,
+                              onClear: _confirmClearText,
+                            );
+                            final parameters = _VoiceParametersSection(
+                              state: state,
+                              voiceOptions: voiceOptions,
+                              usesBytedanceSpeakerIds:
+                                  notifier.usesBytedanceSpeakerIds,
+                              showKeyboardHint:
+                                  platform == TargetPlatform.windows,
+                              onSynthesize: synthesize,
+                            );
 
-                                return SingleChildScrollView(
-                                  keyboardDismissBehavior:
-                                      ScrollViewKeyboardDismissBehavior.onDrag,
-                                  padding: AppLayout.pagePadding(context),
-                                  child: Center(
-                                    child: ConstrainedBox(
-                                      constraints:
-                                          const BoxConstraints(maxWidth: 960),
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.stretch,
-                                        children: [
-                                          if (errorMessage != null) ...[
-                                            InlineErrorBanner(
-                                              message: errorMessage,
-                                            ),
-                                            const SizedBox(
-                                                height: AppSpacing.md),
-                                          ],
-                                          if (stacked) ...[
-                                            editor,
-                                            const SizedBox(
-                                                height: AppSpacing.md),
-                                            parameters,
-                                          ] else
-                                            Row(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
-                                              children: [
-                                                Expanded(
-                                                    flex: 3, child: editor),
-                                                const SizedBox(
-                                                    width: AppSpacing.md),
-                                                Expanded(
-                                                    flex: 2, child: parameters),
-                                              ],
-                                            ),
-                                          if (state.hasAudio) ...[
-                                            const SizedBox(
-                                                height: AppSpacing.md),
-                                            _PlayerCard(state: state),
-                                          ],
-                                        ],
-                                      ),
-                                    ),
+                            return SingleChildScrollView(
+                              keyboardDismissBehavior:
+                                  ScrollViewKeyboardDismissBehavior.onDrag,
+                              padding: AppLayout.pagePadding(context),
+                              child: Center(
+                                child: ConstrainedBox(
+                                  constraints: const BoxConstraints(
+                                    maxWidth: 960,
                                   ),
-                                );
-                              },
-                            ),
-                          ),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: [
+                                      if (errorMessage != null) ...[
+                                        InlineErrorBanner(
+                                          message: errorMessage,
+                                        ),
+                                        const SizedBox(height: AppSpacing.md),
+                                      ],
+                                      if (stacked) ...[
+                                        editor,
+                                        const SizedBox(height: AppSpacing.md),
+                                        parameters,
+                                      ] else
+                                        Row(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Expanded(flex: 3, child: editor),
+                                            const SizedBox(
+                                              width: AppSpacing.md,
+                                            ),
+                                            Expanded(
+                                              flex: 2,
+                                              child: parameters,
+                                            ),
+                                          ],
+                                        ),
+                                      if (state.hasAudio) ...[
+                                        const SizedBox(height: AppSpacing.md),
+                                        _PlayerCard(state: state),
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
               ),
             ),
           ),
@@ -226,7 +225,9 @@ class _TtsScreenState extends ConsumerState<TtsScreen> {
 
   Future<void> _saveDesktopAudio() async {
     try {
-      final saved = await ref.read(ttsProvider.notifier).saveCopy(
+      final saved = await ref
+          .read(ttsProvider.notifier)
+          .saveCopy(
             dialogTitle: context.l10n.text(
               zh: '保存合成语音',
               en: 'Save generated speech',
@@ -235,17 +236,15 @@ class _TtsScreenState extends ConsumerState<TtsScreen> {
       if (saved && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-              context.l10n.text(zh: 'MP3 已保存。', en: 'MP3 saved.'),
-            ),
+            content: Text(context.l10n.text(zh: 'MP3 已保存。', en: 'MP3 saved.')),
           ),
         );
       }
     } on AppException catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(context.l10n.appError(error))),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(context.l10n.appError(error))));
       }
     }
   }
@@ -271,14 +270,13 @@ class _TtsScreenState extends ConsumerState<TtsScreen> {
       builder: (context) => AlertDialog(
         scrollable: true,
         icon: Icon(Icons.clear_all, color: colors.error),
-        title: Text(l10n.text(
-          zh: '清空输入文字？',
-          en: 'Clear input text?',
-        )),
-        content: Text(l10n.text(
-          zh: '未保存的输入将被永久删除且无法撤销。已生成或已保存的音频不会受影响。',
-          en: 'Unsaved input will be permanently deleted and cannot be recovered. Generated or saved audio will not be affected.',
-        )),
+        title: Text(l10n.text(zh: '清空输入文字？', en: 'Clear input text?')),
+        content: Text(
+          l10n.text(
+            zh: '未保存的输入将被永久删除且无法撤销。已生成或已保存的音频不会受影响。',
+            en: 'Unsaved input will be permanently deleted and cannot be recovered. Generated or saved audio will not be affected.',
+          ),
+        ),
         actions: [
           TextButton(
             key: const Key('cancelClearTtsTextButton'),
@@ -374,34 +372,37 @@ class _TextEditorSection extends StatelessWidget {
                     ),
               alignLabelWithHint: true,
             ),
-            buildCounter: (
-              context, {
-              required currentLength,
-              required isFocused,
-              maxLength,
-            }) {
-              final limit = maxLength ?? AppConstants.maxTtsCharacters;
-              final isNearLimit = currentLength >= (limit * 0.9).ceil();
-              final theme = Theme.of(context);
-              final semanticColors = theme.extension<AppSemanticColors>();
-              final counterColor = isNearLimit
-                  ? semanticColors?.warning ?? theme.colorScheme.error
-                  : theme.colorScheme.onSurfaceVariant;
-              return Semantics(
-                label: context.l10n.text(
-                  zh: '已输入 $currentLength 个字符，共可输入 $limit 个字符',
-                  en: '$currentLength of $limit ${limit == 1 ? 'character' : 'characters'} entered',
-                ),
-                child: Text(
-                  '$currentLength / $limit',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: counterColor,
-                    fontWeight: isNearLimit ? FontWeight.w600 : FontWeight.w400,
-                    fontFeatures: const [FontFeature.tabularFigures()],
-                  ),
-                ),
-              );
-            },
+            buildCounter:
+                (
+                  context, {
+                  required currentLength,
+                  required isFocused,
+                  maxLength,
+                }) {
+                  final limit = maxLength ?? AppConstants.maxTtsCharacters;
+                  final isNearLimit = currentLength >= (limit * 0.9).ceil();
+                  final theme = Theme.of(context);
+                  final semanticColors = theme.extension<AppSemanticColors>();
+                  final counterColor = isNearLimit
+                      ? semanticColors?.warning ?? theme.colorScheme.error
+                      : theme.colorScheme.onSurfaceVariant;
+                  return Semantics(
+                    label: context.l10n.text(
+                      zh: '已输入 $currentLength 个字符，共可输入 $limit 个字符',
+                      en: '$currentLength of $limit ${limit == 1 ? 'character' : 'characters'} entered',
+                    ),
+                    child: Text(
+                      '$currentLength / $limit',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: counterColor,
+                        fontWeight: isNearLimit
+                            ? FontWeight.w600
+                            : FontWeight.w400,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
+                    ),
+                  );
+                },
           ),
         );
       },
@@ -413,14 +414,14 @@ class _VoiceParametersSection extends ConsumerWidget {
   const _VoiceParametersSection({
     required this.state,
     required this.voiceOptions,
-    required this.usesSeedTtsSpeakerIds,
+    required this.usesBytedanceSpeakerIds,
     required this.showKeyboardHint,
     required this.onSynthesize,
   });
 
   final TtsState state;
   final List<String> voiceOptions;
-  final bool usesSeedTtsSpeakerIds;
+  final bool usesBytedanceSpeakerIds;
   final bool showKeyboardHint;
   final VoidCallback onSynthesize;
 
@@ -472,10 +473,10 @@ class _VoiceParametersSection extends ConsumerWidget {
           ),
           const SizedBox(height: AppSpacing.xs),
           Text(
-            usesSeedTtsSpeakerIds
+            usesBytedanceSpeakerIds
                 ? context.l10n.text(
-                    zh: 'Seed TTS 使用火山模型专属 Speaker ID。',
-                    en: 'Seed TTS uses a model-specific Volcengine Speaker ID.',
+                    zh: 'ByteDance Seed-TTS 2.0 使用火山引擎 Speaker ID。',
+                    en: 'ByteDance Seed-TTS 2.0 uses Volcengine Speaker IDs.',
                   )
                 : context.l10n.text(
                     zh: '当前 Speaker ID：${state.voice}',
@@ -522,9 +523,7 @@ class _VoiceParametersSection extends ConsumerWidget {
                   ],
                 );
               }
-              return Row(
-                children: [label, const Spacer(), value],
-              );
+              return Row(children: [label, const Spacer(), value]);
             },
           ),
           Slider(
@@ -574,14 +573,8 @@ class _VoiceParametersSection extends ConsumerWidget {
               index: state.isGenerating ? 1 : 0,
               alignment: Alignment.center,
               children: [
-                Text(context.l10n.text(
-                  zh: '合成语音',
-                  en: 'Generate speech',
-                )),
-                Text(context.l10n.text(
-                  zh: '正在合成…',
-                  en: 'Generating…',
-                )),
+                Text(context.l10n.text(zh: '合成语音', en: 'Generate speech')),
+                Text(context.l10n.text(zh: '正在合成…', en: 'Generating…')),
               ],
             ),
           ),
@@ -622,20 +615,14 @@ class _PlayerCard extends ConsumerWidget {
       leading: Icon(_playerStatusIcon(state)),
       trailing: compactHeader
           ? IconButton(
-              tooltip: context.l10n.text(
-                zh: '另存为 MP3',
-                en: 'Save as MP3',
-              ),
+              tooltip: context.l10n.text(zh: '另存为 MP3', en: 'Save as MP3'),
               onPressed: () => _save(context, notifier),
               icon: const Icon(Icons.download_outlined),
             )
           : OutlinedButton.icon(
               onPressed: () => _save(context, notifier),
               icon: const Icon(Icons.download_outlined),
-              label: Text(context.l10n.text(
-                zh: '保存 MP3',
-                en: 'Save MP3',
-              )),
+              label: Text(context.l10n.text(zh: '保存 MP3', en: 'Save MP3')),
             ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -661,18 +648,15 @@ class _PlayerCard extends ConsumerWidget {
       if (saved && context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(context.l10n.text(
-              zh: 'MP3 已保存。',
-              en: 'MP3 saved.',
-            )),
+            content: Text(context.l10n.text(zh: 'MP3 已保存。', en: 'MP3 saved.')),
           ),
         );
       }
     } on AppException catch (error) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(context.l10n.appError(error))),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(context.l10n.appError(error))));
       }
     }
   }
@@ -707,9 +691,8 @@ class _PlayerTransport extends StatelessWidget {
         zh: '播放进度 ${_duration(Duration(milliseconds: value.round()))}',
         en: 'Playback position ${_duration(Duration(milliseconds: value.round()))}',
       ),
-      onChanged: (value) => notifier.seek(
-        Duration(milliseconds: value.round()),
-      ),
+      onChanged: (value) =>
+          notifier.seek(Duration(milliseconds: value.round())),
     );
     final time = Semantics(
       label: context.l10n.text(
@@ -738,10 +721,7 @@ class _PlayerTransport extends StatelessWidget {
                   Expanded(
                     child: Text(
                       state.isPlaying
-                          ? context.l10n.text(
-                              zh: '正在播放',
-                              en: 'Playing',
-                            )
+                          ? context.l10n.text(zh: '正在播放', en: 'Playing')
                           : context.l10n.text(
                               zh: '播放控制',
                               en: 'Playback controls',
@@ -854,26 +834,23 @@ class _VolumeControl extends StatelessWidget {
 
 String _playerStatus(BuildContext context, TtsState state) {
   return switch (state.phase) {
-    TtsPhase.playing => context.l10n.text(
-        zh: '正在播放。',
-        en: 'Playing.',
-      ),
+    TtsPhase.playing => context.l10n.text(zh: '正在播放。', en: 'Playing.'),
     TtsPhase.paused => context.l10n.text(
-        zh: '播放已暂停，可继续播放或保存。',
-        en: 'Playback is paused. Resume or save the audio.',
-      ),
+      zh: '播放已暂停，可继续播放或保存。',
+      en: 'Playback is paused. Resume or save the audio.',
+    ),
     TtsPhase.completed => context.l10n.text(
-        zh: '播放完成，可重新播放或保存。',
-        en: 'Playback finished. Replay or save the audio.',
-      ),
+      zh: '播放完成，可重新播放或保存。',
+      en: 'Playback finished. Replay or save the audio.',
+    ),
     TtsPhase.failure => context.l10n.text(
-        zh: '音频仍可使用，请查看上方错误信息。',
-        en: 'The audio is still available. Review the error above.',
-      ),
+      zh: '音频仍可使用，请查看上方错误信息。',
+      en: 'The audio is still available. Review the error above.',
+    ),
     _ => context.l10n.text(
-        zh: '音频已生成，可播放或保存为 MP3。',
-        en: 'Audio generated. Play it or save it as MP3.',
-      ),
+      zh: '音频已生成，可播放或保存为 MP3。',
+      en: 'Audio generated. Play it or save it as MP3.',
+    ),
   };
 }
 

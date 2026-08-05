@@ -294,7 +294,13 @@ void main() {
     addTearDown(notifier.dispose);
 
     expect(notifier.state.voice, 'zh_female_cancan_uranus_bigtts');
-    expect(notifier.availableVoices, ['zh_female_cancan_uranus_bigtts']);
+    expect(
+      notifier.availableVoices,
+      containsAll(<String>[
+        'zh_female_cancan_uranus_bigtts',
+        'zh_female_vv_uranus_bigtts',
+      ]),
+    );
 
     notifier.setVoice('alloy');
     expect(notifier.state.voice, 'zh_female_cancan_uranus_bigtts');

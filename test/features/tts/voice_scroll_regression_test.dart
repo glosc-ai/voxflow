@@ -67,29 +67,72 @@ void main() {
     expect(voiceRow.position.pixels, greaterThan(0));
   });
 
-  testWidgets('selecting a voice preserves the horizontal scroll offset', (
+  testWidgets(
+    'selecting a voice in a long ByteDance catalog preserves scroll offset',
+    (tester) async {
+      final voiceRow = await _pumpDesktopTtsScreen(
+        tester,
+        model: 'bytedance/seed-tts-2.0',
+      );
+      final targetVoice = voiceRow.notifier.availableVoices.last;
+
+      expect(voiceRow.notifier.availableVoices.length, greaterThan(1));
+      expect(voiceRow.position.maxScrollExtent, greaterThan(0));
+
+      voiceRow.position.jumpTo(voiceRow.position.maxScrollExtent);
+      await tester.pumpAndSettle();
+      final offsetBeforeSelection = voiceRow.position.pixels;
+      expect(offsetBeforeSelection, greaterThan(0));
+
+      await tester.tap(find.text(targetVoice).first);
+      await tester.pumpAndSettle();
+
+      final positionAfterSelection = _horizontalScrollablePosition(tester);
+      expect(voiceRow.notifier.state.voice, targetVoice);
+      expect(
+        positionAfterSelection.pixels,
+        closeTo(offsetBeforeSelection, 1),
+        reason: 'Selecting a card must not rebuild the list at offset zero.',
+      );
+    },
+  );
+
+  testWidgets(
+    'desktop ByteDance voice cards show official metadata and request ID',
+    (tester) async {
+      final voiceRow = await _pumpDesktopTtsScreen(
+        tester,
+        model: 'bytedance/seed-tts-2.0',
+      );
+
+      expect(find.byKey(const Key('desktopTtsVoiceScrollbar')), findsOneWidget);
+      expect(find.text('知性灿灿 2.0'), findsOneWidget);
+      expect(find.text('中文 · 角色扮演'), findsOneWidget);
+      expect(find.text('zh_female_cancan_uranus_bigtts'), findsOneWidget);
+      expect(
+        voiceRow.notifier.state.voice,
+        'zh_female_cancan_uranus_bigtts',
+        reason: 'The display metadata must not replace the request value.',
+      );
+    },
+  );
+
+  testWidgets('mobile ByteDance voice cards show official metadata', (
     tester,
   ) async {
-    final voiceRow = await _pumpDesktopTtsScreen(tester);
-
-    expect(voiceRow.position.maxScrollExtent, greaterThan(0));
-    voiceRow.position.jumpTo(voiceRow.position.maxScrollExtent);
-    await tester.pumpAndSettle();
-    final offsetBeforeSelection = voiceRow.position.pixels;
-    expect(offsetBeforeSelection, greaterThan(0));
-
-    await tester.tap(find.text('Shimmer'));
-    await tester.pumpAndSettle();
-
-    final positionAfterSelection = _horizontalScrollablePosition(tester);
-    expect(voiceRow.notifier.state.voice, 'shimmer');
-    expect(
-      positionAfterSelection.pixels,
-      closeTo(offsetBeforeSelection, 1),
-      reason: 'Selecting a card must not rebuild the list at offset zero.',
+    final voiceRow = await _pumpTtsScreen(
+      tester,
+      size: const Size(400, 800),
+      model: 'bytedance/seed-tts-2.0',
+      platform: TargetPlatform.android,
     );
-  });
 
+    expect(find.byKey(const Key('mobileTtsVoiceScrollbar')), findsOneWidget);
+    expect(find.text('知性灿灿 2.0'), findsOneWidget);
+    expect(find.text('中文'), findsOneWidget);
+    expect(find.text('角色扮演'), findsOneWidget);
+    expect(voiceRow.notifier.state.voice, 'zh_female_cancan_uranus_bigtts');
+  });
 }
 
 Future<_VoiceRowHarness> _pumpDesktopTtsScreen(
@@ -188,12 +231,6 @@ Finder _horizontalScrollableFinder(
   return find.byWidget(candidates.single.widget);
 }
 
-class _SilentPlaybackController implements PlaybackController {
-  const _SilentPlaybackController();
-
-  @override
-  Stream<void> get completions => const Stream.empty();
-
 ScrollPosition _horizontalScrollablePosition(WidgetTester tester) {
   return tester
       .state<ScrollableState>(
@@ -201,6 +238,12 @@ ScrollPosition _horizontalScrollablePosition(WidgetTester tester) {
       )
       .position;
 }
+
+class _SilentPlaybackController implements PlaybackController {
+  const _SilentPlaybackController();
+
+  @override
+  Stream<void> get completions => const Stream.empty();
 
   @override
   Stream<Duration> get durationChanges => const Stream.empty();

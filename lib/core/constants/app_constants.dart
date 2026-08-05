@@ -1,3 +1,5 @@
+import 'volcengine_tts_voice_catalog.dart';
+
 class AppConstants {
   AppConstants._();
 
@@ -30,12 +32,22 @@ class AppConstants {
     'shimmer',
   ];
 
-  static const seedTtsVoices = <String>[
-    'zh_female_cancan_uranus_bigtts',
-  ];
+  /// Seed-TTS 2.0 Speaker IDs derived from the single typed catalog.
+  ///
+  /// Keep the public string list for request validation and provider state; UI
+  /// metadata is resolved from [VolcengineTtsVoiceCatalog.voices].
+  static final List<String> bytedanceTtsVoices = List.unmodifiable(
+    VolcengineTtsVoiceCatalog.voices.map((voice) => voice.speakerId),
+  );
+
+  static bool usesVolcengineSeedTtsVoiceCatalog(String model) {
+    return model.trim().toLowerCase() == seedTtsModel;
+  }
 
   static List<String> ttsVoicesForModel(String model) {
-    return model.trim().toLowerCase() == seedTtsModel ? seedTtsVoices : voices;
+    return usesVolcengineSeedTtsVoiceCatalog(model)
+        ? bytedanceTtsVoices
+        : voices;
   }
 
   static String defaultTtsVoiceForModel(String model) {

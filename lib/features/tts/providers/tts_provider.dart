@@ -108,8 +108,8 @@ class TtsNotifier extends StateNotifier<TtsState> {
 
   List<String> get availableVoices => AppConstants.ttsVoicesForModel(_model);
 
-  bool get usesSeedTtsSpeakerIds =>
-      _model.trim().toLowerCase() == AppConstants.seedTtsModel;
+  bool get usesBytedanceSpeakerIds =>
+      AppConstants.usesVolcengineSeedTtsVoiceCatalog(_model);
 
   void updateModel(String model) {
     final normalized = model.trim();

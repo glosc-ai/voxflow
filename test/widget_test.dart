@@ -579,7 +579,10 @@ void main() {
     );
 
     expect(find.text('zh_female_cancan_uranus_bigtts'), findsOneWidget);
-    expect(find.text('Seed TTS 使用火山模型专属 Speaker ID。'), findsOneWidget);
+    expect(
+      find.text('ByteDance Seed-TTS 2.0 使用火山引擎 Speaker ID。'),
+      findsOneWidget,
+    );
     expect(find.text('alloy'), findsNothing);
   });
 }
