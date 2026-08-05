@@ -42,7 +42,14 @@ try {
         "msvcp140.dll",
         "vcruntime140.dll",
         "vcruntime140_1.dll",
+        "dartjni.dll",
+        "ffmpeg_kit_extended_flutter_plugin.dll",
+        "libffmpegkit.dll",
+        "sqlite3.dll",
+        "data\app.so",
+        "data\icudtl.dat",
         "data\flutter_assets",
+        "data\flutter_assets\THIRD_PARTY_NOTICES.md",
         "README.md"
     )
     foreach ($relativePath in $requiredPaths) {
@@ -50,8 +57,20 @@ try {
             throw "Packaged Windows runtime is incomplete: $relativePath"
         }
     }
+    $forbiddenExtensions = @(
+        ".dart",
+        ".jks",
+        ".keystore",
+        ".p12",
+        ".pem",
+        ".pfx"
+    )
+    $forbiddenNames = @(".env", "key.properties")
     $forbiddenFiles = Get-ChildItem -LiteralPath $tempRoot -Recurse -File |
-        Where-Object { $_.Extension -in @(".dart", ".jks", ".keystore") }
+        Where-Object {
+            $_.Extension -in $forbiddenExtensions -or
+            $_.Name -in $forbiddenNames
+        }
     if ($forbiddenFiles) {
         throw "Package contains source or signing material."
     }
