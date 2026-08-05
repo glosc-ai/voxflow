@@ -176,7 +176,7 @@ jobs:
           cache: true
 
       - name: Install dependencies
-        run: flutter pub get
+        run: flutter pub get --enforce-lockfile
 
       - name: Check Dart formatting
         run: dart format --output=none --set-exit-if-changed .
@@ -302,7 +302,7 @@ jobs:
           echo "VOXFLOW_ANDROID_CERT_SHA256=$actual" >> "$GITHUB_ENV"
 
       - name: Install dependencies
-        run: flutter pub get
+        run: flutter pub get --enforce-lockfile
 
       - name: Build signed ABI APKs
         env:
@@ -434,7 +434,9 @@ jobs:
       - detect_version
       - quality
     if: needs.detect_version.outputs.should_build == 'true'
-    runs-on: windows-latest
+    # permission_handler_windows 0.2.x still uses C++/WinRT's deprecated
+    # experimental coroutine headers, which VS2026 rejects at compile time.
+    runs-on: windows-2022
     timeout-minutes: 45
 
     steps:
@@ -451,7 +453,7 @@ jobs:
           cache: true
 
       - name: Install dependencies
-        run: flutter pub get
+        run: flutter pub get --enforce-lockfile
 
       - name: Build and verify Windows release package
         shell: pwsh
