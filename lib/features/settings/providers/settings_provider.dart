@@ -6,43 +6,101 @@ import '../../../core/logging/app_logger.dart';
 import '../../../core/network/dio_client.dart';
 import '../models/model_catalog.dart';
 import '../models/settings_state.dart';
+import '../services/api_key_store.dart';
 import '../services/settings_repository.dart';
 
 final sharedPreferencesProvider = Provider<SharedPreferences>((ref) {
   throw StateError('SharedPreferences 尚未初始化。');
 });
 
+final apiKeyStoreProvider = Provider<ApiKeyStore>((ref) {
+  return const MethodChannelApiKeyStore();
+});
+
 final settingsRepositoryProvider = Provider<SettingsRepository>((ref) {
-  return SettingsRepository(ref.watch(sharedPreferencesProvider));
+  return SettingsRepository(
+    ref.watch(sharedPreferencesProvider),
+    ref.watch(apiKeyStoreProvider),
+  );
 });
 
 final appLoggerProvider = Provider<AppLogger>((ref) => AppLogger.instance);
 
-final settingsProvider =
-    StateNotifierProvider<SettingsNotifier, SettingsState>((ref) {
-  return SettingsNotifier(ref.watch(settingsRepositoryProvider));
-});
+final settingsProvider = StateNotifierProvider<SettingsNotifier, SettingsState>(
+  (ref) {
+    return SettingsNotifier(ref.watch(settingsRepositoryProvider));
+  },
+);
 
 final dioClientProvider = Provider<DioClient>((ref) {
-  return DioClient.withSettings(
-    () => ref.read(settingsProvider),
-  );
+  return DioClient.withSettings(() => ref.read(settingsProvider));
 });
 
 typedef ModelLoader = Future<List<String>> Function(SettingsState settings);
+typedef ConnectionTester = Future<void> Function(SettingsState settings);
 
 class SettingsNotifier extends StateNotifier<SettingsState> {
   SettingsNotifier(
     this._repository, {
     ModelLoader? modelLoader,
-  })  : _modelLoader = modelLoader ?? _loadModels,
-        super(_repository.load());
+    ConnectionTester? connectionTester,
+  }) : _modelLoader = modelLoader ?? _loadModels,
+       _connectionTester = connectionTester ?? _testConnection,
+       super(_repository.load());
 
   final SettingsRepository _repository;
   final ModelLoader _modelLoader;
+  final ConnectionTester _connectionTester;
 
   static Future<List<String>> _loadModels(SettingsState settings) {
     return DioClient(settings).fetchModelIds();
+  }
+
+  static Future<void> _testConnection(SettingsState settings) {
+    return DioClient(settings).testConnection();
+  }
+
+  Future<void> checkStoredConnectionOnLaunch() async {
+    if (!state.hasApiKey) {
+      state = state.copyWith(
+        clearActiveOperation: true,
+        clearConnectionResult: true,
+      );
+      return;
+    }
+
+    late final SettingsState credentials;
+    try {
+      credentials = state.credentialsValidated();
+    } catch (_) {
+      state = state.copyWith(
+        clearActiveOperation: true,
+        lastConnectionSucceeded: false,
+      );
+      return;
+    }
+
+    state = state.copyWith(
+      activeOperation: SettingsOperation.testingConnection,
+      clearConnectionResult: true,
+    );
+    var succeeded = false;
+    try {
+      await _connectionTester(credentials);
+      succeeded = true;
+    } catch (_) {
+      // Startup checks report through the persistent status area and must not
+      // surface an unhandled asynchronous exception.
+    }
+
+    if (!_hasSameCredentials(credentials) ||
+        state.activeOperation != SettingsOperation.testingConnection) {
+      return;
+    }
+    state = state.copyWith(
+      clearActiveOperation: true,
+      lastConnectionSucceeded: succeeded,
+    );
   }
 
   Future<AppMessage> save({
@@ -65,10 +123,7 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
         localePreference: state.localePreference,
       ).validated();
       await _repository.save(validated);
-      const feedback = AppMessage(
-        zh: '设置已保存。',
-        en: 'Settings saved.',
-      );
+      const feedback = AppMessage(zh: '设置已保存。', en: 'Settings saved.');
       state = validated.copyWith(
         availableSttModels: state.availableSttModels,
         availableTtsModels: state.availableTtsModels,
@@ -119,7 +174,7 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
         themePreference: state.themePreference,
         localePreference: state.localePreference,
       ).validated();
-      await DioClient(validated).testConnection();
+      await _connectionTester(validated);
       await _repository.save(validated);
       const feedback = AppMessage(
         zh: '连接成功，设置已保存。',
@@ -188,9 +243,11 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
         );
       }
       final feedback = AppMessage(
-        zh: '已获取 ${catalog.stt.length} 个语音转文字模型、'
+        zh:
+            '已获取 ${catalog.stt.length} 个语音转文字模型、'
             '${catalog.tts.length} 个文字转语音模型；选择后请保存设置。',
-        en: 'Fetched ${catalog.stt.length} speech-to-text '
+        en:
+            'Fetched ${catalog.stt.length} speech-to-text '
             '${catalog.stt.length == 1 ? 'model' : 'models'} and '
             '${catalog.tts.length} text-to-speech '
             '${catalog.tts.length == 1 ? 'model' : 'models'}. Save settings '
@@ -233,10 +290,16 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
     if (state.themePreference == preference) {
       return;
     }
+    _ensureIdle();
     final previous = state;
-    state = state.copyWith(themePreference: preference);
+    final updated = state.copyWith(
+      themePreference: preference,
+      activeOperation: SettingsOperation.updatingPreference,
+    );
+    state = updated;
     try {
-      await _repository.save(state);
+      await _repository.save(updated);
+      state = updated.copyWith(clearActiveOperation: true);
     } catch (_) {
       state = previous;
       rethrow;
@@ -247,10 +310,16 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
     if (state.localePreference == preference) {
       return;
     }
+    _ensureIdle();
     final previous = state;
-    state = state.copyWith(localePreference: preference);
+    final updated = state.copyWith(
+      localePreference: preference,
+      activeOperation: SettingsOperation.updatingPreference,
+    );
+    state = updated;
     try {
-      await _repository.save(state);
+      await _repository.save(updated);
+      state = updated.copyWith(clearActiveOperation: true);
     } catch (_) {
       state = previous;
       rethrow;
@@ -293,6 +362,14 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
     }
   }
 
+  Future<void> reloadAfterDataReset() async {
+    // Drop the in-memory credential before touching platform storage so a
+    // failed reload can never leave a deleted key available to Dio clients.
+    state = const SettingsState();
+    await _repository.initialize();
+    state = _repository.load();
+  }
+
   Future<void> setSttModel(String model) async {
     await _setSpeechModel(model, isStt: true);
   }
@@ -301,10 +378,7 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
     await _setSpeechModel(model, isStt: false);
   }
 
-  Future<void> _setSpeechModel(
-    String model, {
-    required bool isStt,
-  }) async {
+  Future<void> _setSpeechModel(String model, {required bool isStt}) async {
     final normalized = model.trim();
     if (normalized.isEmpty) {
       throw const AppException(
@@ -318,17 +392,35 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
       return;
     }
 
+    _ensureIdle();
     final previous = state;
-    state = state.copyWith(
+    final updated = state.copyWith(
       sttModel: isStt ? normalized : null,
       ttsModel: isStt ? null : normalized,
+      activeOperation: SettingsOperation.updatingPreference,
       clearMessage: true,
     );
+    state = updated;
     try {
-      await _repository.save(state);
+      await _repository.save(updated);
+      state = updated.copyWith(clearActiveOperation: true);
     } catch (_) {
       state = previous;
       rethrow;
     }
+  }
+
+  void _ensureIdle() {
+    if (state.isBusy) {
+      throw const AppException(
+        AppErrorCode.invalidConfiguration,
+        '另一项设置操作仍在进行，请稍候。',
+        englishMessage: 'Another settings operation is still running.',
+      );
+    }
+  }
+
+  bool _hasSameCredentials(SettingsState snapshot) {
+    return state.apiKey == snapshot.apiKey && state.baseUrl == snapshot.baseUrl;
   }
 }

@@ -17,12 +17,13 @@ final historyRepositoryProvider = Provider<HistoryRepository>((ref) {
 });
 
 final historyProvider =
-    StateNotifierProvider<HistoryNotifier, AsyncValue<List<HistoryRecord>>>(
-        (ref) {
-  final notifier = HistoryNotifier(ref.watch(historyRepositoryProvider));
-  Future.microtask(notifier.load);
-  return notifier;
-});
+    StateNotifierProvider<HistoryNotifier, AsyncValue<List<HistoryRecord>>>((
+      ref,
+    ) {
+      final notifier = HistoryNotifier(ref.watch(historyRepositoryProvider));
+      unawaited(notifier.load());
+      return notifier;
+    });
 
 final historyPlaybackManagerProvider = Provider<PlaybackController>((ref) {
   final manager = AudioPlaybackManager();
@@ -32,28 +33,41 @@ final historyPlaybackManagerProvider = Provider<PlaybackController>((ref) {
 
 final historyPlaybackProvider =
     StateNotifierProvider<HistoryPlaybackNotifier, HistoryPlaybackState>((ref) {
-  return HistoryPlaybackNotifier(ref.watch(historyPlaybackManagerProvider));
-});
+      return HistoryPlaybackNotifier(ref.watch(historyPlaybackManagerProvider));
+    });
 
 class HistoryNotifier extends StateNotifier<AsyncValue<List<HistoryRecord>>> {
   HistoryNotifier(this._repository) : super(const AsyncValue.loading());
 
   final HistoryRepository _repository;
   String _query = '';
+  int _loadGeneration = 0;
 
-  Future<void> load({String? query}) async {
+  Future<void> load({String? query}) {
+    return _load(query: query, retainCachedRecords: true);
+  }
+
+  Future<void> _load({String? query, required bool retainCachedRecords}) async {
+    final generation = ++_loadGeneration;
     if (query != null) {
       _query = query;
     }
-    final cachedRecords = state.valueOrNull;
+    final cachedRecords = retainCachedRecords ? state.valueOrNull : null;
     state = cachedRecords == null
         ? const AsyncValue.loading()
         : const AsyncValue<List<HistoryRecord>>.loading().copyWithPrevious(
             AsyncValue.data(cachedRecords),
           );
     try {
-      state = AsyncValue.data(await _repository.search(_query));
+      final records = await _repository.search(_query);
+      if (generation != _loadGeneration) {
+        return;
+      }
+      state = AsyncValue.data(records);
     } catch (error, stackTrace) {
+      if (generation != _loadGeneration) {
+        return;
+      }
       final localizedError = error is AppException
           ? error
           : const AppException(
@@ -69,6 +83,12 @@ class HistoryNotifier extends StateNotifier<AsyncValue<List<HistoryRecord>>> {
           ? failure
           : failure.copyWithPrevious(AsyncValue.data(cachedRecords));
     }
+  }
+
+  /// Reloads the empty query after a destructive reset and invalidates every
+  /// search and cached result from before the reset boundary.
+  Future<void> reloadAfterDataReset() {
+    return _load(query: '', retainCachedRecords: false);
   }
 
   Future<HistoryRecord> add({
@@ -147,47 +167,75 @@ class HistoryPlaybackState {
 
 class HistoryPlaybackNotifier extends StateNotifier<HistoryPlaybackState> {
   HistoryPlaybackNotifier(this._playback)
-      : super(const HistoryPlaybackState()) {
+    : super(const HistoryPlaybackState()) {
     _completionSubscription = _playback.completions.listen((_) {
-      state = HistoryPlaybackState(recordId: state.recordId);
+      if (state.recordId != null) {
+        state = HistoryPlaybackState(recordId: state.recordId);
+      }
     });
   }
 
   final PlaybackController _playback;
   late final StreamSubscription<void> _completionSubscription;
+  Future<void> _commandQueue = Future<void>.value();
+  int _commandEpoch = 0;
 
-  Future<void> toggle(HistoryRecord record) async {
-    try {
-      if (record.id == state.recordId && state.isPlaying) {
-        await _playback.pause();
-        state = HistoryPlaybackState(recordId: record.id);
+  Future<void> toggle(HistoryRecord record) {
+    final epoch = _commandEpoch;
+    return _enqueueCommand(() async {
+      if (epoch != _commandEpoch) {
         return;
       }
-      if (record.id != state.recordId) {
-        await _playback.load(record.audioPath);
+      try {
+        if (record.id == state.recordId && state.isPlaying) {
+          await _playback.pause();
+          if (epoch == _commandEpoch) {
+            state = HistoryPlaybackState(recordId: record.id);
+          }
+          return;
+        }
+        if (record.id != state.recordId) {
+          await _playback.load(record.audioPath);
+          if (epoch != _commandEpoch) {
+            return;
+          }
+        }
+        await _playback.play();
+        if (epoch == _commandEpoch) {
+          state = HistoryPlaybackState(recordId: record.id, isPlaying: true);
+        }
+      } catch (error) {
+        if (epoch == _commandEpoch) {
+          state = HistoryPlaybackState(
+            recordId: record.id,
+            error: error is AppException
+                ? error.localizedMessage
+                : const AppMessage(
+                    zh: '无法播放历史音频。',
+                    en: 'Unable to play the history audio.',
+                  ),
+          );
+        }
       }
-      await _playback.play();
-      state = HistoryPlaybackState(recordId: record.id, isPlaying: true);
-    } catch (error) {
-      state = HistoryPlaybackState(
-        recordId: record.id,
-        error: error is AppException
-            ? error.localizedMessage
-            : const AppMessage(
-                zh: '无法播放历史音频。',
-                en: 'Unable to play the history audio.',
-              ),
-      );
-    }
+    });
   }
 
-  Future<void> stop() async {
-    try {
-      await _playback.stop();
-    } catch (_) {
-      // The record can still be deleted if stopping a missing file fails.
-    }
-    state = const HistoryPlaybackState();
+  Future<void> stop() {
+    _commandEpoch += 1;
+    return _enqueueCommand(() async {
+      try {
+        await _playback.stop();
+      } catch (_) {
+        // The record can still be deleted if stopping a missing file fails.
+      }
+      state = const HistoryPlaybackState();
+    });
+  }
+
+  Future<void> _enqueueCommand(Future<void> Function() command) {
+    final result = _commandQueue.then((_) => command());
+    _commandQueue = result.catchError((_) {});
+    return result;
   }
 
   @override

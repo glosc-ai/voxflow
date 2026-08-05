@@ -1,5 +1,7 @@
 #include "flutter_window.h"
 
+#include <commctrl.h>
+
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -8,6 +10,8 @@
 #include "flutter/generated_plugin_registrant.h"
 #include <flutter/standard_method_codec.h>
 
+#include "secure_credential_store.h"
+
 namespace {
 
 constexpr UINT kForceStartupRedrawMessage = WM_APP + 1;
@@ -15,6 +19,23 @@ constexpr UINT_PTR kStartupResizeTimerId = 0x5646;
 constexpr UINT kStartupResizeDelayMs = 75;
 constexpr int kStartupResizeDelta = 32;
 constexpr char kWindowChannelName[] = "ai.glosc.voxflow/window";
+constexpr UINT_PTR kFlutterViewSubclassId = 0x56465852;
+
+bool IsResizeHitTest(LRESULT hit_test) {
+  switch (hit_test) {
+    case HTLEFT:
+    case HTRIGHT:
+    case HTTOP:
+    case HTTOPLEFT:
+    case HTTOPRIGHT:
+    case HTBOTTOM:
+    case HTBOTTOMLEFT:
+    case HTBOTTOMRIGHT:
+      return true;
+    default:
+      return false;
+  }
+}
 
 }  // namespace
 
@@ -39,7 +60,18 @@ bool FlutterWindow::OnCreate() {
     return false;
   }
   RegisterPlugins(flutter_controller_->engine());
-  SetChildContent(flutter_controller_->view()->GetNativeWindow());
+  flutter_view_handle_ = flutter_controller_->view()->GetNativeWindow();
+  SetChildContent(flutter_view_handle_);
+  if (!::SetWindowSubclass(
+          flutter_view_handle_, FlutterViewSubclassProc,
+          kFlutterViewSubclassId, reinterpret_cast<DWORD_PTR>(this))) {
+    flutter_view_handle_ = nullptr;
+    return false;
+  }
+  flutter_view_subclass_installed_ = true;
+
+  secure_credential_store_ = std::make_unique<SecureCredentialStore>(
+      flutter_controller_->engine()->messenger());
 
   window_channel_ = std::make_unique<
       flutter::MethodChannel<flutter::EncodableValue>>(
@@ -160,12 +192,39 @@ void FlutterWindow::OnDestroy() {
     ::KillTimer(GetHandle(), kStartupResizeTimerId);
   }
   startup_resize_pending_ = false;
+  secure_credential_store_.reset();
   window_channel_.reset();
+  if (flutter_view_subclass_installed_ && flutter_view_handle_) {
+    ::RemoveWindowSubclass(flutter_view_handle_, FlutterViewSubclassProc,
+                           kFlutterViewSubclassId);
+  }
+  flutter_view_subclass_installed_ = false;
+  flutter_view_handle_ = nullptr;
   if (flutter_controller_) {
     flutter_controller_ = nullptr;
   }
 
   Win32Window::OnDestroy();
+}
+
+LRESULT CALLBACK FlutterWindow::FlutterViewSubclassProc(
+    HWND window, UINT message, WPARAM wparam, LPARAM lparam,
+    UINT_PTR subclass_id, DWORD_PTR reference_data) noexcept {
+  if (message == WM_NCHITTEST) {
+    auto* that = reinterpret_cast<FlutterWindow*>(reference_data);
+    if (that && that->GetHandle()) {
+      const LRESULT parent_hit_test = ::SendMessage(
+          that->GetHandle(), WM_NCHITTEST, wparam, lparam);
+      if (IsResizeHitTest(parent_hit_test)) {
+        // HTTRANSPARENT asks User32 to continue hit-testing windows from the
+        // same UI thread underneath the Flutter child. The native parent then
+        // receives the non-client mouse messages that start system resizing.
+        return HTTRANSPARENT;
+      }
+    }
+  }
+
+  return ::DefSubclassProc(window, message, wparam, lparam);
 }
 
 LRESULT

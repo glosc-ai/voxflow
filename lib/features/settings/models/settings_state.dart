@@ -33,6 +33,7 @@ enum SettingsOperation {
   saving,
   testingConnection,
   fetchingModels,
+  updatingPreference,
   resetting,
 }
 
@@ -47,6 +48,7 @@ class SettingsState {
     this.availableSttModels = const [],
     this.availableTtsModels = const [],
     this.hasFetchedModels = false,
+    this.credentialRecoveryRequired = false,
     this.activeOperation,
     this.lastConnectionSucceeded,
     this.feedback,
@@ -62,6 +64,7 @@ class SettingsState {
   final List<String> availableSttModels;
   final List<String> availableTtsModels;
   final bool hasFetchedModels;
+  final bool credentialRecoveryRequired;
   final SettingsOperation? activeOperation;
   final bool? lastConnectionSucceeded;
   final AppMessage? feedback;
@@ -88,6 +91,7 @@ class SettingsState {
     List<String>? availableTtsModels,
     bool clearAvailableModels = false,
     bool? hasFetchedModels,
+    bool? credentialRecoveryRequired,
     SettingsOperation? activeOperation,
     bool clearActiveOperation = false,
     bool? lastConnectionSucceeded,
@@ -115,8 +119,11 @@ class SettingsState {
       availableTtsModels: clearAvailableModels
           ? const []
           : (availableTtsModels ?? this.availableTtsModels),
-      hasFetchedModels: hasFetchedModels ??
+      hasFetchedModels:
+          hasFetchedModels ??
           (clearAvailableModels ? false : this.hasFetchedModels),
+      credentialRecoveryRequired:
+          credentialRecoveryRequired ?? this.credentialRecoveryRequired,
       activeOperation: clearActiveOperation
           ? null
           : (activeOperation ?? this.activeOperation),

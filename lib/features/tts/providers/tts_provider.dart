@@ -14,10 +14,8 @@ import '../models/tts_state.dart';
 import '../services/audio_playback_manager.dart';
 import '../services/tts_api_service.dart';
 
-typedef TtsHistoryWriter = Future<void> Function({
-  required String text,
-  required String audioPath,
-});
+typedef TtsHistoryWriter =
+    Future<void> Function({required String text, required String audioPath});
 
 final ttsApiServiceProvider = Provider<TtsApiService>((ref) {
   return TtsApiService(ref.watch(dioClientProvider));
@@ -31,11 +29,9 @@ final ttsPlaybackManagerProvider = Provider<PlaybackController>((ref) {
 
 final ttsHistoryWriterProvider = Provider<TtsHistoryWriter>((ref) {
   return ({required text, required audioPath}) async {
-    await ref.read(historyProvider.notifier).add(
-          type: HistoryType.tts,
-          text: text,
-          audioPath: audioPath,
-        );
+    await ref
+        .read(historyProvider.notifier)
+        .add(type: HistoryType.tts, text: text, audioPath: audioPath);
   };
 });
 
@@ -71,22 +67,27 @@ class TtsNotifier extends StateNotifier<TtsState> {
     required PlaybackController playback,
     required TtsHistoryWriter historyWriter,
     required String model,
-  })  : _apiService = apiService,
-        _playback = playback,
-        _historyWriter = historyWriter,
-        _model = model,
-        super(
-          TtsState(
-            voice: AppConstants.defaultTtsVoiceForModel(model),
-          ),
-        ) {
+  }) : _apiService = apiService,
+       _playback = playback,
+       _historyWriter = historyWriter,
+       _model = model,
+       super(TtsState(voice: AppConstants.defaultTtsVoiceForModel(model))) {
     _positionSubscription = _playback.positionChanges.listen((position) {
+      if (_resettingPlayback || state.isGenerating || !state.hasAudio) {
+        return;
+      }
       state = state.copyWith(position: position);
     });
     _durationSubscription = _playback.durationChanges.listen((duration) {
+      if (_resettingPlayback || state.isGenerating || !state.hasAudio) {
+        return;
+      }
       state = state.copyWith(duration: duration);
     });
     _completionSubscription = _playback.completions.listen((_) {
+      if (_resettingPlayback || state.isGenerating || !state.hasAudio) {
+        return;
+      }
       state = state.copyWith(
         phase: TtsPhase.completed,
         position: state.duration,
@@ -101,6 +102,9 @@ class TtsNotifier extends StateNotifier<TtsState> {
   late final StreamSubscription<Duration> _positionSubscription;
   late final StreamSubscription<Duration> _durationSubscription;
   late final StreamSubscription<void> _completionSubscription;
+  Future<void> _playbackCommandQueue = Future<void>.value();
+  int _playbackEpoch = 0;
+  bool _resettingPlayback = false;
 
   List<String> get availableVoices => AppConstants.ttsVoicesForModel(_model);
 
@@ -135,9 +139,10 @@ class TtsNotifier extends StateNotifier<TtsState> {
   }
 
   Future<void> setPlaybackRate(double rate) async {
-    if (state.isGenerating) {
+    if (state.isGenerating || _resettingPlayback) {
       return;
     }
+    final epoch = _playbackEpoch;
     final normalized = rate.clamp(0.25, 4.0).toDouble();
     final previousRate = state.playbackRate;
     state = state.copyWith(playbackRate: normalized, clearError: true);
@@ -146,7 +151,13 @@ class TtsNotifier extends StateNotifier<TtsState> {
     }
     try {
       await _playback.setPlaybackRate(normalized);
+      if (epoch != _playbackEpoch) {
+        return;
+      }
     } catch (error) {
+      if (epoch != _playbackEpoch) {
+        return;
+      }
       state = state.copyWith(playbackRate: previousRate);
       _setFailure(
         error,
@@ -164,8 +175,8 @@ class TtsNotifier extends StateNotifier<TtsState> {
     );
     final nextRate = currentIndex < 0
         ? 1.0
-        : supportedPlaybackRates[
-            (currentIndex + 1) % supportedPlaybackRates.length];
+        : supportedPlaybackRates[(currentIndex + 1) %
+              supportedPlaybackRates.length];
     return setPlaybackRate(nextRate);
   }
 
@@ -174,6 +185,7 @@ class TtsNotifier extends StateNotifier<TtsState> {
       return;
     }
     final previousState = state;
+    _playbackEpoch += 1;
     state = state.copyWith(
       phase: TtsPhase.generating,
       position: Duration.zero,
@@ -183,7 +195,7 @@ class TtsNotifier extends StateNotifier<TtsState> {
     File? output;
     try {
       if (previousState.hasAudio) {
-        await _playback.stop();
+        await _enqueuePlaybackCommand(_playback.stop);
       }
       final request = TtsRequest(
         text: text,
@@ -225,70 +237,87 @@ class TtsNotifier extends StateNotifier<TtsState> {
     }
   }
 
-  Future<void> playOrPause() async {
-    if (!state.hasAudio || state.isGenerating) {
-      return;
+  Future<void> playOrPause() {
+    if (!state.hasAudio || state.isGenerating || _resettingPlayback) {
+      return Future<void>.value();
     }
-    try {
-      if (state.isPlaying) {
-        await _playback.pause();
-        state = state.copyWith(phase: TtsPhase.paused, clearError: true);
+    final epoch = _playbackEpoch;
+    return _enqueuePlaybackCommand(() async {
+      if (epoch != _playbackEpoch || _resettingPlayback || !state.hasAudio) {
         return;
       }
-      if (state.phase == TtsPhase.completed) {
-        await _playback.seek(Duration.zero);
-        state = state.copyWith(position: Duration.zero);
+      try {
+        if (state.isPlaying) {
+          await _playback.pause();
+          if (epoch == _playbackEpoch && !_resettingPlayback) {
+            state = state.copyWith(phase: TtsPhase.paused, clearError: true);
+          }
+          return;
+        }
+        if (state.phase == TtsPhase.completed) {
+          await _playback.seek(Duration.zero);
+          if (epoch != _playbackEpoch || _resettingPlayback) {
+            return;
+          }
+          state = state.copyWith(position: Duration.zero);
+        }
+        await _playback.play();
+        if (epoch == _playbackEpoch && !_resettingPlayback) {
+          state = state.copyWith(phase: TtsPhase.playing, clearError: true);
+        }
+      } catch (error) {
+        if (epoch == _playbackEpoch && !_resettingPlayback) {
+          _setFailure(
+            error,
+            const AppMessage(zh: '播放音频失败。', en: 'Unable to play the audio.'),
+          );
+        }
       }
-      await _playback.play();
-      state = state.copyWith(phase: TtsPhase.playing, clearError: true);
-    } catch (error) {
-      _setFailure(
-        error,
-        const AppMessage(
-          zh: '播放音频失败。',
-          en: 'Unable to play the audio.',
-        ),
-      );
-    }
+    });
   }
 
   Future<void> seek(Duration position) async {
-    if (!state.hasAudio || state.isGenerating) {
+    if (!state.hasAudio || state.isGenerating || _resettingPlayback) {
       return;
     }
+    final epoch = _playbackEpoch;
     final maximum = state.duration;
     final target = position < Duration.zero
         ? Duration.zero
         : (maximum > Duration.zero && position > maximum ? maximum : position);
     try {
       await _playback.seek(target);
+      if (epoch != _playbackEpoch) {
+        return;
+      }
       state = state.copyWith(position: target, clearError: true);
     } catch (error) {
+      if (epoch != _playbackEpoch) {
+        return;
+      }
       _setFailure(
         error,
-        const AppMessage(
-          zh: '调整播放进度失败。',
-          en: 'Unable to seek in the audio.',
-        ),
+        const AppMessage(zh: '调整播放进度失败。', en: 'Unable to seek in the audio.'),
       );
     }
   }
 
   Future<void> setVolume(double volume) async {
-    if (state.isGenerating) {
+    if (state.isGenerating || _resettingPlayback) {
       return;
     }
+    final epoch = _playbackEpoch;
     final normalized = volume.clamp(0.0, 1.0);
     state = state.copyWith(volume: normalized);
     try {
       await _playback.setVolume(normalized);
     } catch (error) {
+      if (epoch != _playbackEpoch) {
+        return;
+      }
       _setFailure(
         error,
-        const AppMessage(
-          zh: '调整音量失败。',
-          en: 'Unable to change the volume.',
-        ),
+        const AppMessage(zh: '调整音量失败。', en: 'Unable to change the volume.'),
       );
     }
   }
@@ -333,6 +362,33 @@ class TtsNotifier extends StateNotifier<TtsState> {
     }
   }
 
+  Future<void> reset() async {
+    if (state.isGenerating) {
+      return;
+    }
+    if (_resettingPlayback) {
+      await _playbackCommandQueue;
+      return;
+    }
+    _resettingPlayback = true;
+    _playbackEpoch += 1;
+    try {
+      await _enqueuePlaybackCommand(_playback.stop);
+    } catch (_) {
+      // Clearing local state must remain possible if the previous audio file
+      // has already disappeared or the native player has shut down.
+    } finally {
+      state = TtsState(voice: AppConstants.defaultTtsVoiceForModel(_model));
+      _resettingPlayback = false;
+    }
+  }
+
+  Future<void> _enqueuePlaybackCommand(Future<void> Function() command) {
+    final result = _playbackCommandQueue.then((_) => command());
+    _playbackCommandQueue = result.catchError((_) {});
+    return result;
+  }
+
   Future<void> _restorePreviousAudio(TtsState previousState) async {
     final path = previousState.audioPath;
     if (path == null) {
@@ -353,10 +409,7 @@ class TtsNotifier extends StateNotifier<TtsState> {
 
   void _setFailure(Object error, AppMessage fallback) {
     final message = error is AppException ? error.localizedMessage : fallback;
-    state = state.copyWith(
-      phase: TtsPhase.failure,
-      error: message,
-    );
+    state = state.copyWith(phase: TtsPhase.failure, error: message);
   }
 
   @override

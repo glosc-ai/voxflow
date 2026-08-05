@@ -122,19 +122,15 @@ void main() {
     final service = TtsApiService(
       DioClient(_settings, dio: dio),
       writer: (bytes) async {
-        final file =
-            File('${directory.path}${Platform.pathSeparator}voice.mp3');
+        final file = File(
+          '${directory.path}${Platform.pathSeparator}voice.mp3',
+        );
         return file.writeAsBytes(bytes, flush: true);
       },
     );
 
     final file = await service.synthesize(
-      const TtsRequest(
-        text: '测试语音',
-        model: 'tts-1',
-        voice: 'alloy',
-        speed: 1,
-      ),
+      const TtsRequest(text: '测试语音', model: 'tts-1', voice: 'alloy', speed: 1),
     );
 
     expect(await file.readAsBytes(), [73, 68, 51]);
@@ -148,8 +144,9 @@ void main() {
   });
 
   test('TTS Notifier 完成合成、播放和结束状态转换', () async {
-    final directory =
-        await Directory.systemTemp.createTemp('voxflow_tts_state_');
+    final directory = await Directory.systemTemp.createTemp(
+      'voxflow_tts_state_',
+    );
     addTearDown(() => directory.delete(recursive: true));
     final audioFile = File(
       '${directory.path}${Platform.pathSeparator}generated.mp3',
@@ -183,8 +180,9 @@ void main() {
   });
 
   test('播放速率独立于合成语速，并按交付序列循环', () async {
-    final directory =
-        await Directory.systemTemp.createTemp('voxflow_tts_rate_');
+    final directory = await Directory.systemTemp.createTemp(
+      'voxflow_tts_rate_',
+    );
     addTearDown(() => directory.delete(recursive: true));
     final audioFile = File(
       '${directory.path}${Platform.pathSeparator}generated.mp3',
@@ -217,8 +215,9 @@ void main() {
   });
 
   test('重新合成期间停止旧音频，失败后恢复旧结果和播放设置', () async {
-    final directory =
-        await Directory.systemTemp.createTemp('voxflow_tts_restore_');
+    final directory = await Directory.systemTemp.createTemp(
+      'voxflow_tts_restore_',
+    );
     addTearDown(() => directory.delete(recursive: true));
     final audioFile = File(
       '${directory.path}${Platform.pathSeparator}generated.mp3',
@@ -276,8 +275,9 @@ void main() {
   });
 
   test('Seed TTS Notifier 默认使用模型专属 Speaker ID', () async {
-    final directory =
-        await Directory.systemTemp.createTemp('voxflow_seed_tts_state_');
+    final directory = await Directory.systemTemp.createTemp(
+      'voxflow_seed_tts_state_',
+    );
     addTearDown(() => directory.delete(recursive: true));
     final audioFile = File(
       '${directory.path}${Platform.pathSeparator}generated.mp3',
@@ -294,13 +294,104 @@ void main() {
     addTearDown(notifier.dispose);
 
     expect(notifier.state.voice, 'zh_female_cancan_uranus_bigtts');
-    expect(notifier.availableVoices, [
-      'zh_female_cancan_uranus_bigtts',
-    ]);
+    expect(notifier.availableVoices, ['zh_female_cancan_uranus_bigtts']);
 
     notifier.setVoice('alloy');
     expect(notifier.state.voice, 'zh_female_cancan_uranus_bigtts');
   });
+
+  test(
+    'reset queues stop after delayed play and prevents playback revival',
+    () async {
+      final directory = await Directory.systemTemp.createTemp(
+        'voxflow_tts_reset_race_',
+      );
+      addTearDown(() => directory.delete(recursive: true));
+      final audioFile = File(
+        '${directory.path}${Platform.pathSeparator}generated.mp3',
+      );
+      await audioFile.writeAsBytes([1, 2, 3]);
+      final playback = _DelayedPlayPlayback();
+      addTearDown(playback.dispose);
+      final notifier = TtsNotifier(
+        apiService: _FakeTtsService(audioFile),
+        playback: playback,
+        historyWriter: ({required text, required audioPath}) async {},
+        model: 'tts-1',
+      );
+      addTearDown(notifier.dispose);
+      await notifier.synthesize('reset race');
+
+      final play = notifier.playOrPause();
+      await playback.playStarted.future;
+      final reset = notifier.reset();
+      playback.allowPlay.complete();
+      await Future.wait([play, reset]);
+
+      expect(playback.playCalls, 1);
+      expect(playback.stopCalls, 1);
+      expect(notifier.state.phase, TtsPhase.idle);
+      expect(notifier.state.audioPath, isNull);
+
+      playback.complete();
+      await Future<void>.delayed(Duration.zero);
+      expect(notifier.state.phase, TtsPhase.idle);
+    },
+  );
+
+  test(
+    'old playback events cannot make an in-flight synthesis resettable',
+    () async {
+      final directory = await Directory.systemTemp.createTemp(
+        'voxflow_tts_generation_event_race_',
+      );
+      addTearDown(() => directory.delete(recursive: true));
+      final audioFile = File(
+        '${directory.path}${Platform.pathSeparator}generated.mp3',
+      );
+      await audioFile.writeAsBytes([1, 2, 3]);
+      final service = _ControllableTtsService(audioFile);
+      final playback = _FakePlayback();
+      addTearDown(playback.dispose);
+      final historyTexts = <String>[];
+      final notifier = TtsNotifier(
+        apiService: service,
+        playback: playback,
+        historyWriter: ({required text, required audioPath}) async {
+          historyTexts.add(text);
+        },
+        model: 'tts-1',
+      );
+      addTearDown(notifier.dispose);
+      await notifier.synthesize('existing audio');
+
+      final delayedRequest = service.delayNextRequest();
+      final synthesis = notifier.synthesize('replacement audio');
+      await Future<void>.delayed(Duration.zero);
+      expect(notifier.state.phase, TtsPhase.generating);
+
+      playback
+        ..emitPosition(const Duration(seconds: 1))
+        ..emitDuration(const Duration(seconds: 9))
+        ..complete();
+      await Future<void>.delayed(Duration.zero);
+
+      expect(notifier.state.phase, TtsPhase.generating);
+      expect(notifier.state.position, Duration.zero);
+      expect(notifier.state.duration, Duration.zero);
+      final stopCallsBeforeRejectedReset = playback.stopCalls;
+      await notifier.reset();
+      expect(notifier.state.phase, TtsPhase.generating);
+      expect(playback.stopCalls, stopCallsBeforeRejectedReset);
+      expect(historyTexts, ['existing audio']);
+
+      delayedRequest.complete(audioFile);
+      await synthesis;
+
+      expect(notifier.state.phase, TtsPhase.ready);
+      expect(historyTexts, ['existing audio', 'replacement audio']);
+    },
+  );
 
   test('未知合成错误保留中英文 fallback', () async {
     final playback = _FakePlayback();
@@ -442,9 +533,25 @@ class _FakePlayback implements PlaybackController {
 
   void complete() => _completions.add(null);
 
+  void emitPosition(Duration position) => _positions.add(position);
+
+  void emitDuration(Duration duration) => _durations.add(duration);
+
   Future<void> dispose() async {
     await _positions.close();
     await _durations.close();
     await _completions.close();
+  }
+}
+
+class _DelayedPlayPlayback extends _FakePlayback {
+  final playStarted = Completer<void>();
+  final allowPlay = Completer<void>();
+
+  @override
+  Future<void> play() async {
+    playCalls += 1;
+    playStarted.complete();
+    await allowPlay.future;
   }
 }

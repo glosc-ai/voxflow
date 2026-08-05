@@ -13,8 +13,8 @@ class HistoryRepository {
   HistoryRepository({
     DatabaseFactory? factory,
     DatabasePathProvider? pathProvider,
-  })  : _factory = factory,
-        _pathProvider = pathProvider ?? PathUtils.getDatabasePath;
+  }) : _factory = factory,
+       _pathProvider = pathProvider ?? PathUtils.getDatabasePath;
 
   final DatabaseFactory? _factory;
   final DatabasePathProvider _pathProvider;
@@ -111,8 +111,9 @@ class HistoryRepository {
       final trimmed = query.trim();
       final rows = await database.query(
         'history_records',
-        where:
-            trimmed.isEmpty ? null : "text LIKE ? ESCAPE '\\' COLLATE NOCASE",
+        where: trimmed.isEmpty
+            ? null
+            : "text LIKE ? ESCAPE '\\' COLLATE NOCASE",
         whereArgs: trimmed.isEmpty ? null : ['%${_escapeLike(trimmed)}%'],
         orderBy: 'created_at DESC, id DESC',
       );
@@ -143,6 +144,33 @@ class HistoryRepository {
         AppErrorCode.storageFailure,
         '无法删除历史记录。',
         englishMessage: 'Unable to delete the history record.',
+      );
+    }
+  }
+
+  /// Clears VoxFlow history metadata without touching any referenced files.
+  ///
+  /// Managed audio has a separate lifecycle because a record may also point
+  /// at a user-owned import. Keeping file deletion out of this module prevents
+  /// a database reset from deleting files outside VoxFlow's managed folder.
+  Future<void> clear() async {
+    try {
+      final database = await _db;
+      await database.transaction((transaction) async {
+        await transaction.delete('history_records');
+        await transaction.delete(
+          'sqlite_sequence',
+          where: 'name = ?',
+          whereArgs: const ['history_records'],
+        );
+      });
+    } on AppException {
+      rethrow;
+    } catch (_) {
+      throw const AppException(
+        AppErrorCode.storageFailure,
+        '无法清空本地历史记录。',
+        englishMessage: 'Unable to clear local history.',
       );
     }
   }

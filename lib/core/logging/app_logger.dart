@@ -10,10 +10,8 @@ enum AppLogLevel { debug, info, warning, error }
 typedef LogFileResolver = Future<File> Function();
 
 class AppLogger {
-  AppLogger({
-    LogFileResolver? fileResolver,
-    this.maxFileBytes = 1024 * 1024,
-  }) : _fileResolver = fileResolver ?? PathUtils.getLogFile;
+  AppLogger({LogFileResolver? fileResolver, this.maxFileBytes = 1024 * 1024})
+    : _fileResolver = fileResolver ?? PathUtils.getLogFile;
 
   static final AppLogger instance = AppLogger();
 
@@ -71,6 +69,40 @@ class AppLogger {
           AppErrorCode.storageFailure,
           '无法读取诊断日志。',
           englishMessage: 'Unable to read the diagnostic log.',
+        );
+      }
+    });
+  }
+
+  /// Deletes the active diagnostic log and its single rotated predecessor.
+  ///
+  /// Clearing is serialized with reads and writes so an earlier queued write
+  /// cannot recreate stale data after this future completes.
+  Future<void> clear() {
+    return _enqueue(() async {
+      try {
+        final file = await _fileResolver();
+        final files = [file, File('${file.path}.1')];
+        var deletionFailed = false;
+        for (final candidate in files) {
+          try {
+            if (await candidate.exists()) {
+              await candidate.delete();
+            }
+          } catch (_) {
+            deletionFailed = true;
+          }
+        }
+        if (deletionFailed) {
+          throw const FileSystemException(
+            'One or more diagnostic logs could not be deleted.',
+          );
+        }
+      } catch (_) {
+        throw const AppException(
+          AppErrorCode.storageFailure,
+          '无法清空诊断日志。',
+          englishMessage: 'Unable to clear diagnostic logs.',
         );
       }
     });
@@ -142,10 +174,7 @@ class AppLogger {
 
   Future<T> _enqueue<T>(Future<T> Function() action) {
     final queued = _pending.then((_) => action());
-    _pending = queued.then<void>(
-      (_) {},
-      onError: (_, __) {},
-    );
+    _pending = queued.then<void>((_) {}, onError: (_, __) {});
     return queued;
   }
 
@@ -166,10 +195,7 @@ class AppLogger {
           RegExp(r'Bearer\s+[^\s,;]+', caseSensitive: false),
           'Bearer [REDACTED]',
         )
-        .replaceAll(
-          RegExp(r'sk-[A-Za-z0-9_-]{6,}'),
-          '[REDACTED]',
-        )
+        .replaceAll(RegExp(r'sk-[A-Za-z0-9_-]{6,}'), '[REDACTED]')
         .replaceAll(
           RegExp(
             r'(api[_ -]?key|authorization)\s*[:=]\s*[^\s,;]+',

@@ -11,10 +11,7 @@ import '../../../widgets/mobile_design.dart';
 import '../providers/privacy_notice_provider.dart';
 
 class PrivacyNoticeGate extends ConsumerWidget {
-  const PrivacyNoticeGate({
-    required this.child,
-    super.key,
-  });
+  const PrivacyNoticeGate({required this.child, super.key});
 
   final Widget child;
 
@@ -38,17 +35,17 @@ class _PrivacyNoticeScreen extends ConsumerWidget {
     }
     return LayoutBuilder(
       builder: (context, constraints) {
-        final compact = constraints.maxWidth < AppBreakpoints.compact ||
+        final compact =
+            constraints.maxWidth < AppBreakpoints.compact ||
             constraints.maxHeight < 760 ||
             MediaQuery.textScalerOf(context).scale(1) >= 1.3;
         final action = FilledButton.icon(
           key: const Key('privacyNoticeAcceptButton'),
           onPressed: () => _acknowledge(context, ref),
           icon: const Icon(Icons.check),
-          label: Text(l10n.text(
-            zh: '我已了解并继续',
-            en: 'I understand and want to continue',
-          )),
+          label: Text(
+            l10n.text(zh: '我已了解并继续', en: 'I understand and want to continue'),
+          ),
         );
         return Scaffold(
           appBar: AppBar(
@@ -57,10 +54,7 @@ class _PrivacyNoticeScreen extends ConsumerWidget {
               largeTextMaxLines: 2,
             ),
             title: Text(
-              l10n.text(
-                zh: '数据与隐私说明',
-                en: 'Data and privacy',
-              ),
+              l10n.text(zh: '数据与隐私说明', en: 'Data and privacy'),
               maxLines: 2,
             ),
           ),
@@ -87,9 +81,9 @@ class _PrivacyNoticeScreen extends ConsumerWidget {
                               Icon(
                                 Icons.privacy_tip_outlined,
                                 size: 28,
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .onPrimaryContainer,
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onPrimaryContainer,
                               ),
                               const SizedBox(width: AppSpacing.md),
                               Expanded(
@@ -105,9 +99,9 @@ class _PrivacyNoticeScreen extends ConsumerWidget {
                                           .textTheme
                                           .titleLarge
                                           ?.copyWith(
-                                            color: Theme.of(context)
-                                                .colorScheme
-                                                .onPrimaryContainer,
+                                            color: Theme.of(
+                                              context,
+                                            ).colorScheme.onPrimaryContainer,
                                           ),
                                     ),
                                     const SizedBox(height: AppSpacing.xs),
@@ -120,9 +114,9 @@ class _PrivacyNoticeScreen extends ConsumerWidget {
                                           .textTheme
                                           .bodyMedium
                                           ?.copyWith(
-                                            color: Theme.of(context)
-                                                .colorScheme
-                                                .onPrimaryContainer,
+                                            color: Theme.of(
+                                              context,
+                                            ).colorScheme.onPrimaryContainer,
                                           ),
                                     ),
                                   ],
@@ -136,20 +130,17 @@ class _PrivacyNoticeScreen extends ConsumerWidget {
                       AppStatusBanner(
                         kind: AppStatusKind.warning,
                         title: l10n.text(
-                          zh: 'API Key 本机存储提示',
-                          en: 'API key storage notice',
+                          zh: 'API Key 安全存储',
+                          en: 'Protected API key storage',
                         ),
                         message: l10n.text(
-                          zh: 'API Key 会以明文形式保存在本机应用设置中。请仅使用可撤销、低额度的受限测试密钥。',
-                          en: 'The API key is stored as plain text in local app settings. Use only a revocable, low-limit key.',
+                          zh: 'API Key 在 Windows 上由当前用户配置文件的 DPAPI 保护，在 Android 上由当前应用安装的 Keystore 保护；不会写入普通应用设置、系统备份或诊断日志。',
+                          en: 'The API key is protected by DPAPI for the current Windows user profile or by Keystore for the current Android app installation, and is never written to ordinary app preferences, system backups, or diagnostic logs.',
                         ),
                       ),
                       const SizedBox(height: AppSpacing.md),
                       AppSection(
-                        title: l10n.text(
-                          zh: '数据范围',
-                          en: 'Data scope',
-                        ),
+                        title: l10n.text(zh: '数据范围', en: 'Data scope'),
                         description: l10n.text(
                           zh: '以下信息帮助你判断当前配置是否符合自己的隐私要求。',
                           en: 'Use this information to decide whether the current configuration meets your privacy requirements.',
@@ -197,10 +188,7 @@ class _PrivacyNoticeScreen extends ConsumerWidget {
                       ),
                       if (!compact) ...[
                         const SizedBox(height: AppSpacing.xl),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: action,
-                        ),
+                        Align(alignment: Alignment.centerRight, child: action),
                       ],
                     ],
                   ),
@@ -254,10 +242,7 @@ class _PrivacyNoticeScreen extends ConsumerWidget {
                   zh: 'Privacy · 本地数据',
                   en: 'Privacy · Local data',
                 ),
-                title: l10n.text(
-                  zh: '数据与隐私说明',
-                  en: 'Data and privacy',
-                ),
+                title: l10n.text(zh: '数据与隐私说明', en: 'Data and privacy'),
               ),
               MobileSurfaceCard(
                 radius: AppRadii.mobileHero,
@@ -282,9 +267,7 @@ class _PrivacyNoticeScreen extends ConsumerWidget {
                               zh: '开始使用前，请确认数据处理方式',
                               en: 'Review how your data is handled',
                             ),
-                            style: Theme.of(context)
-                                .textTheme
-                                .titleLarge
+                            style: Theme.of(context).textTheme.titleLarge
                                 ?.copyWith(
                                   color: colors.onPrimaryContainer,
                                   fontWeight: FontWeight.w600,
@@ -296,9 +279,7 @@ class _PrivacyNoticeScreen extends ConsumerWidget {
                               zh: 'VoxFlow 只会将内容发送到你配置的服务，并在本机保存必要的任务记录。',
                               en: 'VoxFlow sends content only to the service you configure and keeps necessary task records on this device.',
                             ),
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodyMedium
+                            style: Theme.of(context).textTheme.bodyMedium
                                 ?.copyWith(color: colors.onPrimaryContainer),
                           ),
                         ],
@@ -311,12 +292,12 @@ class _PrivacyNoticeScreen extends ConsumerWidget {
               AppStatusBanner(
                 kind: AppStatusKind.warning,
                 title: l10n.text(
-                  zh: 'API Key 本机存储提示',
-                  en: 'API key storage notice',
+                  zh: 'API Key 安全存储',
+                  en: 'Protected API key storage',
                 ),
                 message: l10n.text(
-                  zh: 'API Key 会以明文形式保存在本机应用设置中。请仅使用可撤销、低额度的受限测试密钥。',
-                  en: 'The API key is stored as plain text in local app settings. Use only a revocable, low-limit key.',
+                  zh: 'API Key 在 Windows 上由当前用户配置文件的 DPAPI 保护，在 Android 上由当前应用安装的 Keystore 保护；不会写入普通应用设置、系统备份或诊断日志。',
+                  en: 'The API key is protected by DPAPI for the current Windows user profile or by Keystore for the current Android app installation, and is never written to ordinary app preferences, system backups, or diagnostic logs.',
                 ),
               ),
               const SizedBox(height: AppSpacing.md),
@@ -328,8 +309,8 @@ class _PrivacyNoticeScreen extends ConsumerWidget {
                     Text(
                       l10n.text(zh: '数据范围', en: 'Data scope'),
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                     const SizedBox(height: AppSpacing.xxs),
                     Text(
@@ -338,16 +319,13 @@ class _PrivacyNoticeScreen extends ConsumerWidget {
                         en: 'Confirm that the current configuration meets your privacy requirements.',
                       ),
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: colors.onSurfaceVariant,
-                          ),
+                        color: colors.onSurfaceVariant,
+                      ),
                     ),
                     const SizedBox(height: AppSpacing.md),
                     _NoticeItem(
                       icon: Icons.cloud_upload_outlined,
-                      title: l10n.text(
-                        zh: '数据外发',
-                        en: 'Data sent externally',
-                      ),
+                      title: l10n.text(zh: '数据外发', en: 'Data sent externally'),
                       description: l10n.text(
                         zh: '你提交的文本和音频会发送到你配置的 API 服务商，VoxFlow 不会替你选择其他服务商。',
                         en: 'Submitted text and audio are sent to the API provider you configure. VoxFlow does not choose another provider for you.',
@@ -368,10 +346,7 @@ class _PrivacyNoticeScreen extends ConsumerWidget {
                     const Divider(height: AppSpacing.xl),
                     _NoticeItem(
                       icon: Icons.description_outlined,
-                      title: l10n.text(
-                        zh: '诊断日志',
-                        en: 'Diagnostic logs',
-                      ),
+                      title: l10n.text(zh: '诊断日志', en: 'Diagnostic logs'),
                       description: l10n.text(
                         zh: '日志会脱敏 API Key、认证头和输入正文，但仍可能包含请求时间、接口路径、模型和错误原因。',
                         en: 'Logs redact API keys, authorization headers, and input content, but may include request times, endpoint paths, models, and error reasons.',
@@ -394,10 +369,7 @@ class _PrivacyNoticeScreen extends ConsumerWidget {
             key: const Key('privacyNoticeAcceptButton'),
             onPressed: () => _acknowledge(context, ref),
             child: Text(
-              l10n.text(
-                zh: '我已了解并继续',
-                en: 'I understand and want to continue',
-              ),
+              l10n.text(zh: '我已了解并继续', en: 'I understand and want to continue'),
               maxLines: 2,
               textAlign: TextAlign.center,
             ),
@@ -412,9 +384,9 @@ class _PrivacyNoticeScreen extends ConsumerWidget {
       await ref.read(privacyNoticeProvider.notifier).acknowledge();
     } on AppException catch (error) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(context.l10n.appError(error))),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(context.l10n.appError(error))));
       }
     }
   }
@@ -459,8 +431,8 @@ class _NoticeItem extends StatelessWidget {
                 Text(
                   description,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: colors.onSurfaceVariant,
-                      ),
+                    color: colors.onSurfaceVariant,
+                  ),
                 ),
               ],
             ),

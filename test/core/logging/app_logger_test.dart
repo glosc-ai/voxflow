@@ -7,9 +7,7 @@ void main() {
   test('日志写入 JSONL 并脱敏密钥、认证头与输入内容', () async {
     final directory = await Directory.systemTemp.createTemp('voxflow_log_');
     addTearDown(() => directory.delete(recursive: true));
-    final file = File(
-      '${directory.path}${Platform.pathSeparator}voxflow.log',
-    );
+    final file = File('${directory.path}${Platform.pathSeparator}voxflow.log');
     final logger = AppLogger(fileResolver: () async => file);
 
     await logger.error(
@@ -37,13 +35,8 @@ void main() {
   test('日志超过限制后轮转并保留上一份', () async {
     final directory = await Directory.systemTemp.createTemp('voxflow_rotate_');
     addTearDown(() => directory.delete(recursive: true));
-    final file = File(
-      '${directory.path}${Platform.pathSeparator}voxflow.log',
-    );
-    final logger = AppLogger(
-      fileResolver: () async => file,
-      maxFileBytes: 120,
-    );
+    final file = File('${directory.path}${Platform.pathSeparator}voxflow.log');
+    final logger = AppLogger(fileResolver: () async => file, maxFileBytes: 120);
 
     await logger.info('test', 'first', fields: {'reason': 'a' * 100});
     await logger.info('test', 'second');
@@ -55,9 +48,7 @@ void main() {
   test('单次写入失败后日志队列仍可继续工作', () async {
     final directory = await Directory.systemTemp.createTemp('voxflow_retry_');
     addTearDown(() => directory.delete(recursive: true));
-    final file = File(
-      '${directory.path}${Platform.pathSeparator}voxflow.log',
-    );
+    final file = File('${directory.path}${Platform.pathSeparator}voxflow.log');
     var shouldFail = true;
     final logger = AppLogger(
       fileResolver: () async {
@@ -74,4 +65,33 @@ void main() {
 
     expect(await logger.readAll(), contains('recovered_write'));
   });
+
+  test(
+    'clear removes current and rotated logs, is idempotent, and can log again',
+    () async {
+      final directory = await Directory.systemTemp.createTemp(
+        'voxflow_log_clear_',
+      );
+      addTearDown(() => directory.delete(recursive: true));
+      final file = File(
+        '${directory.path}${Platform.pathSeparator}voxflow.log',
+      );
+      final rotated = File('${file.path}.1');
+      final sibling = File('${file.path}.export');
+      await file.writeAsString('current');
+      await rotated.writeAsString('rotated');
+      await sibling.writeAsString('user copy');
+      final logger = AppLogger(fileResolver: () async => file);
+
+      await logger.clear();
+      await logger.clear();
+
+      expect(await file.exists(), isFalse);
+      expect(await rotated.exists(), isFalse);
+      expect(await sibling.exists(), isTrue);
+
+      await logger.info('test', 'after_clear');
+      expect(await logger.readAll(), contains('after_clear'));
+    },
+  );
 }

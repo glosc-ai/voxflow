@@ -66,4 +66,47 @@ void main() {
     await repository.delete(record.id!);
     expect(await repository.search(), isEmpty);
   });
+
+  test(
+    'clear removes every record, is idempotent, and keeps audio files',
+    () async {
+      final externalAudio = File(
+        '${temporaryDirectory.path}${Platform.pathSeparator}user-import.wav',
+      );
+      await externalAudio.writeAsString('user owned');
+
+      await repository.insert(
+        HistoryRecord(
+          type: HistoryType.stt,
+          text: 'first',
+          audioPath: externalAudio.path,
+          createdAt: DateTime.utc(2026, 1, 1),
+        ),
+      );
+      await repository.insert(
+        HistoryRecord(
+          type: HistoryType.tts,
+          text: 'second',
+          audioPath: externalAudio.path,
+          createdAt: DateTime.utc(2026, 1, 2),
+        ),
+      );
+
+      await repository.clear();
+      await repository.clear();
+
+      expect(await repository.search(), isEmpty);
+      expect(await externalAudio.exists(), isTrue);
+
+      final insertedAfterReset = await repository.insert(
+        HistoryRecord(
+          type: HistoryType.stt,
+          text: 'after reset',
+          audioPath: externalAudio.path,
+          createdAt: DateTime.utc(2026, 1, 3),
+        ),
+      );
+      expect(insertedAfterReset.id, 1);
+    },
+  );
 }

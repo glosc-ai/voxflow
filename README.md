@@ -27,7 +27,9 @@ main.dart → VoxFlowBootstrap → ProviderScope → VoxFlowApp
           → PrivacyNoticeGate → AppShell
 ```
 
-`VoxFlowBootstrap` 会先初始化 SharedPreferences，再将其注入 Riverpod。
+`VoxFlowBootstrap` 会先初始化 SharedPreferences 和平台安全凭据存储，校验加密凭据包
+中的 API Key/API Root 绑定关系，并在配套 Root 有效时完成旧版明文 API Key 的一次性
+迁移，再注入 Riverpod。
 `VoxFlowApp` 根据设置装配主题和语言，并在进入主界面前显示数据与隐私说明；
 `AppShell` 使用 `IndexedStack` 保存各功能页面状态，并在 Android 显示底部导航、
 在 Windows 显示 `NavigationRail`。
@@ -72,12 +74,13 @@ flowchart LR
     View["Views / AppShell"] --> State["Riverpod Providers / StateNotifier"]
     State --> Service["Feature Services / Repositories"]
     Service --> Core["DioClient / 路径 / 日志 / 错误"]
-    Service --> Platform["录音 / 播放 / FFmpeg / SharedPreferences / SQLite"]
+    Service --> Platform["录音 / 播放 / FFmpeg / 安全凭据 / SharedPreferences / SQLite"]
     Core --> Remote["OpenAI 兼容 HTTP / SeedASR WebSocket"]
 ```
 
-- 设置模块通过 SharedPreferences 保存 API、模型、主题和语言配置；网络请求在发起时
-  动态读取当前配置。
+- 设置模块通过 Windows 当前用户级 DPAPI 或 Android Keystore 加密保存 API Key 与
+  规范化 API Root 的绑定凭据包；供界面编辑的 Root、模型、主题和语言配置保存在
+  SharedPreferences，网络请求在发起时动态读取当前已验证配置。
 - STT 根据模型选择 Whisper/OpenAI 兼容的 HTTP multipart，或 SeedASR 二进制
   WebSocket。SeedASR 模块会在内部检测输入，并通过 FFmpeg 将不兼容音频临时转换为
   16 kHz、16-bit、单声道 PCM WAV；TTS 通过 `/audio/speech` 获取 MP3 字节。
@@ -134,8 +137,18 @@ Windows 发布时必须分发 `build/windows/x64/runner/Release` 完整目录，
 自定义代理必须使用 HTTPS，并兼容 `/models`、`/audio/transcriptions` 和
 `/audio/speech`。
 
-API Key 按项目约束保存在本机 SharedPreferences 中，不具备操作系统密钥库级加密；
-应用不会把密钥写入调试日志或错误提示。
+API Key 在 Windows 上使用当前用户级 DPAPI 加密，在 Android 上使用 Android
+Keystore AES-GCM 加密；加密内容同时绑定保存时规范化后的 API Root。普通
+SharedPreferences、调试日志和错误提示均不会保存或显示密钥。Android 应用数据不会
+进入系统云备份或设备迁移。旧版本留下的明文 Key 或安全存储中的旧格式 Key，只有在
+配套 API Root 有效、绑定凭据包写入并回读验证成功后才会自动迁移。API Root 缺失、
+无效、与安全包不匹配，或 Key/Root 更新未完整确认时，旧版明文 Key 会被验证删除，
+应用会显示凭据恢复提示、隐藏 Key 并禁止自动联网；重新保存一组完整凭据后才解除该
+状态。
+
+应用启动后会自动调用 `/models` 检查已保存配置的可用性，并在桌面侧栏状态区域显示
+未配置、检测中、已连接或连接失败。设置页还提供“清空全部数据”，可删除安全凭据、
+偏好、历史、受管音频、诊断日志与隐私确认；用户导入的原始文件和另存文件不受影响。
 
 转录源文件限制为 25 MB，支持 MP3、MP4、MPEG、MPGA、M4A、WAV 和 WEBM。
 选择 SeedASR 时，应用会自动把非目标格式转换为 16 kHz、16-bit、单声道 PCM

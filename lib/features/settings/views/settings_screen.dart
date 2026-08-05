@@ -15,6 +15,7 @@ import '../../../widgets/app_section.dart';
 import '../../../widgets/app_status_banner.dart';
 import '../../../widgets/mobile_design.dart';
 import '../models/settings_state.dart';
+import '../providers/application_data_reset_provider.dart';
 import '../providers/settings_provider.dart';
 import '../widgets/masked_text_editing_controller.dart';
 import '../widgets/speech_model_selector.dart';
@@ -63,22 +64,41 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final settings = ref.watch(settingsProvider);
-    ref.listen<String>(
-      settingsProvider.select((value) => value.sttModel),
-      (previous, next) {
-        if (!_sttModelDirty && _sttModel != next && mounted) {
-          setState(() => _sttModel = next);
-        }
-      },
-    );
-    ref.listen<String>(
-      settingsProvider.select((value) => value.ttsModel),
-      (previous, next) {
-        if (!_ttsModelDirty && _ttsModel != next && mounted) {
-          setState(() => _ttsModel = next);
-        }
-      },
-    );
+    final applicationReset = ref.watch(applicationDataResetProvider);
+    final isResettingAllData = applicationReset.isLoading;
+    final interactionsDisabled = settings.isBusy || isResettingAllData;
+    ref.listen<String>(settingsProvider.select((value) => value.apiKey), (
+      previous,
+      next,
+    ) {
+      if (_apiKeyController.text != next) {
+        _apiKeyController.text = next;
+      }
+    });
+    ref.listen<String>(settingsProvider.select((value) => value.baseUrl), (
+      previous,
+      next,
+    ) {
+      if (_baseUrlController.text != next) {
+        _baseUrlController.text = next;
+      }
+    });
+    ref.listen<String>(settingsProvider.select((value) => value.sttModel), (
+      previous,
+      next,
+    ) {
+      if (!_sttModelDirty && _sttModel != next && mounted) {
+        setState(() => _sttModel = next);
+      }
+    });
+    ref.listen<String>(settingsProvider.select((value) => value.ttsModel), (
+      previous,
+      next,
+    ) {
+      if (!_ttsModelDirty && _ttsModel != next && mounted) {
+        setState(() => _ttsModel = next);
+      }
+    });
     final l10n = context.l10n;
     final colors = Theme.of(context).colorScheme;
     final isFetchingModels =
@@ -88,7 +108,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final isSaving = settings.activeOperation == SettingsOperation.saving;
     final useDesktopLayout =
         Theme.of(context).platform == TargetPlatform.windows &&
-            MediaQuery.sizeOf(context).width >= 760;
+        MediaQuery.sizeOf(context).width >= 760;
     final useMobileLayout =
         Theme.of(context).platform == TargetPlatform.android;
     final useLiveModelSelectors = useDesktopLayout || useMobileLayout;
@@ -113,7 +133,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     return CallbackShortcuts(
       bindings: {
         const SingleActivator(LogicalKeyboardKey.enter, control: true): () {
-          if (!settings.isBusy) {
+          if (!interactionsDisabled) {
             _submit(testConnection: false);
           }
         },
@@ -129,156 +149,187 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 isFetchingModels: isFetchingModels,
                 isTestingConnection: isTestingConnection,
                 isSaving: isSaving,
+                interactionsDisabled: interactionsDisabled,
+                isResettingAllData: isResettingAllData,
               )
             : useMobileLayout
-                ? _buildMobilePage(
-                    settings: settings,
-                    isFetchingModels: isFetchingModels,
-                    isTestingConnection: isTestingConnection,
-                    isSaving: isSaving,
-                  )
-                : Scaffold(
-                    appBar: AppBar(
-                      toolbarHeight: AppTheme.responsiveAppBarHeight(
-                        context,
-                        largeTextMaxLines: 1,
-                      ),
-                      title: Text(
-                        l10n.text(zh: '设置', en: 'Settings'),
-                        maxLines: 1,
-                      ),
-                    ),
-                    body: SafeArea(
-                      top: false,
-                      child: Center(
-                        child: SingleChildScrollView(
-                          padding: AppLayout.pagePadding(context),
-                          child: ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 720),
-                            child: Form(
-                              key: _formKey,
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  Text(
-                                    l10n.text(
-                                      zh: '连接、模型与本机诊断',
-                                      en: 'Connection, models, and local diagnostics',
+            ? _buildMobilePage(
+                settings: settings,
+                isFetchingModels: isFetchingModels,
+                isTestingConnection: isTestingConnection,
+                isSaving: isSaving,
+                interactionsDisabled: interactionsDisabled,
+                isResettingAllData: isResettingAllData,
+              )
+            : Scaffold(
+                appBar: AppBar(
+                  toolbarHeight: AppTheme.responsiveAppBarHeight(
+                    context,
+                    largeTextMaxLines: 1,
+                  ),
+                  title: Text(l10n.text(zh: '设置', en: 'Settings'), maxLines: 1),
+                ),
+                body: SafeArea(
+                  top: false,
+                  child: Center(
+                    child: SingleChildScrollView(
+                      padding: AppLayout.pagePadding(context),
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 720),
+                        child: Form(
+                          key: _formKey,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Text(
+                                l10n.text(
+                                  zh: '连接、模型与本机诊断',
+                                  en: 'Connection, models, and local diagnostics',
+                                ),
+                                style: Theme.of(context).textTheme.bodyLarge
+                                    ?.copyWith(
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onSurfaceVariant,
                                     ),
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .bodyLarge
-                                        ?.copyWith(
-                                          color: Theme.of(context)
-                                              .colorScheme
-                                              .onSurfaceVariant,
-                                        ),
-                                  ),
-                                  const SizedBox(height: AppSpacing.md),
-                                  AppStatusBanner(
-                                    kind: AppStatusKind.warning,
-                                    title: l10n.text(
-                                      zh: '使用受限密钥',
-                                      en: 'Use a restricted key',
-                                    ),
-                                    message: l10n.text(
-                                      zh: 'API Key 以明文保存在本机。请使用可撤销、低额度的专用密钥；应用日志不会记录密钥。',
-                                      en: 'The API key is stored as plain text on this device. Use a revocable, low-limit key. App logs never record the key.',
-                                    ),
-                                  ),
-                                  const SizedBox(height: AppSpacing.md),
-                                  AppSection(
-                                    title: l10n.text(
-                                      zh: 'API 连接',
-                                      en: 'API connection',
-                                    ),
-                                    description: l10n.text(
-                                      zh: '配置 OpenAI 兼容服务，并在保存前验证连接。',
-                                      en: 'Configure an OpenAI-compatible service and verify it before saving.',
-                                    ),
-                                    leading: const Icon(Icons.link),
-                                    trailing: OutlinedButton.icon(
-                                      key: const Key('fetchModelsButton'),
-                                      onPressed:
-                                          settings.isBusy ? null : _fetchModels,
-                                      icon: isFetchingModels
-                                          ? SizedBox.square(
-                                              dimension: 16,
-                                              child: CircularProgressIndicator(
-                                                strokeWidth: 2,
-                                                color: colors.primary,
-                                              ),
-                                            )
-                                          : const Icon(Icons.download_outlined),
-                                      label: Text(
-                                        isFetchingModels
-                                            ? l10n.text(
-                                                zh: '正在获取…',
-                                                en: 'Fetching…',
-                                              )
-                                            : l10n.text(
-                                                zh: '获取模型',
-                                                en: 'Fetch models',
-                                              ),
-                                      ),
-                                    ),
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.stretch,
-                                      children: [
-                                        TextFormField(
-                                          key: const Key('baseUrlField'),
-                                          controller: _baseUrlController,
-                                          keyboardType: TextInputType.url,
-                                          textInputAction: TextInputAction.next,
-                                          decoration: const InputDecoration(
-                                            labelText: 'API Root',
-                                            hintText:
-                                                AppConstants.defaultBaseUrl,
-                                            prefixIcon: Icon(Icons.link),
+                              ),
+                              const SizedBox(height: AppSpacing.md),
+                              if (settings.credentialRecoveryRequired) ...[
+                                _buildCredentialRecoveryBanner(l10n),
+                                const SizedBox(height: AppSpacing.md),
+                              ],
+                              AppSection(
+                                title: l10n.text(
+                                  zh: 'API 连接',
+                                  en: 'API connection',
+                                ),
+                                description: l10n.text(
+                                  zh: '配置 OpenAI 兼容服务，并在保存前验证连接。',
+                                  en: 'Configure an OpenAI-compatible service and verify it before saving.',
+                                ),
+                                leading: const Icon(Icons.link),
+                                trailing: OutlinedButton.icon(
+                                  key: const Key('fetchModelsButton'),
+                                  onPressed: interactionsDisabled
+                                      ? null
+                                      : _fetchModels,
+                                  icon: isFetchingModels
+                                      ? SizedBox.square(
+                                          dimension: 16,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: colors.primary,
                                           ),
-                                          validator: (value) {
-                                            try {
-                                              SettingsState.normalizeBaseUrl(
-                                                  value ?? '');
-                                              return null;
-                                            } on AppException catch (error) {
-                                              return l10n.appError(error);
-                                            }
-                                          },
-                                        ),
-                                        const SizedBox(height: AppSpacing.md),
-                                        Semantics(
-                                          key: const Key('apiKeySemantics'),
-                                          textField: true,
-                                          readOnly: false,
-                                          focusable: true,
-                                          focused: _apiKeyFocusNode.hasFocus,
-                                          obscured: _obscureApiKey,
+                                        )
+                                      : const Icon(Icons.download_outlined),
+                                  label: Text(
+                                    isFetchingModels
+                                        ? l10n.text(
+                                            zh: '正在获取…',
+                                            en: 'Fetching…',
+                                          )
+                                        : l10n.text(
+                                            zh: '获取模型',
+                                            en: 'Fetch models',
+                                          ),
+                                  ),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    TextFormField(
+                                      key: const Key('baseUrlField'),
+                                      controller: _baseUrlController,
+                                      keyboardType: TextInputType.url,
+                                      textInputAction: TextInputAction.next,
+                                      decoration: const InputDecoration(
+                                        labelText: 'API Root',
+                                        hintText: AppConstants.defaultBaseUrl,
+                                        prefixIcon: Icon(Icons.link),
+                                      ),
+                                      validator: (value) {
+                                        try {
+                                          SettingsState.normalizeBaseUrl(
+                                            value ?? '',
+                                          );
+                                          return null;
+                                        } on AppException catch (error) {
+                                          return l10n.appError(error);
+                                        }
+                                      },
+                                    ),
+                                    const SizedBox(height: AppSpacing.md),
+                                    Semantics(
+                                      key: const Key('apiKeySemantics'),
+                                      textField: true,
+                                      readOnly: false,
+                                      focusable: true,
+                                      focused: _apiKeyFocusNode.hasFocus,
+                                      obscured: _obscureApiKey,
+                                      label: _obscureApiKey
+                                          ? l10n.text(
+                                              zh: 'API Key，内容已隐藏',
+                                              en: 'API key, content hidden',
+                                            )
+                                          : l10n.text(
+                                              zh: 'API Key，内容可见',
+                                              en: 'API key, content visible',
+                                            ),
+                                      value: _obscureApiKey
+                                          ? (_apiKeyController.text.isEmpty
+                                                ? l10n.text(
+                                                    zh: '未填写',
+                                                    en: 'Not entered',
+                                                  )
+                                                : l10n.text(
+                                                    zh: '已填写',
+                                                    en: 'Entered',
+                                                  ))
+                                          : _apiKeyController.text,
+                                      onTap: _apiKeyFocusNode.requestFocus,
+                                      customSemanticsActions: {
+                                        CustomSemanticsAction(
                                           label: _obscureApiKey
                                               ? l10n.text(
-                                                  zh: 'API Key，内容已隐藏',
-                                                  en: 'API key, content hidden',
+                                                  zh: '显示密钥',
+                                                  en: 'Show API key',
                                                 )
                                               : l10n.text(
-                                                  zh: 'API Key，内容可见',
-                                                  en: 'API key, content visible',
+                                                  zh: '隐藏密钥',
+                                                  en: 'Hide API key',
                                                 ),
-                                          value: _obscureApiKey
-                                              ? (_apiKeyController.text.isEmpty
-                                                  ? l10n.text(
-                                                      zh: '未填写',
-                                                      en: 'Not entered',
-                                                    )
-                                                  : l10n.text(
-                                                      zh: '已填写',
-                                                      en: 'Entered',
-                                                    ))
-                                              : _apiKeyController.text,
-                                          onTap: _apiKeyFocusNode.requestFocus,
-                                          customSemanticsActions: {
-                                            CustomSemanticsAction(
-                                              label: _obscureApiKey
+                                        ): _toggleApiKeyVisibility,
+                                      },
+                                      onSetText: (value) {
+                                        setState(() {
+                                          _apiKeyController
+                                              .value = TextEditingValue(
+                                            text: value,
+                                            selection: TextSelection.collapsed(
+                                              offset: value.length,
+                                            ),
+                                          );
+                                        });
+                                      },
+                                      child: ExcludeSemantics(
+                                        child: TextFormField(
+                                          key: const Key('apiKeyField'),
+                                          controller: _apiKeyController,
+                                          focusNode: _apiKeyFocusNode,
+                                          keyboardType:
+                                              TextInputType.visiblePassword,
+                                          textInputAction: TextInputAction.next,
+                                          enableSuggestions: false,
+                                          autocorrect: false,
+                                          enableInteractiveSelection:
+                                              !_obscureApiKey,
+                                          onChanged: (_) => setState(() {}),
+                                          decoration: InputDecoration(
+                                            labelText: 'API Key',
+                                            prefixIcon: const Icon(Icons.key),
+                                            suffixIcon: IconButton(
+                                              tooltip: _obscureApiKey
                                                   ? l10n.text(
                                                       zh: '显示密钥',
                                                       en: 'Show API key',
@@ -287,427 +338,412 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                                       zh: '隐藏密钥',
                                                       en: 'Hide API key',
                                                     ),
-                                            ): _toggleApiKeyVisibility,
-                                          },
-                                          onSetText: (value) {
-                                            setState(() {
-                                              _apiKeyController.value =
-                                                  TextEditingValue(
-                                                text: value,
-                                                selection:
-                                                    TextSelection.collapsed(
-                                                  offset: value.length,
-                                                ),
-                                              );
-                                            });
-                                          },
-                                          child: ExcludeSemantics(
-                                            child: TextFormField(
-                                              key: const Key('apiKeyField'),
-                                              controller: _apiKeyController,
-                                              focusNode: _apiKeyFocusNode,
-                                              keyboardType:
-                                                  TextInputType.visiblePassword,
-                                              textInputAction:
-                                                  TextInputAction.next,
-                                              enableSuggestions: false,
-                                              autocorrect: false,
-                                              enableInteractiveSelection:
-                                                  !_obscureApiKey,
-                                              onChanged: (_) => setState(() {}),
-                                              decoration: InputDecoration(
-                                                labelText: 'API Key',
-                                                prefixIcon:
-                                                    const Icon(Icons.key),
-                                                suffixIcon: IconButton(
-                                                  tooltip: _obscureApiKey
-                                                      ? l10n.text(
-                                                          zh: '显示密钥',
-                                                          en: 'Show API key',
-                                                        )
-                                                      : l10n.text(
-                                                          zh: '隐藏密钥',
-                                                          en: 'Hide API key',
-                                                        ),
-                                                  onPressed:
-                                                      _toggleApiKeyVisibility,
-                                                  icon: Icon(
-                                                    _obscureApiKey
-                                                        ? Icons.visibility
-                                                        : Icons.visibility_off,
-                                                  ),
-                                                ),
+                                              onPressed:
+                                                  _toggleApiKeyVisibility,
+                                              icon: Icon(
+                                                _obscureApiKey
+                                                    ? Icons.visibility
+                                                    : Icons.visibility_off,
                                               ),
-                                              validator: (value) =>
-                                                  value == null ||
-                                                          value.trim().isEmpty
-                                                      ? l10n.text(
-                                                          zh: '请填写 API Key',
-                                                          en: 'Enter an API key',
-                                                        )
-                                                      : null,
                                             ),
                                           ),
+                                          validator: (value) =>
+                                              value == null ||
+                                                  value.trim().isEmpty
+                                              ? l10n.text(
+                                                  zh: '请填写 API Key',
+                                                  en: 'Enter an API key',
+                                                )
+                                              : null,
                                         ),
-                                        const SizedBox(height: AppSpacing.md),
-                                        Align(
-                                          alignment: Alignment.centerRight,
-                                          child: OutlinedButton.icon(
-                                            onPressed: settings.isBusy
-                                                ? null
-                                                : () => _submit(
-                                                    testConnection: true),
-                                            icon: isTestingConnection
-                                                ? const SizedBox.square(
-                                                    dimension: 16,
-                                                    child:
-                                                        CircularProgressIndicator(
+                                      ),
+                                    ),
+                                    const SizedBox(height: AppSpacing.md),
+                                    Align(
+                                      alignment: Alignment.centerRight,
+                                      child: OutlinedButton.icon(
+                                        onPressed: interactionsDisabled
+                                            ? null
+                                            : () =>
+                                                  _submit(testConnection: true),
+                                        icon: isTestingConnection
+                                            ? const SizedBox.square(
+                                                dimension: 16,
+                                                child:
+                                                    CircularProgressIndicator(
                                                       strokeWidth: 2,
+                                                    ),
+                                              )
+                                            : const Icon(Icons.network_check),
+                                        label: Text(
+                                          isTestingConnection
+                                              ? l10n.text(
+                                                  zh: '正在检查…',
+                                                  en: 'Checking…',
+                                                )
+                                              : l10n.text(
+                                                  zh: '测试 API 连通性',
+                                                  en: 'Test API connection',
+                                                ),
+                                        ),
+                                      ),
+                                    ),
+                                    if (settings.lastConnectionSucceeded !=
+                                        null) ...[
+                                      const SizedBox(height: AppSpacing.md),
+                                      AppStatusBanner(
+                                        kind: settings.lastConnectionSucceeded!
+                                            ? AppStatusKind.success
+                                            : AppStatusKind.error,
+                                        title: settings.lastConnectionSucceeded!
+                                            ? l10n.text(
+                                                zh: '连接可用',
+                                                en: 'Connection available',
+                                              )
+                                            : l10n.text(
+                                                zh: '连接失败',
+                                                en: 'Connection failed',
+                                              ),
+                                        message:
+                                            settings.messageFor(
+                                              Localizations.localeOf(context),
+                                            ) ??
+                                            '',
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: AppSpacing.md),
+                              AppSection(
+                                title: l10n.text(zh: '模型', en: 'Models'),
+                                description: l10n.text(
+                                  zh: '先获取服务支持的模型，再选择用于转录和语音合成的默认模型。',
+                                  en: 'Fetch supported models, then choose defaults for transcription and speech synthesis.',
+                                ),
+                                leading: const Icon(Icons.tune),
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    DropdownButtonFormField<String>(
+                                      key: const Key('sttModelField'),
+                                      initialValue:
+                                          sttModels.contains(_sttModel)
+                                          ? _sttModel
+                                          : null,
+                                      isExpanded: true,
+                                      decoration: InputDecoration(
+                                        labelText: l10n.text(
+                                          zh: '语音转文字模型',
+                                          en: 'Speech-to-text model',
+                                        ),
+                                      ),
+                                      disabledHint:
+                                          settings.hasFetchedModels &&
+                                              sttModels.isEmpty
+                                          ? Text(
+                                              l10n.text(
+                                                zh: '服务未提供兼容的语音转文字模型',
+                                                en: 'No compatible speech-to-text model',
+                                              ),
+                                            )
+                                          : null,
+                                      items: sttModels
+                                          .map(
+                                            (model) => DropdownMenuItem(
+                                              value: model,
+                                              child: Text(
+                                                model,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                          )
+                                          .toList(),
+                                      onChanged:
+                                          interactionsDisabled ||
+                                              sttModels.isEmpty
+                                          ? null
+                                          : (value) {
+                                              _sttModel = value;
+                                              _sttModelDirty = true;
+                                            },
+                                    ),
+                                    const SizedBox(height: AppSpacing.md),
+                                    DropdownButtonFormField<String>(
+                                      key: const Key('ttsModelField'),
+                                      initialValue:
+                                          ttsModels.contains(_ttsModel)
+                                          ? _ttsModel
+                                          : null,
+                                      isExpanded: true,
+                                      decoration: InputDecoration(
+                                        labelText: l10n.text(
+                                          zh: '文字转语音模型',
+                                          en: 'Text-to-speech model',
+                                        ),
+                                      ),
+                                      disabledHint:
+                                          settings.hasFetchedModels &&
+                                              ttsModels.isEmpty
+                                          ? Text(
+                                              l10n.text(
+                                                zh: '服务未提供兼容的文字转语音模型',
+                                                en: 'No compatible text-to-speech model',
+                                              ),
+                                            )
+                                          : null,
+                                      items: ttsModels
+                                          .map(
+                                            (model) => DropdownMenuItem(
+                                              value: model,
+                                              child: Text(
+                                                model,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                          )
+                                          .toList(),
+                                      onChanged:
+                                          interactionsDisabled ||
+                                              ttsModels.isEmpty
+                                          ? null
+                                          : (value) {
+                                              _ttsModel = value;
+                                              _ttsModelDirty = true;
+                                            },
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: AppSpacing.md),
+                              AppSection(
+                                title: l10n.text(
+                                  zh: '外观与语言',
+                                  en: 'Appearance and language',
+                                ),
+                                description: l10n.text(
+                                  zh: '主题和语言会立即切换并保存在本机。',
+                                  en: 'Theme and language changes apply immediately and are stored on this device.',
+                                ),
+                                leading: const Icon(Icons.contrast),
+                                child: Column(
+                                  children: [
+                                    DropdownButtonFormField<AppThemePreference>(
+                                      key: ValueKey(
+                                        'themeMode:${settings.themePreference.name}',
+                                      ),
+                                      initialValue: settings.themePreference,
+                                      isExpanded: true,
+                                      decoration: InputDecoration(
+                                        labelText: l10n.text(
+                                          zh: '主题模式',
+                                          en: 'Theme',
+                                        ),
+                                        prefixIcon: const Icon(
+                                          Icons.brightness_6_outlined,
+                                        ),
+                                      ),
+                                      items: [
+                                        for (final preference
+                                            in AppThemePreference.values)
+                                          DropdownMenuItem(
+                                            value: preference,
+                                            child: Text(
+                                              _themePreferenceLabel(
+                                                l10n,
+                                                preference,
+                                              ),
+                                            ),
+                                          ),
+                                      ],
+                                      onChanged: (preference) {
+                                        if (preference != null) {
+                                          _setThemePreference(preference);
+                                        }
+                                      },
+                                    ),
+                                    const SizedBox(height: AppSpacing.md),
+                                    DropdownButtonFormField<
+                                      AppLocalePreference
+                                    >(
+                                      key: ValueKey(
+                                        'localePreference:'
+                                        '${settings.localePreference.name}',
+                                      ),
+                                      initialValue: settings.localePreference,
+                                      isExpanded: true,
+                                      decoration: InputDecoration(
+                                        labelText: l10n.text(
+                                          zh: '语言',
+                                          en: 'Language',
+                                        ),
+                                        prefixIcon: const Icon(Icons.language),
+                                      ),
+                                      items: [
+                                        for (final preference
+                                            in AppLocalePreference.values)
+                                          DropdownMenuItem(
+                                            value: preference,
+                                            child: Text(
+                                              _localePreferenceLabel(
+                                                l10n,
+                                                preference,
+                                              ),
+                                            ),
+                                          ),
+                                      ],
+                                      onChanged: (preference) {
+                                        if (preference != null) {
+                                          _setLocalePreference(preference);
+                                        }
+                                      },
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: AppSpacing.md),
+                              AppSection(
+                                title: l10n.text(
+                                  zh: '诊断日志',
+                                  en: 'Diagnostic logs',
+                                ),
+                                description: l10n.text(
+                                  zh: '记录接口路径、状态码、模型和脱敏后的错误原因；不会记录 API Key、认证头、音频或输入文本。',
+                                  en: 'Records endpoint paths, status codes, models, and redacted error reasons. API keys, authorization headers, audio, and input text are never logged.',
+                                ),
+                                leading: const Icon(
+                                  Icons.monitor_heart_outlined,
+                                ),
+                                child: Wrap(
+                                  spacing: AppSpacing.sm,
+                                  runSpacing: AppSpacing.sm,
+                                  alignment: WrapAlignment.end,
+                                  children: [
+                                    OutlinedButton.icon(
+                                      key: const Key('viewLogsButton'),
+                                      onPressed: _showLogs,
+                                      icon: const Icon(Icons.article_outlined),
+                                      label: Text(
+                                        l10n.text(zh: '查看日志', en: 'View logs'),
+                                      ),
+                                    ),
+                                    OutlinedButton.icon(
+                                      key: const Key('exportLogsButton'),
+                                      onPressed: _exportLogs,
+                                      icon: const Icon(Icons.save_alt),
+                                      label: Text(
+                                        l10n.text(
+                                          zh: '导出日志',
+                                          en: 'Export logs',
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: AppSpacing.md),
+                              AppSection(
+                                title: l10n.text(
+                                  zh: '重置应用数据',
+                                  en: 'Reset app data',
+                                ),
+                                description: l10n.text(
+                                  zh: '清除 API 凭据、设置、历史、受管音频、诊断日志和隐私确认，恢复到初次安装状态。',
+                                  en: 'Clear API credentials, settings, history, managed audio, diagnostics, and privacy acknowledgement to restore the initial state.',
+                                ),
+                                leading: Icon(
+                                  Icons.delete_forever_outlined,
+                                  color: colors.error,
+                                ),
+                                child: Align(
+                                  alignment: Alignment.centerRight,
+                                  child: _buildResetAllDataButton(
+                                    interactionsDisabled: interactionsDisabled,
+                                    isResettingAllData: isResettingAllData,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: AppSpacing.xl),
+                              LayoutBuilder(
+                                builder: (context, constraints) {
+                                  final expandAction =
+                                      Theme.of(context).platform ==
+                                          TargetPlatform.android ||
+                                      MediaQuery.textScalerOf(
+                                            context,
+                                          ).scale(1) >=
+                                          1.6 ||
+                                      constraints.maxWidth < 420;
+                                  return Align(
+                                    alignment: Alignment.centerRight,
+                                    child: SizedBox(
+                                      width: expandAction
+                                          ? double.infinity
+                                          : null,
+                                      child: FilledButton.icon(
+                                        key: const Key('settingsSaveButton'),
+                                        onPressed: interactionsDisabled
+                                            ? null
+                                            : () => _submit(
+                                                testConnection: false,
+                                              ),
+                                        icon: SizedBox.square(
+                                          key: const Key(
+                                            'settingsSaveIconSlot',
+                                          ),
+                                          dimension: 24,
+                                          child: Center(
+                                            child: isSaving
+                                                ? SizedBox.square(
+                                                    dimension: 16,
+                                                    child: CircularProgressIndicator(
+                                                      key: const Key(
+                                                        'settingsSavingIndicator',
+                                                      ),
+                                                      strokeWidth: 2,
+                                                      color: colors.onSurface,
                                                     ),
                                                   )
                                                 : const Icon(
-                                                    Icons.network_check),
-                                            label: Text(
-                                              isTestingConnection
-                                                  ? l10n.text(
-                                                      zh: '正在检查…',
-                                                      en: 'Checking…',
-                                                    )
-                                                  : l10n.text(
-                                                      zh: '测试 API 连通性',
-                                                      en: 'Test API connection',
-                                                    ),
-                                            ),
+                                                    Icons.save_outlined,
+                                                  ),
                                           ),
                                         ),
-                                        if (settings.lastConnectionSucceeded !=
-                                            null) ...[
-                                          const SizedBox(height: AppSpacing.md),
-                                          AppStatusBanner(
-                                            kind: settings
-                                                    .lastConnectionSucceeded!
-                                                ? AppStatusKind.success
-                                                : AppStatusKind.error,
-                                            title: settings
-                                                    .lastConnectionSucceeded!
-                                                ? l10n.text(
-                                                    zh: '连接可用',
-                                                    en: 'Connection available',
-                                                  )
-                                                : l10n.text(
-                                                    zh: '连接失败',
-                                                    en: 'Connection failed',
-                                                  ),
-                                            message: settings.messageFor(
-                                                  Localizations.localeOf(
-                                                      context),
-                                                ) ??
-                                                '',
+                                        label: IndexedStack(
+                                          key: const Key(
+                                            'settingsSaveLabelStack',
                                           ),
-                                        ],
-                                      ],
-                                    ),
-                                  ),
-                                  const SizedBox(height: AppSpacing.md),
-                                  AppSection(
-                                    title: l10n.text(zh: '模型', en: 'Models'),
-                                    description: l10n.text(
-                                      zh: '先获取服务支持的模型，再选择用于转录和语音合成的默认模型。',
-                                      en: 'Fetch supported models, then choose defaults for transcription and speech synthesis.',
-                                    ),
-                                    leading: const Icon(Icons.tune),
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.stretch,
-                                      children: [
-                                        DropdownButtonFormField<String>(
-                                          key: const Key('sttModelField'),
-                                          initialValue:
-                                              sttModels.contains(_sttModel)
-                                                  ? _sttModel
-                                                  : null,
-                                          isExpanded: true,
-                                          decoration: InputDecoration(
-                                            labelText: l10n.text(
-                                              zh: '语音转文字模型',
-                                              en: 'Speech-to-text model',
-                                            ),
-                                          ),
-                                          disabledHint:
-                                              settings.hasFetchedModels &&
-                                                      sttModels.isEmpty
-                                                  ? Text(l10n.text(
-                                                      zh: '服务未提供兼容的语音转文字模型',
-                                                      en: 'No compatible speech-to-text model',
-                                                    ))
-                                                  : null,
-                                          items: sttModels
-                                              .map(
-                                                (model) => DropdownMenuItem(
-                                                  value: model,
-                                                  child: Text(
-                                                    model,
-                                                    overflow:
-                                                        TextOverflow.ellipsis,
-                                                  ),
-                                                ),
-                                              )
-                                              .toList(),
-                                          onChanged: settings.isBusy ||
-                                                  sttModels.isEmpty
-                                              ? null
-                                              : (value) {
-                                                  _sttModel = value;
-                                                  _sttModelDirty = true;
-                                                },
-                                        ),
-                                        const SizedBox(height: AppSpacing.md),
-                                        DropdownButtonFormField<String>(
-                                          key: const Key('ttsModelField'),
-                                          initialValue:
-                                              ttsModels.contains(_ttsModel)
-                                                  ? _ttsModel
-                                                  : null,
-                                          isExpanded: true,
-                                          decoration: InputDecoration(
-                                            labelText: l10n.text(
-                                              zh: '文字转语音模型',
-                                              en: 'Text-to-speech model',
-                                            ),
-                                          ),
-                                          disabledHint:
-                                              settings.hasFetchedModels &&
-                                                      ttsModels.isEmpty
-                                                  ? Text(l10n.text(
-                                                      zh: '服务未提供兼容的文字转语音模型',
-                                                      en: 'No compatible text-to-speech model',
-                                                    ))
-                                                  : null,
-                                          items: ttsModels
-                                              .map(
-                                                (model) => DropdownMenuItem(
-                                                  value: model,
-                                                  child: Text(
-                                                    model,
-                                                    overflow:
-                                                        TextOverflow.ellipsis,
-                                                  ),
-                                                ),
-                                              )
-                                              .toList(),
-                                          onChanged: settings.isBusy ||
-                                                  ttsModels.isEmpty
-                                              ? null
-                                              : (value) {
-                                                  _ttsModel = value;
-                                                  _ttsModelDirty = true;
-                                                },
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  const SizedBox(height: AppSpacing.md),
-                                  AppSection(
-                                    title: l10n.text(
-                                      zh: '外观与语言',
-                                      en: 'Appearance and language',
-                                    ),
-                                    description: l10n.text(
-                                      zh: '主题和语言会立即切换并保存在本机。',
-                                      en: 'Theme and language changes apply immediately and are stored on this device.',
-                                    ),
-                                    leading: const Icon(Icons.contrast),
-                                    child: Column(
-                                      children: [
-                                        DropdownButtonFormField<
-                                            AppThemePreference>(
-                                          key: ValueKey(
-                                            'themeMode:${settings.themePreference.name}',
-                                          ),
-                                          initialValue:
-                                              settings.themePreference,
-                                          isExpanded: true,
-                                          decoration: InputDecoration(
-                                            labelText: l10n.text(
-                                              zh: '主题模式',
-                                              en: 'Theme',
-                                            ),
-                                            prefixIcon: const Icon(
-                                              Icons.brightness_6_outlined,
-                                            ),
-                                          ),
-                                          items: [
-                                            for (final preference
-                                                in AppThemePreference.values)
-                                              DropdownMenuItem(
-                                                value: preference,
-                                                child: Text(
-                                                  _themePreferenceLabel(
-                                                    l10n,
-                                                    preference,
-                                                  ),
-                                                ),
+                                          index: isSaving ? 1 : 0,
+                                          alignment: Alignment.center,
+                                          children: [
+                                            Text(
+                                              l10n.text(
+                                                zh: '保存设置',
+                                                en: 'Save settings',
                                               ),
+                                            ),
+                                            Text(
+                                              l10n.text(
+                                                zh: '正在保存…',
+                                                en: 'Saving…',
+                                              ),
+                                            ),
                                           ],
-                                          onChanged: (preference) {
-                                            if (preference != null) {
-                                              _setThemePreference(preference);
-                                            }
-                                          },
                                         ),
-                                        const SizedBox(height: AppSpacing.md),
-                                        DropdownButtonFormField<
-                                            AppLocalePreference>(
-                                          key: ValueKey(
-                                            'localePreference:'
-                                            '${settings.localePreference.name}',
-                                          ),
-                                          initialValue:
-                                              settings.localePreference,
-                                          isExpanded: true,
-                                          decoration: InputDecoration(
-                                            labelText: l10n.text(
-                                              zh: '语言',
-                                              en: 'Language',
-                                            ),
-                                            prefixIcon:
-                                                const Icon(Icons.language),
-                                          ),
-                                          items: [
-                                            for (final preference
-                                                in AppLocalePreference.values)
-                                              DropdownMenuItem(
-                                                value: preference,
-                                                child: Text(
-                                                  _localePreferenceLabel(
-                                                    l10n,
-                                                    preference,
-                                                  ),
-                                                ),
-                                              ),
-                                          ],
-                                          onChanged: (preference) {
-                                            if (preference != null) {
-                                              _setLocalePreference(preference);
-                                            }
-                                          },
-                                        ),
-                                      ],
+                                      ),
                                     ),
-                                  ),
-                                  const SizedBox(height: AppSpacing.md),
-                                  AppSection(
-                                    title: l10n.text(
-                                      zh: '诊断日志',
-                                      en: 'Diagnostic logs',
-                                    ),
-                                    description: l10n.text(
-                                      zh: '记录接口路径、状态码、模型和脱敏后的错误原因；不会记录 API Key、认证头、音频或输入文本。',
-                                      en: 'Records endpoint paths, status codes, models, and redacted error reasons. API keys, authorization headers, audio, and input text are never logged.',
-                                    ),
-                                    leading: const Icon(
-                                        Icons.monitor_heart_outlined),
-                                    child: Wrap(
-                                      spacing: AppSpacing.sm,
-                                      runSpacing: AppSpacing.sm,
-                                      alignment: WrapAlignment.end,
-                                      children: [
-                                        OutlinedButton.icon(
-                                          key: const Key('viewLogsButton'),
-                                          onPressed: _showLogs,
-                                          icon: const Icon(
-                                              Icons.article_outlined),
-                                          label: Text(l10n.text(
-                                            zh: '查看日志',
-                                            en: 'View logs',
-                                          )),
-                                        ),
-                                        OutlinedButton.icon(
-                                          key: const Key('exportLogsButton'),
-                                          onPressed: _exportLogs,
-                                          icon: const Icon(Icons.save_alt),
-                                          label: Text(l10n.text(
-                                            zh: '导出日志',
-                                            en: 'Export logs',
-                                          )),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  const SizedBox(height: AppSpacing.xl),
-                                  LayoutBuilder(
-                                    builder: (context, constraints) {
-                                      final expandAction =
-                                          Theme.of(context).platform ==
-                                                  TargetPlatform.android ||
-                                              MediaQuery.textScalerOf(context)
-                                                      .scale(1) >=
-                                                  1.6 ||
-                                              constraints.maxWidth < 420;
-                                      return Align(
-                                        alignment: Alignment.centerRight,
-                                        child: SizedBox(
-                                          width: expandAction
-                                              ? double.infinity
-                                              : null,
-                                          child: FilledButton.icon(
-                                            key:
-                                                const Key('settingsSaveButton'),
-                                            onPressed: settings.isBusy
-                                                ? null
-                                                : () => _submit(
-                                                    testConnection: false),
-                                            icon: SizedBox.square(
-                                              key: const Key(
-                                                  'settingsSaveIconSlot'),
-                                              dimension: 24,
-                                              child: Center(
-                                                child: isSaving
-                                                    ? SizedBox.square(
-                                                        dimension: 16,
-                                                        child:
-                                                            CircularProgressIndicator(
-                                                          key: const Key(
-                                                            'settingsSavingIndicator',
-                                                          ),
-                                                          strokeWidth: 2,
-                                                          color:
-                                                              colors.onSurface,
-                                                        ),
-                                                      )
-                                                    : const Icon(
-                                                        Icons.save_outlined),
-                                              ),
-                                            ),
-                                            label: IndexedStack(
-                                              key: const Key(
-                                                  'settingsSaveLabelStack'),
-                                              index: isSaving ? 1 : 0,
-                                              alignment: Alignment.center,
-                                              children: [
-                                                Text(l10n.text(
-                                                  zh: '保存设置',
-                                                  en: 'Save settings',
-                                                )),
-                                                Text(l10n.text(
-                                                  zh: '正在保存…',
-                                                  en: 'Saving…',
-                                                )),
-                                              ],
-                                            ),
-                                          ),
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                ],
+                                  );
+                                },
                               ),
-                            ),
+                            ],
                           ),
                         ),
                       ),
                     ),
                   ),
+                ),
+              ),
       ),
     );
   }
@@ -717,6 +753,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     required bool isFetchingModels,
     required bool isTestingConnection,
     required bool isSaving,
+    required bool interactionsDisabled,
+    required bool isResettingAllData,
   }) {
     final l10n = context.l10n;
     final colors = Theme.of(context).colorScheme;
@@ -771,10 +809,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             _MobileSegmentOption(
                               key: const ValueKey('mobileThemeOption:system'),
                               value: AppThemePreference.system,
-                              label: l10n.text(
-                                zh: '跟随系统',
-                                en: 'Follow system',
-                              ),
+                              label: l10n.text(zh: '跟随系统', en: 'Follow system'),
                             ),
                           ],
                           onChanged: _setThemePreference,
@@ -805,14 +840,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               label: 'English',
                             ),
                             _MobileSegmentOption(
-                              key: const ValueKey(
-                                'mobileLocaleOption:system',
-                              ),
+                              key: const ValueKey('mobileLocaleOption:system'),
                               value: AppLocalePreference.system,
-                              label: l10n.text(
-                                zh: '跟随系统',
-                                en: 'Follow system',
-                              ),
+                              label: l10n.text(zh: '跟随系统', en: 'Follow system'),
                             ),
                           ],
                           onChanged: _setLocalePreference,
@@ -835,7 +865,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         control: SpeechModelSelector(
                           key: const Key('sttModelField'),
                           kind: SpeechModelKind.stt,
-                          enabled: !settings.isBusy,
+                          enabled: !interactionsDisabled,
                         ),
                       ),
                       _MobileSettingsRow(
@@ -850,7 +880,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         control: SpeechModelSelector(
                           key: const Key('ttsModelField'),
                           kind: SpeechModelKind.tts,
-                          enabled: !settings.isBusy,
+                          enabled: !interactionsDisabled,
                         ),
                       ),
                       _MobileSettingsRow(
@@ -865,7 +895,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         controlFullWidth: true,
                         control: OutlinedButton.icon(
                           key: const Key('fetchModelsButton'),
-                          onPressed: settings.isBusy ? null : _fetchModels,
+                          onPressed: interactionsDisabled ? null : _fetchModels,
                           icon: isFetchingModels
                               ? SizedBox.square(
                                   dimension: 16,
@@ -877,14 +907,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               : const Icon(Icons.download_outlined),
                           label: Text(
                             isFetchingModels
-                                ? l10n.text(
-                                    zh: '正在获取…',
-                                    en: 'Fetching…',
-                                  )
-                                : l10n.text(
-                                    zh: '获取模型',
-                                    en: 'Fetch models',
-                                  ),
+                                ? l10n.text(zh: '正在获取…', en: 'Fetching…')
+                                : l10n.text(zh: '获取模型', en: 'Fetch models'),
                           ),
                         ),
                       ),
@@ -902,11 +926,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             en: 'Use a restricted test key',
                           ),
                           message: l10n.text(
-                            zh: 'API Key 以明文保存在本机。请使用可撤销、低额度的专用密钥；日志不会记录密钥。',
-                            en: 'The API key is stored as plain text on this device. Use a revocable, low-limit key. Logs never record it.',
+                            zh: 'API Key 由当前 Windows 用户配置文件的 DPAPI 或当前 Android 应用安装的 Keystore 保护；不会进入系统备份或日志。',
+                            en: 'The API key is protected for the current Windows user profile or Android app installation. System backups and logs never contain it.',
                           ),
                         ),
                       ),
+                      if (settings.credentialRecoveryRequired)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(18, 0, 18, 15),
+                          child: _buildCredentialRecoveryBanner(l10n),
+                        ),
                       _MobileSettingsRow(
                         name: 'Base URL',
                         description: l10n.text(
@@ -946,10 +975,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         control: _buildMobileApiKeyField(l10n),
                       ),
                       _MobileSettingsRow(
-                        name: l10n.text(
-                          zh: '连接检查',
-                          en: 'Connection check',
-                        ),
+                        name: l10n.text(zh: '连接检查', en: 'Connection check'),
                         description: l10n.text(
                           zh: '验证当前表单；成功后同时保存设置。',
                           en: 'Verify the current form. A successful check also saves it.',
@@ -957,7 +983,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         controlFullWidth: true,
                         control: OutlinedButton.icon(
                           key: const Key('testConnectionButton'),
-                          onPressed: settings.isBusy
+                          onPressed: interactionsDisabled
                               ? null
                               : () => _submit(testConnection: true),
                           icon: isTestingConnection
@@ -970,10 +996,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               : const Icon(Icons.network_check),
                           label: Text(
                             isTestingConnection
-                                ? l10n.text(
-                                    zh: '正在检查…',
-                                    en: 'Checking…',
-                                  )
+                                ? l10n.text(zh: '正在检查…', en: 'Checking…')
                                 : l10n.text(
                                     zh: '测试 API 连通性',
                                     en: 'Test API connection',
@@ -997,7 +1020,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                     zh: '连接失败',
                                     en: 'Connection failed',
                                   ),
-                            message: settings.messageFor(
+                            message:
+                                settings.messageFor(
                                   Localizations.localeOf(context),
                                 ) ??
                                 '',
@@ -1009,10 +1033,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   _MobileSettingsCard(
                     children: [
                       _MobileSettingsRow(
-                        name: l10n.text(
-                          zh: '诊断日志',
-                          en: 'Diagnostic logs',
-                        ),
+                        name: l10n.text(zh: '诊断日志', en: 'Diagnostic logs'),
                         description: l10n.text(
                           zh: '记录接口路径、状态码、模型和脱敏错误，不记录密钥、音频或输入正文。',
                           en: 'Records endpoint paths, status codes, models, and redacted errors, never keys, audio, or input content.',
@@ -1026,19 +1047,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               key: const Key('viewLogsButton'),
                               onPressed: _showLogs,
                               icon: const Icon(Icons.article_outlined),
-                              label: Text(l10n.text(
-                                zh: '查看日志',
-                                en: 'View logs',
-                              )),
+                              label: Text(
+                                l10n.text(zh: '查看日志', en: 'View logs'),
+                              ),
                             ),
                             OutlinedButton.icon(
                               key: const Key('exportLogsButton'),
                               onPressed: _exportLogs,
                               icon: const Icon(Icons.save_alt),
-                              label: Text(l10n.text(
-                                zh: '导出日志',
-                                en: 'Export logs',
-                              )),
+                              label: Text(
+                                l10n.text(zh: '导出日志', en: 'Export logs'),
+                              ),
                             ),
                           ],
                         ),
@@ -1060,10 +1079,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           zh: '开始 / 停止录音',
                           en: 'Start / stop recording',
                         ),
-                        gesture: l10n.text(
-                          zh: '点按录音面板',
-                          en: 'Tap recorder',
-                        ),
+                        gesture: l10n.text(zh: '点按录音面板', en: 'Tap recorder'),
                       ),
                       _MobileGestureRow(
                         label: l10n.text(
@@ -1076,10 +1092,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         ),
                       ),
                       _MobileGestureRow(
-                        label: l10n.text(
-                          zh: '浏览全部音色',
-                          en: 'Browse all voices',
-                        ),
+                        label: l10n.text(zh: '浏览全部音色', en: 'Browse all voices'),
                         gesture: l10n.text(
                           zh: '横向滑动',
                           en: 'Swipe horizontally',
@@ -1091,10 +1104,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   _MobileSettingsCard(
                     children: [
                       _MobileSettingsRow(
-                        name: l10n.text(
-                          zh: '本地偏好',
-                          en: 'Local preferences',
-                        ),
+                        name: l10n.text(zh: '本地偏好', en: 'Local preferences'),
                         description: l10n.text(
                           zh: '重置密钥、接口、模型、主题和语言；保留历史、关联音频、日志与隐私确认。',
                           en: 'Reset credentials, models, appearance, and language while keeping history, audio, logs, and privacy acknowledgement.',
@@ -1102,7 +1112,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         controlFullWidth: true,
                         control: OutlinedButton.icon(
                           key: const Key('resetLocalPreferencesButton'),
-                          onPressed: settings.isBusy
+                          onPressed: interactionsDisabled
                               ? null
                               : _confirmResetLocalPreferences,
                           icon: isResetting
@@ -1116,10 +1126,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               : const Icon(Icons.restart_alt),
                           label: Text(
                             isResetting
-                                ? l10n.text(
-                                    zh: '正在重置…',
-                                    en: 'Resetting…',
-                                  )
+                                ? l10n.text(zh: '正在重置…', en: 'Resetting…')
                                 : l10n.text(
                                     zh: '重置本地偏好',
                                     en: 'Reset local preferences',
@@ -1130,12 +1137,25 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           ),
                         ),
                       ),
+                      const Divider(height: 1),
+                      _MobileSettingsRow(
+                        name: l10n.text(zh: '全部应用数据', en: 'All app data'),
+                        description: l10n.text(
+                          zh: '删除凭据、设置、历史、受管音频、日志和隐私确认，恢复到初次安装状态。',
+                          en: 'Delete credentials, settings, history, managed audio, logs, and privacy acknowledgement to restore the initial state.',
+                        ),
+                        controlFullWidth: true,
+                        control: _buildResetAllDataButton(
+                          interactionsDisabled: interactionsDisabled,
+                          isResettingAllData: isResettingAllData,
+                        ),
+                      ),
                     ],
                   ),
                   const SizedBox(height: AppSpacing.xl),
                   FilledButton.icon(
                     key: const Key('settingsSaveButton'),
-                    onPressed: settings.isBusy
+                    onPressed: interactionsDisabled
                         ? null
                         : () => _submit(testConnection: false),
                     icon: SizedBox.square(
@@ -1159,14 +1179,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       index: isSaving ? 1 : 0,
                       alignment: Alignment.center,
                       children: [
-                        Text(l10n.text(
-                          zh: '保存设置',
-                          en: 'Save settings',
-                        )),
-                        Text(l10n.text(
-                          zh: '正在保存…',
-                          en: 'Saving…',
-                        )),
+                        Text(l10n.text(zh: '保存设置', en: 'Save settings')),
+                        Text(l10n.text(zh: '正在保存…', en: 'Saving…')),
                       ],
                     ),
                   ),
@@ -1184,6 +1198,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     required bool isFetchingModels,
     required bool isTestingConnection,
     required bool isSaving,
+    required bool interactionsDisabled,
+    required bool isResettingAllData,
   }) {
     final l10n = context.l10n;
     final colors = Theme.of(context).colorScheme;
@@ -1207,18 +1223,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       en: 'PREFERENCES · LOCAL SETTINGS',
                     ),
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: colors.primary,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 1.4,
-                        ),
+                      color: colors.primary,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 1.4,
+                    ),
                   ),
                   const SizedBox(height: AppSpacing.xs),
                   Text(
                     l10n.text(zh: '设置', en: 'Settings'),
                     style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: -0.6,
-                        ),
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: -0.6,
+                    ),
                   ),
                   const SizedBox(height: AppSpacing.xl),
                   _DesktopSettingsCard(
@@ -1245,10 +1261,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             ),
                             _DesktopSegmentOption(
                               value: AppThemePreference.system,
-                              label: l10n.text(
-                                zh: '跟随系统',
-                                en: 'Follow system',
-                              ),
+                              label: l10n.text(zh: '跟随系统', en: 'Follow system'),
                             ),
                           ],
                           onChanged: _setThemePreference,
@@ -1277,10 +1290,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             ),
                             _DesktopSegmentOption(
                               value: AppLocalePreference.system,
-                              label: l10n.text(
-                                zh: '跟随系统',
-                                en: 'Follow system',
-                              ),
+                              label: l10n.text(zh: '跟随系统', en: 'Follow system'),
                             ),
                           ],
                           onChanged: _setLocalePreference,
@@ -1303,7 +1313,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         control: SpeechModelSelector(
                           key: const Key('sttModelField'),
                           kind: SpeechModelKind.stt,
-                          enabled: !settings.isBusy,
+                          enabled: !interactionsDisabled,
                         ),
                       ),
                       _DesktopSettingsRow(
@@ -1318,7 +1328,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         control: SpeechModelSelector(
                           key: const Key('ttsModelField'),
                           kind: SpeechModelKind.tts,
-                          enabled: !settings.isBusy,
+                          enabled: !interactionsDisabled,
                         ),
                       ),
                       _DesktopSettingsRow(
@@ -1332,7 +1342,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         ),
                         control: OutlinedButton.icon(
                           key: const Key('fetchModelsButton'),
-                          onPressed: settings.isBusy ? null : _fetchModels,
+                          onPressed: interactionsDisabled ? null : _fetchModels,
                           icon: isFetchingModels
                               ? SizedBox.square(
                                   dimension: 16,
@@ -1344,14 +1354,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               : const Icon(Icons.download_outlined),
                           label: Text(
                             isFetchingModels
-                                ? l10n.text(
-                                    zh: '正在获取…',
-                                    en: 'Fetching…',
-                                  )
-                                : l10n.text(
-                                    zh: '获取模型',
-                                    en: 'Fetch models',
-                                  ),
+                                ? l10n.text(zh: '正在获取…', en: 'Fetching…')
+                                : l10n.text(zh: '获取模型', en: 'Fetch models'),
                           ),
                         ),
                       ),
@@ -1360,23 +1364,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   const SizedBox(height: AppSpacing.md),
                   _DesktopSettingsCard(
                     children: [
-                      Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: AppSpacing.lg,
-                          vertical: AppSpacing.md,
-                        ),
-                        child: AppStatusBanner(
-                          kind: AppStatusKind.warning,
-                          title: l10n.text(
-                            zh: '使用受限密钥',
-                            en: 'Use a restricted key',
+                      if (settings.credentialRecoveryRequired)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(
+                            AppSpacing.lg,
+                            AppSpacing.md,
+                            AppSpacing.lg,
+                            AppSpacing.md,
                           ),
-                          message: l10n.text(
-                            zh: 'API Key 以明文保存在本机。请使用可撤销、低额度的专用密钥；应用日志不会记录密钥。',
-                            en: 'The API key is stored as plain text on this device. Use a revocable, low-limit key. App logs never record the key.',
-                          ),
+                          child: _buildCredentialRecoveryBanner(l10n),
                         ),
-                      ),
                       _DesktopSettingsRow(
                         name: 'Base URL',
                         description: l10n.text(
@@ -1421,16 +1418,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         control: _buildDesktopApiKeyField(l10n),
                       ),
                       _DesktopSettingsRow(
-                        name: l10n.text(
-                          zh: '连接检查',
-                          en: 'Connection check',
-                        ),
+                        name: l10n.text(zh: '连接检查', en: 'Connection check'),
                         description: l10n.text(
                           zh: '使用当前表单验证服务连通性；成功后同时保存设置。',
                           en: 'Verify the current form against the service. A successful check also saves the settings.',
                         ),
                         control: OutlinedButton.icon(
-                          onPressed: settings.isBusy
+                          onPressed: interactionsDisabled
                               ? null
                               : () => _submit(testConnection: true),
                           icon: isTestingConnection
@@ -1443,10 +1437,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               : const Icon(Icons.network_check),
                           label: Text(
                             isTestingConnection
-                                ? l10n.text(
-                                    zh: '正在检查…',
-                                    en: 'Checking…',
-                                  )
+                                ? l10n.text(zh: '正在检查…', en: 'Checking…')
                                 : l10n.text(
                                     zh: '测试 API 连通性',
                                     en: 'Test API connection',
@@ -1473,7 +1464,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                     zh: '连接失败',
                                     en: 'Connection failed',
                                   ),
-                            message: settings.messageFor(
+                            message:
+                                settings.messageFor(
                                   Localizations.localeOf(context),
                                 ) ??
                                 '',
@@ -1499,10 +1491,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         shortcuts: const ['SPACE'],
                       ),
                       _DesktopShortcutRow(
-                        label: l10n.text(
-                          zh: '切换页面',
-                          en: 'Switch pages',
-                        ),
+                        label: l10n.text(zh: '切换页面', en: 'Switch pages'),
                         shortcuts: const [
                           'CTRL+1',
                           'CTRL+2',
@@ -1511,10 +1500,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         ],
                       ),
                       _DesktopShortcutRow(
-                        label: l10n.text(
-                          zh: '搜索历史记录',
-                          en: 'Search history',
-                        ),
+                        label: l10n.text(zh: '搜索历史记录', en: 'Search history'),
                         shortcuts: const ['CTRL+F'],
                       ),
                       _DesktopShortcutRow(
@@ -1532,10 +1518,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         shortcuts: const ['CTRL+ENTER'],
                       ),
                       _DesktopShortcutRow(
-                        label: l10n.text(
-                          zh: '关闭播放器',
-                          en: 'Close player',
-                        ),
+                        label: l10n.text(zh: '关闭播放器', en: 'Close player'),
                         shortcuts: const ['ESC'],
                       ),
                     ],
@@ -1544,10 +1527,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   _DesktopSettingsCard(
                     children: [
                       _DesktopSettingsRow(
-                        name: l10n.text(
-                          zh: '诊断日志',
-                          en: 'Diagnostic logs',
-                        ),
+                        name: l10n.text(zh: '诊断日志', en: 'Diagnostic logs'),
                         description: l10n.text(
                           zh: '记录接口路径、状态码、模型和脱敏错误；不会记录密钥、音频或输入正文。',
                           en: 'Records endpoint paths, status codes, models, and redacted errors, never keys, audio, or input content.',
@@ -1560,19 +1540,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               key: const Key('viewLogsButton'),
                               onPressed: _showLogs,
                               icon: const Icon(Icons.article_outlined),
-                              label: Text(l10n.text(
-                                zh: '查看日志',
-                                en: 'View logs',
-                              )),
+                              label: Text(
+                                l10n.text(zh: '查看日志', en: 'View logs'),
+                              ),
                             ),
                             OutlinedButton.icon(
                               key: const Key('exportLogsButton'),
                               onPressed: _exportLogs,
                               icon: const Icon(Icons.save_alt),
-                              label: Text(l10n.text(
-                                zh: '导出日志',
-                                en: 'Export logs',
-                              )),
+                              label: Text(
+                                l10n.text(zh: '导出日志', en: 'Export logs'),
+                              ),
                             ),
                           ],
                         ),
@@ -1583,10 +1561,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   _DesktopSettingsCard(
                     children: [
                       _DesktopSettingsRow(
-                        name: l10n.text(
-                          zh: '本地偏好',
-                          en: 'Local preferences',
-                        ),
+                        name: l10n.text(zh: '本地偏好', en: 'Local preferences'),
                         description: l10n.text(
                           zh: '重置 API 凭据、模型、主题与语言。历史记录、音频、日志和隐私确认不会被删除。',
                           en: 'Reset API credentials, models, theme, and language. History, audio, logs, and the privacy acknowledgement are kept.',
@@ -1597,7 +1572,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             foregroundColor: colors.error,
                             side: BorderSide(color: colors.error),
                           ),
-                          onPressed: settings.isBusy
+                          onPressed: interactionsDisabled
                               ? null
                               : _confirmResetLocalPreferences,
                           icon: isResetting
@@ -1610,15 +1585,24 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               : const Icon(Icons.restart_alt),
                           label: Text(
                             isResetting
-                                ? l10n.text(
-                                    zh: '正在重置…',
-                                    en: 'Resetting…',
-                                  )
+                                ? l10n.text(zh: '正在重置…', en: 'Resetting…')
                                 : l10n.text(
                                     zh: '重置偏好',
                                     en: 'Reset preferences',
                                   ),
                           ),
+                        ),
+                      ),
+                      const Divider(height: 1),
+                      _DesktopSettingsRow(
+                        name: l10n.text(zh: '全部应用数据', en: 'All app data'),
+                        description: l10n.text(
+                          zh: '删除凭据、设置、历史、受管音频、日志和隐私确认，恢复到初次安装状态。',
+                          en: 'Delete credentials, settings, history, managed audio, logs, and privacy acknowledgement to restore the initial state.',
+                        ),
+                        control: _buildResetAllDataButton(
+                          interactionsDisabled: interactionsDisabled,
+                          isResettingAllData: isResettingAllData,
                         ),
                       ),
                     ],
@@ -1628,14 +1612,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     builder: (context, constraints) {
                       final expandAction =
                           MediaQuery.textScalerOf(context).scale(1) >= 1.6 ||
-                              constraints.maxWidth < 420;
+                          constraints.maxWidth < 420;
                       return Align(
                         alignment: AlignmentDirectional.centerEnd,
                         child: SizedBox(
                           width: expandAction ? double.infinity : null,
                           child: FilledButton.icon(
                             key: const Key('settingsSaveButton'),
-                            onPressed: settings.isBusy
+                            onPressed: interactionsDisabled
                                 ? null
                                 : () => _submit(testConnection: false),
                             icon: SizedBox.square(
@@ -1661,14 +1645,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               index: isSaving ? 1 : 0,
                               alignment: Alignment.center,
                               children: [
-                                Text(l10n.text(
-                                  zh: '保存设置',
-                                  en: 'Save settings',
-                                )),
-                                Text(l10n.text(
-                                  zh: '正在保存…',
-                                  en: 'Saving…',
-                                )),
+                                Text(
+                                  l10n.text(zh: '保存设置', en: 'Save settings'),
+                                ),
+                                Text(l10n.text(zh: '正在保存…', en: 'Saving…')),
                               ],
                             ),
                           ),
@@ -1685,6 +1665,27 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
+  Widget _buildCredentialRecoveryBanner(AppLocalizations l10n) {
+    final isAndroid = Theme.of(context).platform == TargetPlatform.android;
+    return AppStatusBanner(
+      key: const Key('credentialRecoveryRequiredBanner'),
+      kind: AppStatusKind.error,
+      title: l10n.text(
+        zh: 'API 凭据恢复未完成',
+        en: 'API credential recovery required',
+      ),
+      message: isAndroid
+          ? l10n.text(
+              zh: '为防止密钥发送到错误服务，原凭据已停用。请重新输入 API Root 和 API Key 后保存；若仍失败，请在 Android 系统设置中清除 VoxFlow 的应用存储。',
+              en: 'The saved credential is disabled to prevent it from reaching the wrong service. Enter the API Root and API key again. If saving still fails, clear VoxFlow app storage in Android system settings.',
+            )
+          : l10n.text(
+              zh: r'为防止密钥发送到错误服务，原凭据已停用。请重新输入 API Root 和 API Key 后保存；若仍失败，请关闭 VoxFlow，并删除 HKCU\Software\Glosc AI\VoxFlow 下的 ApiKeyV1 注册表值。',
+              en: r'The saved credential is disabled to prevent it from reaching the wrong service. Enter the API Root and API key again. If saving still fails, close VoxFlow and delete the ApiKeyV1 registry value under HKCU\Software\Glosc AI\VoxFlow.',
+            ),
+    );
+  }
+
   Widget _buildMobileApiKeyField(AppLocalizations l10n) {
     return Semantics(
       key: const Key('apiKeySemantics'),
@@ -1694,18 +1695,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       focused: _apiKeyFocusNode.hasFocus,
       obscured: _obscureApiKey,
       label: _obscureApiKey
-          ? l10n.text(
-              zh: 'API Key，内容已隐藏',
-              en: 'API key, content hidden',
-            )
-          : l10n.text(
-              zh: 'API Key，内容可见',
-              en: 'API key, content visible',
-            ),
+          ? l10n.text(zh: 'API Key，内容已隐藏', en: 'API key, content hidden')
+          : l10n.text(zh: 'API Key，内容可见', en: 'API key, content visible'),
       value: _obscureApiKey
           ? (_apiKeyController.text.isEmpty
-              ? l10n.text(zh: '未填写', en: 'Not entered')
-              : l10n.text(zh: '已填写', en: 'Entered'))
+                ? l10n.text(zh: '未填写', en: 'Not entered')
+                : l10n.text(zh: '已填写', en: 'Entered'))
           : _apiKeyController.text,
       onTap: _apiKeyFocusNode.requestFocus,
       customSemanticsActions: {
@@ -1734,9 +1729,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           autocorrect: false,
           enableInteractiveSelection: !_obscureApiKey,
           onChanged: (_) => setState(() {}),
-          style: AppTypography.numeric(
-            Theme.of(context).textTheme.bodyMedium,
-          ),
+          style: AppTypography.numeric(Theme.of(context).textTheme.bodyMedium),
           decoration: InputDecoration(
             hintText: 'sk-…',
             prefixIcon: const Icon(Icons.key),
@@ -1769,18 +1762,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         focused: _apiKeyFocusNode.hasFocus,
         obscured: _obscureApiKey,
         label: _obscureApiKey
-            ? l10n.text(
-                zh: 'API Key，内容已隐藏',
-                en: 'API key, content hidden',
-              )
-            : l10n.text(
-                zh: 'API Key，内容可见',
-                en: 'API key, content visible',
-              ),
+            ? l10n.text(zh: 'API Key，内容已隐藏', en: 'API key, content hidden')
+            : l10n.text(zh: 'API Key，内容可见', en: 'API key, content visible'),
         value: _obscureApiKey
             ? (_apiKeyController.text.isEmpty
-                ? l10n.text(zh: '未填写', en: 'Not entered')
-                : l10n.text(zh: '已填写', en: 'Entered'))
+                  ? l10n.text(zh: '未填写', en: 'Not entered')
+                  : l10n.text(zh: '已填写', en: 'Entered'))
             : _apiKeyController.text,
         onTap: _apiKeyFocusNode.requestFocus,
         customSemanticsActions: {
@@ -1835,6 +1822,36 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
+  Widget _buildResetAllDataButton({
+    required bool interactionsDisabled,
+    required bool isResettingAllData,
+  }) {
+    final l10n = context.l10n;
+    final colors = Theme.of(context).colorScheme;
+    return OutlinedButton.icon(
+      key: const Key('resetAllDataButton'),
+      onPressed: interactionsDisabled ? null : _confirmResetAllData,
+      style: OutlinedButton.styleFrom(
+        foregroundColor: colors.error,
+        side: BorderSide(color: colors.error),
+      ),
+      icon: isResettingAllData
+          ? SizedBox.square(
+              dimension: 16,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: colors.error,
+              ),
+            )
+          : const Icon(Icons.delete_forever_outlined),
+      label: Text(
+        isResettingAllData
+            ? l10n.text(zh: '正在清空…', en: 'Clearing…')
+            : l10n.text(zh: '清空全部数据', en: 'Clear all data'),
+      ),
+    );
+  }
+
   Future<void> _confirmResetLocalPreferences() async {
     final l10n = context.l10n;
     final colors = Theme.of(context).colorScheme;
@@ -1843,14 +1860,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       builder: (context) => AlertDialog(
         scrollable: Theme.of(context).platform == TargetPlatform.android,
         icon: Icon(Icons.restart_alt, color: colors.error),
-        title: Text(l10n.text(
-          zh: '重置本地偏好？',
-          en: 'Reset local preferences?',
-        )),
-        content: Text(l10n.text(
-          zh: '这会清除 API Key，并将 Base URL、语音模型、主题和语言恢复为默认值。历史记录、关联音频、诊断日志和隐私确认都会保留。',
-          en: 'This clears the API key and restores the Base URL, speech models, theme, and language to their defaults. History, associated audio, diagnostic logs, and the privacy acknowledgement are kept.',
-        )),
+        title: Text(l10n.text(zh: '重置本地偏好？', en: 'Reset local preferences?')),
+        content: Text(
+          l10n.text(
+            zh: '这会清除 API Key，并将 Base URL、语音模型、主题和语言恢复为默认值。历史记录、关联音频、诊断日志和隐私确认都会保留。',
+            en: 'This clears the API key and restores the Base URL, speech models, theme, and language to their defaults. History, associated audio, diagnostic logs, and the privacy acknowledgement are kept.',
+          ),
+        ),
         actions: [
           TextButton(
             autofocus: true,
@@ -1882,8 +1898,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
 
     try {
-      final message =
-          await ref.read(settingsProvider.notifier).resetLocalPreferences();
+      final message = await ref
+          .read(settingsProvider.notifier)
+          .resetLocalPreferences();
       if (!mounted) {
         return;
       }
@@ -1900,13 +1917,61 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            message.resolve(Localizations.localeOf(context)),
-          ),
+          content: Text(message.resolve(Localizations.localeOf(context))),
         ),
       );
     } on AppException catch (error) {
       _showException(error);
+    }
+  }
+
+  Future<void> _confirmResetAllData() async {
+    final l10n = context.l10n;
+    final colors = Theme.of(context).colorScheme;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        scrollable: Theme.of(context).platform == TargetPlatform.android,
+        icon: Icon(Icons.delete_forever_outlined, color: colors.error),
+        title: Text(l10n.text(zh: '清空全部应用数据？', en: 'Clear all app data?')),
+        content: Text(
+          l10n.text(
+            zh: '这会永久删除本机保存的 API 凭据、设置、历史记录、受管音频、诊断日志和隐私确认，并回到初次安装状态。用户导入的原始文件和另存文件不会被删除。此操作无法撤销。',
+            en: 'This permanently deletes saved API credentials, settings, history, managed audio, diagnostic logs, and the privacy acknowledgement, returning the app to its initial state. Original imports and files saved elsewhere are not deleted. This cannot be undone.',
+          ),
+        ),
+        actions: [
+          TextButton(
+            autofocus: true,
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text(l10n.text(zh: '取消', en: 'Cancel')),
+          ),
+          FilledButton(
+            key: const Key('resetAllDataConfirmButton'),
+            style: FilledButton.styleFrom(
+              backgroundColor: colors.error,
+              foregroundColor: colors.onError,
+            ),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text(l10n.text(zh: '永久清空', en: 'Clear permanently')),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) {
+      return;
+    }
+
+    try {
+      await ref.read(applicationDataResetProvider.notifier).resetAllData();
+      if (mounted) {
+        _apiKeyController.clear();
+        _baseUrlController.text = const SettingsState().baseUrl;
+      }
+    } on AppException catch (error) {
+      if (mounted) {
+        _showException(error);
+      }
     }
   }
 
@@ -1937,10 +2002,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           final screenHeight = MediaQuery.sizeOf(context).height;
           return AlertDialog(
             scrollable: mobile,
-            title: Text(l10n.text(
-              zh: 'VoxFlow 诊断日志',
-              en: 'VoxFlow diagnostic logs',
-            )),
+            title: Text(
+              l10n.text(zh: 'VoxFlow 诊断日志', en: 'VoxFlow diagnostic logs'),
+            ),
             content: ConstrainedBox(
               constraints: BoxConstraints(
                 maxWidth: mobile ? 560 : 760,
@@ -1965,9 +2029,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           )
                         : contents,
                     key: const Key('diagnosticLogContents'),
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          fontFamily: 'monospace',
-                        ),
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodySmall?.copyWith(fontFamily: 'monospace'),
                   ),
                 ),
               ),
@@ -1988,21 +2052,22 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   Future<void> _exportLogs() async {
     try {
-      final exported = await DiagnosticLogExporter(
-        ref.read(appLoggerProvider),
-      ).export(
-        dialogTitle: context.l10n.text(
-          zh: '导出 VoxFlow 诊断日志',
-          en: 'Export VoxFlow diagnostic logs',
-        ),
-      );
+      final exported = await DiagnosticLogExporter(ref.read(appLoggerProvider))
+          .export(
+            dialogTitle: context.l10n.text(
+              zh: '导出 VoxFlow 诊断日志',
+              en: 'Export VoxFlow diagnostic logs',
+            ),
+          );
       if (exported && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(context.l10n.text(
-              zh: '诊断日志已导出。',
-              en: 'Diagnostic logs exported.',
-            )),
+            content: Text(
+              context.l10n.text(
+                zh: '诊断日志已导出。',
+                en: 'Diagnostic logs exported.',
+              ),
+            ),
           ),
         );
       }
@@ -2011,9 +2076,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
   }
 
-  Future<void> _setThemePreference(
-    AppThemePreference preference,
-  ) async {
+  Future<void> _setThemePreference(AppThemePreference preference) async {
     try {
       await ref.read(settingsProvider.notifier).setThemePreference(preference);
     } on AppException catch (error) {
@@ -2021,9 +2084,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
   }
 
-  Future<void> _setLocalePreference(
-    AppLocalePreference preference,
-  ) async {
+  Future<void> _setLocalePreference(AppLocalePreference preference) async {
     try {
       await ref.read(settingsProvider.notifier).setLocalePreference(preference);
     } on AppException catch (error) {
@@ -2035,9 +2096,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     if (!mounted) {
       return;
     }
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   void _showException(AppException error) {
@@ -2054,7 +2115,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     try {
       final notifier = ref.read(settingsProvider.notifier);
       final platform = Theme.of(context).platform;
-      final useLiveModelSelectors = platform == TargetPlatform.android ||
+      final useLiveModelSelectors =
+          platform == TargetPlatform.android ||
           (platform == TargetPlatform.windows &&
               MediaQuery.sizeOf(context).width >= 760);
       final catalog = await notifier.fetchModels(
@@ -2092,9 +2154,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           SnackBar(
             content: Text(
               context.l10n.text(
-                zh: '已获取 ${catalog.stt.length} 个语音转文字模型、'
+                zh:
+                    '已获取 ${catalog.stt.length} 个语音转文字模型、'
                     '${catalog.tts.length} 个文字转语音模型。',
-                en: 'Fetched ${catalog.stt.length} speech-to-text '
+                en:
+                    'Fetched ${catalog.stt.length} speech-to-text '
                     '${catalog.stt.length == 1 ? 'model' : 'models'} and '
                     '${catalog.tts.length} text-to-speech '
                     '${catalog.tts.length == 1 ? 'model' : 'models'}.',
@@ -2115,14 +2179,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     try {
       final notifier = ref.read(settingsProvider.notifier);
       final platform = Theme.of(context).platform;
-      final useLiveModelSelectors = platform == TargetPlatform.android ||
+      final useLiveModelSelectors =
+          platform == TargetPlatform.android ||
           (platform == TargetPlatform.windows &&
               MediaQuery.sizeOf(context).width >= 760);
       final currentSettings = ref.read(settingsProvider);
-      final sttModel =
-          useLiveModelSelectors ? currentSettings.sttModel : (_sttModel ?? '');
-      final ttsModel =
-          useLiveModelSelectors ? currentSettings.ttsModel : (_ttsModel ?? '');
+      final sttModel = useLiveModelSelectors
+          ? currentSettings.sttModel
+          : (_sttModel ?? '');
+      final ttsModel = useLiveModelSelectors
+          ? currentSettings.ttsModel
+          : (_ttsModel ?? '');
       final message = testConnection
           ? await notifier.testConnection(
               apiKey: _apiKeyController.text,
@@ -2141,9 +2208,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         _ttsModelDirty = false;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-              message.resolve(Localizations.localeOf(context)),
-            ),
+            content: Text(message.resolve(Localizations.localeOf(context))),
           ),
         );
       }
@@ -2205,28 +2270,25 @@ class _MobileSettingsRow extends StatelessWidget {
           Text(
             name,
             style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  fontSize: 14.5,
-                  height: 1.4,
-                  fontWeight: FontWeight.w600,
-                ),
+              fontSize: 14.5,
+              height: 1.4,
+              fontWeight: FontWeight.w600,
+            ),
           ),
           const SizedBox(height: 2),
           Text(
             description,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: colors.onSurfaceVariant,
-                  fontSize: 12,
-                  height: 1.5,
-                ),
+              color: colors.onSurfaceVariant,
+              fontSize: 12,
+              height: 1.5,
+            ),
           ),
           const SizedBox(height: 10),
           if (controlFullWidth)
             SizedBox(width: double.infinity, child: control)
           else
-            Align(
-              alignment: AlignmentDirectional.centerStart,
-              child: control,
-            ),
+            Align(alignment: AlignmentDirectional.centerStart, child: control),
         ],
       ),
     );
@@ -2234,10 +2296,7 @@ class _MobileSettingsRow extends StatelessWidget {
 }
 
 class _MobileSettingsIntro extends StatelessWidget {
-  const _MobileSettingsIntro({
-    required this.name,
-    required this.description,
-  });
+  const _MobileSettingsIntro({required this.name, required this.description});
 
   final String name;
   final String description;
@@ -2253,19 +2312,19 @@ class _MobileSettingsIntro extends StatelessWidget {
           Text(
             name,
             style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  fontSize: 14.5,
-                  height: 1.4,
-                  fontWeight: FontWeight.w600,
-                ),
+              fontSize: 14.5,
+              height: 1.4,
+              fontWeight: FontWeight.w600,
+            ),
           ),
           const SizedBox(height: 2),
           Text(
             description,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: colors.onSurfaceVariant,
-                  fontSize: 12,
-                  height: 1.5,
-                ),
+              color: colors.onSurfaceVariant,
+              fontSize: 12,
+              height: 1.5,
+            ),
           ),
         ],
       ),
@@ -2292,13 +2351,12 @@ class _MobileGestureRow extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         child: Text(
           gesture,
-          style: AppTypography.numeric(
-            Theme.of(context).textTheme.labelSmall,
-          ).copyWith(
-            color: colors.onSurfaceVariant,
-            fontSize: 10.5,
-            height: 1.4,
-          ),
+          style: AppTypography.numeric(Theme.of(context).textTheme.labelSmall)
+              .copyWith(
+                color: colors.onSurfaceVariant,
+                fontSize: 10.5,
+                height: 1.4,
+              ),
         ),
       ),
     );
@@ -2306,7 +2364,8 @@ class _MobileGestureRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final stack = constraints.maxWidth < 280 ||
+          final stack =
+              constraints.maxWidth < 280 ||
               MediaQuery.textScalerOf(context).scale(1) >= 1.4;
           if (stack) {
             return Column(
@@ -2451,13 +2510,13 @@ class _MobileSegmentButtonState extends State<_MobileSegmentButton> {
                     widget.label,
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                          color: widget.selected
-                              ? colors.onSurface
-                              : colors.onSurfaceVariant,
-                          fontWeight: widget.selected
-                              ? FontWeight.w600
-                              : FontWeight.w500,
-                        ),
+                      color: widget.selected
+                          ? colors.onSurface
+                          : colors.onSurfaceVariant,
+                      fontWeight: widget.selected
+                          ? FontWeight.w600
+                          : FontWeight.w500,
+                    ),
                   ),
                 ),
               ),
@@ -2531,16 +2590,16 @@ class _DesktopSettingsRow extends StatelessWidget {
       children: [
         Text(
           name,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: AppSpacing.xxs),
         Text(
           description,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: colors.onSurfaceVariant,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.bodySmall?.copyWith(color: colors.onSurfaceVariant),
         ),
       ],
     );
@@ -2552,7 +2611,8 @@ class _DesktopSettingsRow extends StatelessWidget {
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final stack = constraints.maxWidth < 680 ||
+          final stack =
+              constraints.maxWidth < 680 ||
               MediaQuery.textScalerOf(context).scale(1) >= 1.6;
           if (stack) {
             return Column(
@@ -2582,10 +2642,7 @@ class _DesktopSettingsRow extends StatelessWidget {
 }
 
 class _DesktopSettingsIntro extends StatelessWidget {
-  const _DesktopSettingsIntro({
-    required this.name,
-    required this.description,
-  });
+  const _DesktopSettingsIntro({required this.name, required this.description});
 
   final String name;
   final String description;
@@ -2603,16 +2660,16 @@ class _DesktopSettingsIntro extends StatelessWidget {
         children: [
           Text(
             name,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: AppSpacing.xxs),
           Text(
             description,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: colors.onSurfaceVariant,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: colors.onSurfaceVariant),
           ),
         ],
       ),
@@ -2621,10 +2678,7 @@ class _DesktopSettingsIntro extends StatelessWidget {
 }
 
 class _DesktopShortcutRow extends StatelessWidget {
-  const _DesktopShortcutRow({
-    required this.label,
-    required this.shortcuts,
-  });
+  const _DesktopShortcutRow({required this.label, required this.shortcuts});
 
   final String label;
   final List<String> shortcuts;
@@ -2694,15 +2748,12 @@ class _DesktopKeycap extends StatelessWidget {
             child: Text(
               label,
               style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: colors.onSurfaceVariant,
-                    fontFamily: 'Cascadia Code',
-                    fontFamilyFallback: const [
-                      'JetBrains Mono',
-                      'Consolas',
-                    ],
-                    fontFeatures: const [FontFeature.tabularFigures()],
-                    fontWeight: FontWeight.w600,
-                  ),
+                color: colors.onSurfaceVariant,
+                fontFamily: 'Cascadia Code',
+                fontFamilyFallback: const ['JetBrains Mono', 'Consolas'],
+                fontFeatures: const [FontFeature.tabularFigures()],
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
         ),
@@ -2818,13 +2869,13 @@ class _DesktopSegmentButtonState extends State<_DesktopSegmentButton> {
                   child: Text(
                     widget.label,
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: widget.selected || _hovered
-                              ? colors.onSurface
-                              : colors.onSurfaceVariant,
-                          fontWeight: widget.selected
-                              ? FontWeight.w600
-                              : FontWeight.w500,
-                        ),
+                      color: widget.selected || _hovered
+                          ? colors.onSurface
+                          : colors.onSurfaceVariant,
+                      fontWeight: widget.selected
+                          ? FontWeight.w600
+                          : FontWeight.w500,
+                    ),
                   ),
                 ),
               ),
@@ -2870,10 +2921,7 @@ String _themePreferenceLabel(
   AppThemePreference preference,
 ) {
   return switch (preference) {
-    AppThemePreference.system => l10n.text(
-        zh: '跟随系统',
-        en: 'Follow system',
-      ),
+    AppThemePreference.system => l10n.text(zh: '跟随系统', en: 'Follow system'),
     AppThemePreference.light => l10n.text(zh: '浅色', en: 'Light'),
     AppThemePreference.dark => l10n.text(zh: '深色', en: 'Dark'),
   };
@@ -2884,17 +2932,11 @@ String _localePreferenceLabel(
   AppLocalePreference preference,
 ) {
   return switch (preference) {
-    AppLocalePreference.system => l10n.text(
-        zh: '跟随系统',
-        en: 'Follow system',
-      ),
+    AppLocalePreference.system => l10n.text(zh: '跟随系统', en: 'Follow system'),
     AppLocalePreference.zhHans => l10n.text(
-        zh: '简体中文',
-        en: 'Simplified Chinese',
-      ),
-    AppLocalePreference.english => l10n.text(
-        zh: 'English',
-        en: 'English',
-      ),
+      zh: '简体中文',
+      en: 'Simplified Chinese',
+    ),
+    AppLocalePreference.english => l10n.text(zh: 'English', en: 'English'),
   };
 }

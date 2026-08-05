@@ -7,22 +7,117 @@ import 'package:voxflow/features/settings/models/settings_state.dart';
 import 'package:voxflow/features/settings/providers/settings_provider.dart';
 import 'package:voxflow/features/settings/services/settings_repository.dart';
 import 'package:voxflow/features/settings/views/settings_screen.dart';
+
+import '../../support/memory_api_key_store.dart';
 import 'package:voxflow/l10n/app_localizations.dart';
 
 void main() {
-  testWidgets('save loading state keeps button size and visible progress',
-      (tester) async {
+  for (final (name, platform, size) in [
+    ('Windows desktop', TargetPlatform.windows, const Size(1200, 900)),
+    ('Windows compact', TargetPlatform.windows, const Size(700, 900)),
+    ('Android mobile', TargetPlatform.android, const Size(360, 720)),
+  ]) {
+    testWidgets('$name exposes irreversible full-data reset confirmation', (
+      tester,
+    ) async {
+      SharedPreferences.setMockInitialValues({});
+      final preferences = await SharedPreferences.getInstance();
+      final repository = SettingsRepository(preferences, MemoryApiKeyStore());
+      final notifier = SettingsNotifier(repository);
+      await tester.binding.setSurfaceSize(size);
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [settingsProvider.overrideWith((ref) => notifier)],
+          child: MaterialApp(
+            locale: AppLocalizations.englishLocale,
+            supportedLocales: AppLocalizations.supportedLocales,
+            localizationsDelegates: AppLocalizations.delegates,
+            theme: AppTheme.lightFor(platform),
+            home: const SettingsScreen(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Protected credential storage'), findsNothing);
+      final resetButton = find.byKey(const Key('resetAllDataButton'));
+      expect(resetButton, findsOneWidget);
+      await tester.ensureVisible(resetButton);
+      await tester.pumpAndSettle();
+      expect(resetButton.hitTestable(), findsOneWidget);
+      await tester.tap(resetButton);
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text(
+          'This permanently deletes saved API credentials, settings, history, '
+          'managed audio, diagnostic logs, and the privacy acknowledgement, '
+          'returning the app to its initial state. Original imports and files '
+          'saved elsewhere are not deleted. This cannot be undone.',
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('resetAllDataConfirmButton')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('$name keeps credential recovery guidance visible', (
+      tester,
+    ) async {
+      SharedPreferences.setMockInitialValues({
+        'settings.credentials_update_pending': true,
+        'settings.base_url': 'https://provider.example/v1',
+      });
+      final preferences = await SharedPreferences.getInstance();
+      final repository = SettingsRepository(
+        preferences,
+        MemoryApiKeyStore(initialValue: 'retained-secret'),
+      );
+      await repository.initialize();
+      final notifier = SettingsNotifier(repository);
+      await tester.binding.setSurfaceSize(size);
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [settingsProvider.overrideWith((ref) => notifier)],
+          child: MaterialApp(
+            locale: AppLocalizations.englishLocale,
+            supportedLocales: AppLocalizations.supportedLocales,
+            localizationsDelegates: AppLocalizations.delegates,
+            theme: AppTheme.lightFor(platform),
+            home: const SettingsScreen(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const Key('credentialRecoveryRequiredBanner')),
+        findsOneWidget,
+      );
+      expect(find.text('API credential recovery required'), findsOneWidget);
+    });
+  }
+
+  testWidgets('save loading state keeps button size and visible progress', (
+    tester,
+  ) async {
     SharedPreferences.setMockInitialValues({});
     final preferences = await SharedPreferences.getInstance();
-    final notifier = _TestSettingsNotifier(SettingsRepository(preferences));
+    final notifier = _TestSettingsNotifier(
+      SettingsRepository(preferences, MemoryApiKeyStore()),
+    );
     await tester.binding.setSurfaceSize(const Size(900, 900));
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [
-          settingsProvider.overrideWith((ref) => notifier),
-        ],
+        overrides: [settingsProvider.overrideWith((ref) => notifier)],
         child: MaterialApp(
           locale: AppLocalizations.englishLocale,
           supportedLocales: AppLocalizations.supportedLocales,
@@ -49,12 +144,8 @@ void main() {
     notifier.setSaving();
     await tester.pump();
 
-    final indicatorFinder = find.byKey(
-      const Key('settingsSavingIndicator'),
-    );
-    final indicator = tester.widget<CircularProgressIndicator>(
-      indicatorFinder,
-    );
+    final indicatorFinder = find.byKey(const Key('settingsSavingIndicator'));
+    final indicator = tester.widget<CircularProgressIndicator>(indicatorFinder);
     final theme = Theme.of(tester.element(indicatorFinder));
     expect(indicator.color, theme.colorScheme.onSurface);
     expect(tester.getSize(button), buttonSize);
@@ -69,7 +160,7 @@ void main() {
       'privacy_notice.acknowledged.v1': true,
     });
     final preferences = await SharedPreferences.getInstance();
-    final repository = SettingsRepository(preferences);
+    final repository = SettingsRepository(preferences, MemoryApiKeyStore());
     await repository.save(
       const SettingsState(
         apiKey: 'desktop-secret',
@@ -86,9 +177,7 @@ void main() {
 
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [
-          settingsProvider.overrideWith((ref) => notifier),
-        ],
+        overrides: [settingsProvider.overrideWith((ref) => notifier)],
         child: MaterialApp(
           locale: AppLocalizations.englishLocale,
           supportedLocales: AppLocalizations.supportedLocales,
@@ -100,9 +189,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    final resetButton = find.byKey(
-      const Key('resetLocalPreferencesButton'),
-    );
+    final resetButton = find.byKey(const Key('resetLocalPreferencesButton'));
     await tester.ensureVisible(resetButton);
     await tester.tap(resetButton);
     await tester.pumpAndSettle();
@@ -124,18 +211,14 @@ void main() {
     expect(preferences.getBool('privacy_notice.acknowledged.v1'), isTrue);
     expect(
       tester
-          .widget<TextFormField>(
-            find.byKey(const Key('apiKeyField')),
-          )
+          .widget<TextFormField>(find.byKey(const Key('apiKeyField')))
           .controller
           ?.text,
       isEmpty,
     );
     expect(
       tester
-          .widget<TextFormField>(
-            find.byKey(const Key('baseUrlField')),
-          )
+          .widget<TextFormField>(find.byKey(const Key('baseUrlField')))
           .controller
           ?.text,
       defaults.baseUrl,
@@ -145,7 +228,7 @@ void main() {
   testWidgets('Android 设置按交付稿分组且 360×640 的 200% 字体无溢出', (tester) async {
     SharedPreferences.setMockInitialValues({});
     final preferences = await SharedPreferences.getInstance();
-    final repository = SettingsRepository(preferences);
+    final repository = SettingsRepository(preferences, MemoryApiKeyStore());
     await repository.save(
       const SettingsState(
         apiKey: 'mobile-restricted-secret',
@@ -164,9 +247,7 @@ void main() {
 
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [
-          settingsProvider.overrideWith((ref) => notifier),
-        ],
+        overrides: [settingsProvider.overrideWith((ref) => notifier)],
         child: MaterialApp(
           locale: AppLocalizations.simplifiedChineseLocale,
           supportedLocales: AppLocalizations.supportedLocales,
@@ -204,10 +285,7 @@ void main() {
     final apiKeySemantics = tester.widget<Semantics>(apiKey).properties;
     expect(apiKeySemantics.obscured, isTrue);
     expect(apiKeySemantics.value, '已填写');
-    expect(
-      apiKeySemantics.value,
-      isNot(contains('mobile-restricted-secret')),
-    );
+    expect(apiKeySemantics.value, isNot(contains('mobile-restricted-secret')));
 
     for (final key in const [
       Key('fetchModelsButton'),
@@ -234,7 +312,7 @@ void main() {
       'privacy_notice.acknowledged.v1': true,
     });
     final preferences = await SharedPreferences.getInstance();
-    final repository = SettingsRepository(preferences);
+    final repository = SettingsRepository(preferences, MemoryApiKeyStore());
     await repository.save(
       const SettingsState(
         apiKey: 'mobile-secret',
@@ -251,9 +329,7 @@ void main() {
 
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [
-          settingsProvider.overrideWith((ref) => notifier),
-        ],
+        overrides: [settingsProvider.overrideWith((ref) => notifier)],
         child: MaterialApp(
           locale: AppLocalizations.simplifiedChineseLocale,
           supportedLocales: AppLocalizations.supportedLocales,
@@ -265,9 +341,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    final resetButton = find.byKey(
-      const Key('resetLocalPreferencesButton'),
-    );
+    final resetButton = find.byKey(const Key('resetLocalPreferencesButton'));
     await tester.ensureVisible(resetButton);
     await tester.pumpAndSettle();
     await tester.tap(resetButton);
@@ -292,9 +366,7 @@ void main() {
     expect(preferences.getBool('privacy_notice.acknowledged.v1'), isTrue);
     expect(
       tester
-          .widget<TextFormField>(
-            find.byKey(const Key('apiKeyField')),
-          )
+          .widget<TextFormField>(find.byKey(const Key('apiKeyField')))
           .controller
           ?.text,
       isEmpty,
@@ -305,7 +377,7 @@ void main() {
   testWidgets('Android 模型选择与工作台实时同步并由显式保存保留', (tester) async {
     SharedPreferences.setMockInitialValues({});
     final preferences = await SharedPreferences.getInstance();
-    final repository = SettingsRepository(preferences);
+    final repository = SettingsRepository(preferences, MemoryApiKeyStore());
     await repository.save(
       const SettingsState(
         apiKey: 'mobile-restricted-secret',
@@ -318,9 +390,7 @@ void main() {
 
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [
-          settingsProvider.overrideWith((ref) => notifier),
-        ],
+        overrides: [settingsProvider.overrideWith((ref) => notifier)],
         child: MaterialApp(
           locale: AppLocalizations.simplifiedChineseLocale,
           supportedLocales: AppLocalizations.supportedLocales,
@@ -342,10 +412,7 @@ void main() {
 
     expect(notifier.state.sttModel, 'gpt-4o-transcribe');
     expect(
-      find.descendant(
-        of: selector,
-        matching: find.text('gpt-4o-transcribe'),
-      ),
+      find.descendant(of: selector, matching: find.text('gpt-4o-transcribe')),
       findsOneWidget,
     );
 

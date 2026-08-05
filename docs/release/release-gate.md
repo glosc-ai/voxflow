@@ -20,14 +20,13 @@
 
 ## 已接受限制
 
-- API Key 以本地明文形式保存在 `SharedPreferences`，受限测试用户只能使用可撤销、低额度的密钥。
+- API Key 使用 Windows 当前用户级 DPAPI 或 Android Keystore 加密保存，不写入普通 `SharedPreferences` 或诊断日志。
 - Windows 首版是未签名压缩包，不提供安装器、代码签名、自动更新或回滚。
 - Seed TTS 首版只承诺 `zh_female_cancan_uranus_bigtts`。
 - 历史记录没有分页或虚拟滚动，仅适用于受控测试数据规模。
 
 ## 明确不纳入首版
 
-- Windows Credential Manager、Android Keystore 等系统密钥库集成。
 - Windows 安装器与代码签名。
 - 更多火山 Speaker ID 或动态音色目录。
 - 历史分页及大数据量性能优化。

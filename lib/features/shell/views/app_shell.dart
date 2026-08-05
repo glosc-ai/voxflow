@@ -12,6 +12,7 @@ import '../../../core/services/windows_window_service.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../widgets/mobile_design.dart';
 import '../../history/views/history_screen.dart';
+import '../../settings/providers/application_data_reset_provider.dart';
 import '../../settings/views/settings_screen.dart';
 import '../../settings/models/settings_state.dart';
 import '../../settings/providers/settings_provider.dart';
@@ -32,10 +33,7 @@ class AppShell extends ConsumerStatefulWidget {
       icon: Icons.record_voice_over_outlined,
       selectedIcon: Icons.record_voice_over,
     ),
-    _AppDestination(
-      icon: Icons.history_outlined,
-      selectedIcon: Icons.history,
-    ),
+    _AppDestination(icon: Icons.history_outlined, selectedIcon: Icons.history),
     _AppDestination(
       icon: Icons.settings_outlined,
       selectedIcon: Icons.settings,
@@ -77,6 +75,9 @@ class _AppShellState extends ConsumerState<AppShell>
     ];
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
+        unawaited(
+          ref.read(settingsProvider.notifier).checkStoredConnectionOnLaunch(),
+        );
         _requestPageFocus(ref.read(navigationIndexProvider));
       }
     });
@@ -107,6 +108,9 @@ class _AppShellState extends ConsumerState<AppShell>
 
   Future<void> _selectAfterRecordingCheck(int index) async {
     if (index < 0 || index >= _pageFocusNodes.length) {
+      return;
+    }
+    if (ref.read(applicationDataResetProvider).isLoading) {
       return;
     }
     final currentIndex = ref.read(navigationIndexProvider);
@@ -142,12 +146,7 @@ class _AppShellState extends ConsumerState<AppShell>
     return showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: Text(
-          l10n.text(
-            zh: '停止录音并离开？',
-            en: 'Stop recording and leave?',
-          ),
-        ),
+        title: Text(l10n.text(zh: '停止录音并离开？', en: 'Stop recording and leave?')),
         content: Text(
           l10n.text(
             zh: '当前录音尚未转录。离开将停止并放弃此录音。',
@@ -167,12 +166,7 @@ class _AppShellState extends ConsumerState<AppShell>
               foregroundColor: colors.onError,
             ),
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: Text(
-              l10n.text(
-                zh: '停止并离开',
-                en: 'Stop and leave',
-              ),
-            ),
+            child: Text(l10n.text(zh: '停止并离开', en: 'Stop and leave')),
           ),
         ],
       ),
@@ -270,6 +264,9 @@ class _AppShellState extends ConsumerState<AppShell>
 
   @override
   Widget build(BuildContext context) {
+    final isResettingAllData = ref
+        .watch(applicationDataResetProvider)
+        .isLoading;
     ref.listen<int>(navigationIndexProvider, (previous, next) {
       if (previous != next) {
         _schedulePageFocus(next);
@@ -293,44 +290,54 @@ class _AppShellState extends ConsumerState<AppShell>
           _SafeNavigationActivator(
             LogicalKeyboardKey.digit1,
             _bareNavigationShortcutIsSafe,
-          ): () => _select(0),
+          ): () =>
+              _select(0),
           _SafeNavigationActivator(
             LogicalKeyboardKey.digit2,
             _bareNavigationShortcutIsSafe,
-          ): () => _select(1),
+          ): () =>
+              _select(1),
           _SafeNavigationActivator(
             LogicalKeyboardKey.digit3,
             _bareNavigationShortcutIsSafe,
-          ): () => _select(2),
+          ): () =>
+              _select(2),
           _SafeNavigationActivator(
             LogicalKeyboardKey.digit4,
             _bareNavigationShortcutIsSafe,
-          ): () => _select(3),
+          ): () =>
+              _select(3),
         },
       },
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final selectedIndex = ref.watch(navigationIndexProvider);
-          final isAndroid =
-              Theme.of(context).platform == TargetPlatform.android;
-          final isExtended =
-              constraints.maxWidth > AppBreakpoints.desktopRailCompact &&
+      child: ExcludeFocus(
+        excluding: isResettingAllData,
+        child: IgnorePointer(
+          ignoring: isResettingAllData,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final selectedIndex = ref.watch(navigationIndexProvider);
+              final isAndroid =
+                  Theme.of(context).platform == TargetPlatform.android;
+              final isExtended =
+                  constraints.maxWidth > AppBreakpoints.desktopRailCompact &&
                   MediaQuery.textScalerOf(context).scale(1) < 1.6;
-          if (!isAndroid) {
-            return _DesktopShell(
-              selectedIndex: selectedIndex,
-              extended: isExtended,
-              onSelected: _select,
-              pageStack: _pageStack(selectedIndex),
-              windowVersion: _windowVersion,
-            );
-          }
-          return _CompactShell(
-            selectedIndex: selectedIndex,
-            onSelected: _select,
-            pageStack: _mobilePageStack(selectedIndex),
-          );
-        },
+              if (!isAndroid) {
+                return _DesktopShell(
+                  selectedIndex: selectedIndex,
+                  extended: isExtended,
+                  onSelected: _select,
+                  pageStack: _pageStack(selectedIndex),
+                  windowVersion: _windowVersion,
+                );
+              }
+              return _CompactShell(
+                selectedIndex: selectedIndex,
+                onSelected: _select,
+                pageStack: _mobilePageStack(selectedIndex),
+              );
+            },
+          ),
+        ),
       ),
     );
   }
@@ -460,9 +467,7 @@ class _DesktopTitleBar extends StatelessWidget {
     final colors = Theme.of(context).colorScheme;
     return _GlassSurface(
       key: const Key('desktopTitleBar'),
-      borderRadius: const BorderRadius.vertical(
-        bottom: Radius.circular(16),
-      ),
+      borderRadius: const BorderRadius.vertical(bottom: Radius.circular(16)),
       floating: false,
       child: Row(
         children: [
@@ -484,9 +489,7 @@ class _DesktopTitleBar extends StatelessWidget {
                           children: [
                             TextSpan(
                               text: 'VoxFlow',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodySmall
+                              style: Theme.of(context).textTheme.bodySmall
                                   ?.copyWith(
                                     color: colors.onSurface,
                                     fontWeight: FontWeight.w600,
@@ -501,8 +504,8 @@ class _DesktopTitleBar extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: colors.onSurfaceVariant,
-                            ),
+                          color: colors.onSurfaceVariant,
+                        ),
                       ),
                     ),
                   ],
@@ -519,10 +522,7 @@ class _DesktopTitleBar extends StatelessWidget {
                 key: const Key('desktopVersionLabel'),
                 style: AppTypography.numeric(
                   Theme.of(context).textTheme.labelMedium,
-                ).copyWith(
-                  color: colors.onSurfaceVariant,
-                  fontSize: 10.5,
-                ),
+                ).copyWith(color: colors.onSurfaceVariant, fontSize: 10.5),
               );
             },
           ),
@@ -535,10 +535,7 @@ class _DesktopTitleBar extends StatelessWidget {
           ),
           _WindowButton(
             key: const Key('windowMaximizeButton'),
-            tooltip: context.l10n.text(
-              zh: '最大化或还原',
-              en: 'Maximize or restore',
-            ),
+            tooltip: context.l10n.text(zh: '最大化或还原', en: 'Maximize or restore'),
             icon: Icons.crop_square_rounded,
             onPressed: () =>
                 unawaited(WindowsWindowService.maximizeOrRestore()),
@@ -649,10 +646,7 @@ class _DesktopNavigation extends StatelessWidget {
           children: [
             _DesktopBrand(extended: extended),
             const SizedBox(height: 18),
-            _DesktopApiStatus(
-              extended: extended,
-              presentation: connection,
-            ),
+            _DesktopApiStatus(extended: extended, presentation: connection),
             const SizedBox(height: AppSpacing.lg),
             for (var index = 0; index < 3; index++) ...[
               _DesktopNavigationItem(
@@ -747,20 +741,21 @@ class _DesktopBrand extends StatelessWidget {
                   'VoxFlow',
                   maxLines: 1,
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontSize: 17.5,
-                        fontWeight: FontWeight.w600,
-                      ),
+                    fontSize: 17.5,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
                 Text(
                   'VOICE STUDIO',
                   maxLines: 1,
-                  style: AppTypography.numeric(
-                    Theme.of(context).textTheme.labelMedium,
-                  ).copyWith(
-                    color: colors.onSurfaceVariant,
-                    fontSize: 10,
-                    letterSpacing: 0.6,
-                  ),
+                  style:
+                      AppTypography.numeric(
+                        Theme.of(context).textTheme.labelMedium,
+                      ).copyWith(
+                        color: colors.onSurfaceVariant,
+                        fontSize: 10,
+                        letterSpacing: 0.6,
+                      ),
                 ),
               ],
             ),
@@ -772,10 +767,7 @@ class _DesktopBrand extends StatelessWidget {
 }
 
 class _DesktopApiStatus extends StatelessWidget {
-  const _DesktopApiStatus({
-    required this.extended,
-    required this.presentation,
-  });
+  const _DesktopApiStatus({required this.extended, required this.presentation});
 
   final bool extended;
   final _ConnectionPresentation presentation;
@@ -798,8 +790,9 @@ class _DesktopApiStatus extends StatelessWidget {
         borderRadius: BorderRadius.circular(AppRadii.desktopControl),
       ),
       child: Row(
-        mainAxisAlignment:
-            extended ? MainAxisAlignment.start : MainAxisAlignment.center,
+        mainAxisAlignment: extended
+            ? MainAxisAlignment.start
+            : MainAxisAlignment.center,
         children: [
           _StatusDot(color: presentation.color),
           if (extended) ...[
@@ -810,10 +803,10 @@ class _DesktopApiStatus extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: colors.onSurface,
-                      fontWeight: FontWeight.w500,
-                      fontSize: 12.5,
-                    ),
+                  color: colors.onSurface,
+                  fontWeight: FontWeight.w500,
+                  fontSize: 12.5,
+                ),
               ),
             ),
             Text(
@@ -887,16 +880,15 @@ class _DesktopNavigationItemState extends State<_DesktopNavigationItem> {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final semantics = context.semanticColors;
-    final foreground =
-        widget.selected ? colors.primary : colors.onSurfaceVariant;
+    final foreground = widget.selected
+        ? colors.primary
+        : colors.onSurfaceVariant;
     final duration = MediaQuery.disableAnimationsOf(context)
         ? Duration.zero
         : const Duration(milliseconds: 200);
     final item = Semantics(
       key: widget.selected
-          ? ValueKey(
-              'desktopSelectedNavigationDestination:${widget.shortcut}',
-            )
+          ? ValueKey('desktopSelectedNavigationDestination:${widget.shortcut}')
           : null,
       button: true,
       selected: widget.selected,
@@ -921,8 +913,8 @@ class _DesktopNavigationItemState extends State<_DesktopNavigationItem> {
               color: widget.selected
                   ? semantics.surfaceSelected
                   : (_hovered
-                      ? colors.onSurface.withValues(alpha: 0.05)
-                      : Colors.transparent),
+                        ? colors.onSurface.withValues(alpha: 0.05)
+                        : Colors.transparent),
               borderRadius: BorderRadius.circular(AppRadii.desktopControl),
               border: _focused
                   ? Border.all(color: semantics.focus, width: 2)
@@ -957,12 +949,12 @@ class _DesktopNavigationItemState extends State<_DesktopNavigationItem> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: foreground,
-                            fontSize: 14.5,
-                            fontWeight: widget.selected
-                                ? FontWeight.w600
-                                : FontWeight.w500,
-                          ),
+                        color: foreground,
+                        fontSize: 14.5,
+                        fontWeight: widget.selected
+                            ? FontWeight.w600
+                            : FontWeight.w500,
+                      ),
                     ),
                   ),
                   if (widget.shortcut != null)
@@ -1010,12 +1002,11 @@ class _ShortcutBadge extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: AppTypography.numeric(
-          Theme.of(context).textTheme.labelMedium,
-        ).copyWith(
-          color: selected ? colors.primary : colors.onSurfaceVariant,
-          fontSize: 10.5,
-        ),
+        style: AppTypography.numeric(Theme.of(context).textTheme.labelMedium)
+            .copyWith(
+              color: selected ? colors.primary : colors.onSurfaceVariant,
+              fontSize: 10.5,
+            ),
       ),
     );
   }
@@ -1045,9 +1036,7 @@ class _GlassSurface extends StatelessWidget {
       curve: Curves.ease,
       decoration: BoxDecoration(
         borderRadius: borderRadius,
-        boxShadow: [
-          floating ? effects.floatingShadow : effects.cardShadow,
-        ],
+        boxShadow: [floating ? effects.floatingShadow : effects.cardShadow],
       ),
       child: ClipRRect(
         borderRadius: borderRadius,
@@ -1154,9 +1143,11 @@ class _CompactShell extends StatelessWidget {
             padding: const EdgeInsets.all(AppSpacing.xs),
             child: Row(
               children: [
-                for (var index = 0;
-                    index < AppShell._destinations.length;
-                    index++)
+                for (
+                  var index = 0;
+                  index < AppShell._destinations.length;
+                  index++
+                )
                   Expanded(
                     child: _BottomNavigationItem(
                       key: ValueKey('bottomNavigationDestination:$index'),
@@ -1203,8 +1194,9 @@ class _BottomNavigationItemState extends State<_BottomNavigationItem> {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final semantics = context.semanticColors;
-    final foreground =
-        widget.selected ? colors.primary : colors.onSurfaceVariant;
+    final foreground = widget.selected
+        ? colors.primary
+        : colors.onSurfaceVariant;
     return Semantics(
       button: true,
       selected: widget.selected,
@@ -1226,10 +1218,7 @@ class _BottomNavigationItemState extends State<_BottomNavigationItem> {
               child: AnimatedContainer(
                 duration: MobileMotion.duration(context),
                 curve: Curves.ease,
-                constraints: const BoxConstraints(
-                  minWidth: 48,
-                  minHeight: 48,
-                ),
+                constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
                 padding: const EdgeInsets.fromLTRB(0, 7, 0, 6),
                 decoration: BoxDecoration(
                   color: widget.selected
@@ -1259,11 +1248,11 @@ class _BottomNavigationItemState extends State<_BottomNavigationItem> {
                       softWrap: true,
                       textAlign: TextAlign.center,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: foreground,
-                            fontSize: 10.5,
-                            height: 1.35,
-                            fontWeight: FontWeight.w500,
-                          ),
+                        color: foreground,
+                        fontSize: 10.5,
+                        height: 1.35,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                   ],
                 ),

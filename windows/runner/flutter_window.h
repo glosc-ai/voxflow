@@ -10,6 +10,8 @@
 
 #include "win32_window.h"
 
+class SecureCredentialStore;
+
 // A window that does nothing but host a Flutter view.
 class FlutterWindow : public Win32Window {
  public:
@@ -25,6 +27,13 @@ class FlutterWindow : public Win32Window {
                          LPARAM const lparam) noexcept override;
 
  private:
+  // Lets resize hit tests fall through from the edge-to-edge Flutter child
+  // window to its native parent while preserving normal Flutter input in the
+  // client area.
+  static LRESULT CALLBACK FlutterViewSubclassProc(
+      HWND window, UINT message, WPARAM wparam, LPARAM lparam,
+      UINT_PTR subclass_id, DWORD_PTR reference_data) noexcept;
+
   // The project to run.
   flutter::DartProject project_;
 
@@ -33,6 +42,11 @@ class FlutterWindow : public Win32Window {
 
   std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>>
       window_channel_;
+
+  std::unique_ptr<SecureCredentialStore> secure_credential_store_;
+
+  HWND flutter_view_handle_ = nullptr;
+  bool flutter_view_subclass_installed_ = false;
 
   bool startup_resize_pending_ = false;
   int startup_window_width_ = 0;
