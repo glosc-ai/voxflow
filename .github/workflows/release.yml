@@ -1,0 +1,551 @@
+name: Cross-platform Release
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - pubspec.yaml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  detect_version:
+    name: Detect pubspec version change
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      should_build: ${{ steps.version.outputs.should_build }}
+      should_publish: ${{ steps.version.outputs.should_publish }}
+      version: ${{ steps.version.outputs.version }}
+      version_name: ${{ steps.version.outputs.version_name }}
+      version_code: ${{ steps.version.outputs.version_code }}
+      tag: ${{ steps.version.outputs.tag }}
+      asset_version: ${{ steps.version.outputs.asset_version }}
+
+    steps:
+      - name: Check out source and tags
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect and validate version
+        id: version
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BEFORE_SHA: ${{ github.event.before }}
+          SOURCE_REF: ${{ github.ref }}
+        run: |
+          set -euo pipefail
+
+          parse_version() {
+            local value
+            value="$(
+              awk '
+                /^version:[[:space:]]*/ {
+                  sub(/^version:[[:space:]]*/, "")
+                  sub(/[[:space:]]*#.*/, "")
+                  print
+                  exit
+                }
+              '
+            )"
+            value="$(printf '%s' "$value" | tr -d '[:space:]')"
+            value="${value#\"}"
+            value="${value%\"}"
+            value="${value#\'}"
+            value="${value%\'}"
+            printf '%s' "$value"
+          }
+
+          current_version="$(parse_version < pubspec.yaml)"
+          if [[ ! "$current_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?\+[0-9]+$ ]]; then
+            echo "::error::pubspec.yaml contains an invalid release version: $current_version"
+            exit 1
+          fi
+
+          previous_version=""
+          should_build=false
+          should_publish=false
+
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            if [[ "$SOURCE_REF" != "refs/heads/main" ]]; then
+              echo "::error::Manual release validation must run from main."
+              exit 1
+            fi
+            should_build=true
+          elif [[ "$EVENT_NAME" == "push" ]]; then
+            if [[ -z "$BEFORE_SHA" || "$BEFORE_SHA" =~ ^0+$ ]]; then
+              echo "::error::Cannot safely compare the version for an initial branch push."
+              exit 1
+            fi
+            if ! git cat-file -e "${BEFORE_SHA}:pubspec.yaml" 2>/dev/null; then
+              git fetch --no-tags --depth=1 origin "$BEFORE_SHA" || true
+            fi
+            if ! git cat-file -e "${BEFORE_SHA}:pubspec.yaml" 2>/dev/null; then
+              echo "::error::The pre-push pubspec.yaml is unavailable; refusing to publish."
+              exit 1
+            fi
+            previous_version="$(git show "${BEFORE_SHA}:pubspec.yaml" | parse_version)"
+            if [[ -z "$previous_version" ]]; then
+              echo "::error::The pre-push pubspec.yaml has no readable version."
+              exit 1
+            fi
+            if [[ "$current_version" != "$previous_version" ]]; then
+              should_build=true
+              should_publish=true
+            else
+              echo "::notice::pubspec.yaml changed without changing its version; release jobs are skipped."
+            fi
+          else
+            echo "::error::Unsupported release event: $EVENT_NAME"
+            exit 1
+          fi
+
+          asset_version="${current_version/+/-build.}"
+          asset_version="$(
+            printf '%s' "$asset_version" |
+              sed -E 's/[^0-9A-Za-z._-]+/-/g'
+          )"
+          version_name="${current_version%%+*}"
+          version_code="${current_version##*+}"
+          release_tag="v${current_version}"
+
+          {
+            echo "should_build=$should_build"
+            echo "should_publish=$should_publish"
+            echo "version=$current_version"
+            echo "version_name=$version_name"
+            echo "version_code=$version_code"
+            echo "tag=$release_tag"
+            echo "asset_version=$asset_version"
+          } >> "$GITHUB_OUTPUT"
+
+          {
+            echo "### Release version detection"
+            echo ""
+            echo "- Previous version: \`${previous_version:-manual run}\`"
+            echo "- Current version: \`$current_version\`"
+            echo "- Release tag: \`$release_tag\`"
+            echo "- Build requested: \`$should_build\`"
+            echo "- Publish requested: \`$should_publish\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Reject a version tag used by another commit
+        if: steps.version.outputs.should_publish == 'true'
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+          RELEASE_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          git fetch --force --tags origin
+          existing_target="$(
+            git rev-parse -q --verify "refs/tags/${RELEASE_TAG}^{commit}" || true
+          )"
+          if [[ -n "$existing_target" && "$existing_target" != "$RELEASE_SHA" ]]; then
+            echo "::error::${RELEASE_TAG} already points to ${existing_target}; bump pubspec.yaml instead of reusing a version."
+            exit 1
+          fi
+
+  quality:
+    name: Analyze and test
+    needs: detect_version
+    if: needs.detect_version.outputs.should_build == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out release source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.44.2
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Run static analysis
+        run: flutter analyze
+
+      - name: Run automated tests
+        run: flutter test
+
+  build_android:
+    name: Build signed Android APKs
+    needs:
+      - detect_version
+      - quality
+    if: needs.detect_version.outputs.should_build == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: android-release
+
+    steps:
+      - name: Check out release source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.44.2
+          cache: true
+
+      - name: Validate protected signing configuration
+        shell: bash
+        env:
+          ANDROID_KEY_BASE64: ${{ secrets.ANDROID_KEY_BASE64 }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          required=(
+            ANDROID_KEY_BASE64
+            ANDROID_KEY_ALIAS
+            ANDROID_KEY_PASSWORD
+          )
+          for name in "${required[@]}"; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "::error::$name is not configured for the android-release environment."
+              exit 1
+            fi
+          done
+
+      - name: Decode release keystore
+        shell: bash
+        env:
+          ANDROID_KEY_BASE64: ${{ secrets.ANDROID_KEY_BASE64 }}
+        run: |
+          set -euo pipefail
+          keystore_path="$RUNNER_TEMP/voxflow-release.jks"
+          printf '%s' "$ANDROID_KEY_BASE64" | base64 --decode > "$keystore_path"
+          chmod 600 "$keystore_path"
+          echo "VOXFLOW_ANDROID_KEYSTORE_PATH=$keystore_path" >> "$GITHUB_ENV"
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build signed ABI APKs
+        env:
+          VOXFLOW_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          VOXFLOW_ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          VOXFLOW_ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: flutter build apk --release --split-per-abi
+
+      - name: Verify signatures and stage Android assets
+        id: verify
+        shell: bash
+        env:
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ASSET_VERSION: ${{ needs.detect_version.outputs.asset_version }}
+          EXPECTED_VERSION_NAME: ${{ needs.detect_version.outputs.version_name }}
+          EXPECTED_VERSION_CODE: ${{ needs.detect_version.outputs.version_code }}
+        run: |
+          set -euo pipefail
+          apk_dir="$GITHUB_WORKSPACE/build/app/outputs/flutter-apk"
+          release_dir="$GITHUB_WORKSPACE/dist/release-android"
+          prefix="voxflow-${ASSET_VERSION}"
+          apks=(
+            "$apk_dir/app-armeabi-v7a-release.apk"
+            "$apk_dir/app-arm64-v8a-release.apk"
+            "$apk_dir/app-x86_64-release.apk"
+          )
+          abis=(armeabi-v7a arm64-v8a x86_64)
+          version_code_offsets=(1000 2000 4000)
+          apksigner="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
+          if [[ -z "$apksigner" || ! -x "$apksigner" ]]; then
+            echo "::error::apksigner was not found in the Android SDK."
+            exit 1
+          fi
+          aapt="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -n 1)"
+          if [[ -z "$aapt" || ! -x "$aapt" ]]; then
+            echo "::error::aapt was not found in the Android SDK."
+            exit 1
+          fi
+          normalize_digest() {
+            tr -d ' :\r\n' | tr '[:lower:]' '[:upper:]'
+          }
+          certificate_path="$RUNNER_TEMP/voxflow-release-cert.der"
+          "$JAVA_HOME/bin/keytool" -exportcert \
+            -keystore "$VOXFLOW_ANDROID_KEYSTORE_PATH" \
+            -storepass "$ANDROID_KEY_PASSWORD" \
+            -alias "$ANDROID_KEY_ALIAS" \
+            -file "$certificate_path" >/dev/null
+          expected="$(sha256sum "$certificate_path" | awk '{print $1}' | normalize_digest)"
+          rm -f -- "$certificate_path"
+
+          mkdir -p "$release_dir"
+          release_files=()
+          for index in "${!apks[@]}"; do
+            apk="${apks[$index]}"
+            abi="${abis[$index]}"
+            if [[ ! -f "$apk" ]]; then
+              echo "::error::Missing expected artifact: $(basename "$apk")"
+              exit 1
+            fi
+            if ! unzip -Z1 "$apk" | grep -Fx "lib/$abi/libffmpegkit.so" >/dev/null; then
+              echo "::error::Missing bundled FFmpeg runtime for $abi in $(basename "$apk")."
+              exit 1
+            fi
+            if ! unzip -Z1 "$apk" | grep -Fx \
+              "assets/flutter_assets/THIRD_PARTY_NOTICES.md" >/dev/null; then
+              echo "::error::Missing third-party notices in $(basename "$apk")."
+              exit 1
+            fi
+            package_line="$($aapt dump badging "$apk" | sed -n '/^package: /p' | head -n 1)"
+            application_id="$(printf '%s' "$package_line" | sed -n "s/^package: name='\([^']*\)'.*/\1/p")"
+            actual_version_code="$(printf '%s' "$package_line" | sed -n "s/.*versionCode='\([^']*\)'.*/\1/p")"
+            version_name="$(printf '%s' "$package_line" | sed -n "s/.*versionName='\([^']*\)'.*/\1/p")"
+            expected_version_code="$((${version_code_offsets[$index]} + EXPECTED_VERSION_CODE))"
+            if [[ "$application_id" != "ai.glosc.voxflow" ]]; then
+              echo "::error::Unexpected application ID in $(basename "$apk"): $application_id"
+              exit 1
+            fi
+            if [[ "$version_name" != "$EXPECTED_VERSION_NAME" || "$actual_version_code" != "$expected_version_code" ]]; then
+              echo "::error::Unexpected version in $(basename "$apk"): name=$version_name code=$actual_version_code"
+              exit 1
+            fi
+            verification="$($apksigner verify --print-certs "$apk")"
+            actual="$(
+              printf '%s\n' "$verification" |
+                sed -n 's/^Signer #1 certificate SHA-256 digest: //p' |
+                normalize_digest
+            )"
+            if [[ -z "$actual" || "$actual" != "$expected" ]]; then
+              echo "::error::Unexpected signing certificate for $(basename "$apk")."
+              exit 1
+            fi
+            output_name="${prefix}-android-${abi}.apk"
+            cp -- "$apk" "$release_dir/$output_name"
+            release_files+=("$output_name")
+          done
+
+          (
+            cd "$release_dir"
+            sha256sum "${release_files[@]}" > "${prefix}-android-sha256.txt"
+          )
+          echo "certificate_sha256=$expected" >> "$GITHUB_OUTPUT"
+
+      - name: Upload Android release assets
+        uses: actions/upload-artifact@v4
+        with:
+          name: voxflow-android-${{ needs.detect_version.outputs.asset_version }}
+          if-no-files-found: error
+          overwrite: true
+          retention-days: 30
+          path: dist/release-android/*
+
+      - name: Remove temporary signing material
+        if: always()
+        shell: bash
+        run: |
+          if [[ -n "${VOXFLOW_ANDROID_KEYSTORE_PATH:-}" ]]; then
+            rm -f -- "$VOXFLOW_ANDROID_KEYSTORE_PATH"
+          fi
+
+  build_windows:
+    name: Build Windows x64 package
+    needs:
+      - detect_version
+      - quality
+    if: needs.detect_version.outputs.should_build == 'true'
+    runs-on: windows-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out release source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.44.2
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build and verify Windows release package
+        shell: pwsh
+        env:
+          ASSET_VERSION: ${{ needs.detect_version.outputs.asset_version }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          & .\tool\package_windows_release.ps1
+          & .\tool\verify_windows_package.ps1 `
+            -ZipPath .\dist\voxflow-windows-x64.zip
+
+          $releaseDirectory = Join-Path $env:GITHUB_WORKSPACE 'dist\release-windows'
+          New-Item -ItemType Directory -Path $releaseDirectory -Force | Out-Null
+          $assetName = "voxflow-$env:ASSET_VERSION-windows-x64.zip"
+          $assetPath = Join-Path $releaseDirectory $assetName
+          Copy-Item -LiteralPath .\dist\voxflow-windows-x64.zip `
+            -Destination $assetPath -Force
+          $hash = (Get-FileHash -LiteralPath $assetPath -Algorithm SHA256).Hash.ToLowerInvariant()
+          $checksumPath = Join-Path $releaseDirectory `
+            "voxflow-$env:ASSET_VERSION-windows-sha256.txt"
+          [System.IO.File]::WriteAllText(
+            $checksumPath,
+            "$hash  $assetName`n",
+            [System.Text.Encoding]::ASCII
+          )
+
+      - name: Upload Windows release assets
+        uses: actions/upload-artifact@v4
+        with:
+          name: voxflow-windows-${{ needs.detect_version.outputs.asset_version }}
+          if-no-files-found: error
+          overwrite: true
+          retention-days: 30
+          path: dist/release-windows/*
+
+  publish:
+    name: Publish GitHub Release
+    needs:
+      - detect_version
+      - build_android
+      - build_windows
+    if: needs.detect_version.outputs.should_publish == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+
+    steps:
+      - name: Check out release source and tags
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.sha }}
+
+      - name: Download Android assets
+        uses: actions/download-artifact@v4
+        with:
+          name: voxflow-android-${{ needs.detect_version.outputs.asset_version }}
+          path: release-assets/android
+
+      - name: Download Windows assets
+        uses: actions/download-artifact@v4
+        with:
+          name: voxflow-windows-${{ needs.detect_version.outputs.asset_version }}
+          path: release-assets/windows
+
+      - name: Verify assets and create combined checksum
+        shell: bash
+        env:
+          ASSET_VERSION: ${{ needs.detect_version.outputs.asset_version }}
+        run: |
+          set -euo pipefail
+          prefix="voxflow-${ASSET_VERSION}"
+          (
+            cd release-assets/android
+            sha256sum --check "${prefix}-android-sha256.txt"
+          )
+          (
+            cd release-assets/windows
+            sha256sum --check "${prefix}-windows-sha256.txt"
+          )
+
+          mkdir -p release-assets/final
+          cp -- release-assets/android/${prefix}-android-*.apk release-assets/final/
+          cp -- release-assets/windows/${prefix}-windows-x64.zip release-assets/final/
+          (
+            cd release-assets/final
+            sha256sum \
+              "${prefix}-android-armeabi-v7a.apk" \
+              "${prefix}-android-arm64-v8a.apk" \
+              "${prefix}-android-x86_64.apk" \
+              "${prefix}-windows-x64.zip" \
+              > "${prefix}-sha256.txt"
+          )
+
+      - name: Create or update GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ needs.detect_version.outputs.tag }}
+          RELEASE_VERSION: ${{ needs.detect_version.outputs.version }}
+          RELEASE_SHA: ${{ github.sha }}
+          ASSET_VERSION: ${{ needs.detect_version.outputs.asset_version }}
+        run: |
+          set -euo pipefail
+          git fetch --force --tags origin
+          existing_target="$(
+            git rev-parse -q --verify "refs/tags/${RELEASE_TAG}^{commit}" || true
+          )"
+          if [[ -n "$existing_target" && "$existing_target" != "$RELEASE_SHA" ]]; then
+            echo "::error::${RELEASE_TAG} moved to ${existing_target} while the release was building."
+            exit 1
+          fi
+
+          release_type_args=(--latest=false)
+          if [[ "${RELEASE_VERSION%%+*}" == *-* ]]; then
+            release_type_args+=(--prerelease)
+          fi
+
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            release_is_draft="$(
+              gh release view "$RELEASE_TAG" --json isDraft --jq .isDraft
+            )"
+            release_target="$(
+              gh release view "$RELEASE_TAG" \
+                --json targetCommitish \
+                --jq .targetCommitish
+            )"
+            if [[ "$release_is_draft" != "true" ]]; then
+              echo "::error::${RELEASE_TAG} is already published; refusing to replace public binaries."
+              exit 1
+            fi
+            if [[ "$release_target" != "$RELEASE_SHA" ]]; then
+              echo "::error::Draft ${RELEASE_TAG} targets ${release_target}, not ${RELEASE_SHA}."
+              exit 1
+            fi
+          else
+            gh release create "$RELEASE_TAG" \
+              --target "$RELEASE_SHA" \
+              --title "声流 $RELEASE_VERSION" \
+              --generate-notes \
+              "${release_type_args[@]}" \
+              --draft
+          fi
+
+          prefix="voxflow-${ASSET_VERSION}"
+          gh release upload "$RELEASE_TAG" \
+            "release-assets/final/${prefix}-android-armeabi-v7a.apk" \
+            "release-assets/final/${prefix}-android-arm64-v8a.apk" \
+            "release-assets/final/${prefix}-android-x86_64.apk" \
+            "release-assets/final/${prefix}-windows-x64.zip" \
+            "release-assets/final/${prefix}-sha256.txt" \
+            --clobber
+
+          gh release edit "$RELEASE_TAG" \
+            --draft=false \
+            "${release_type_args[@]}"
