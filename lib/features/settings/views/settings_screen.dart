@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
@@ -137,6 +139,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           if (!interactionsDisabled) {
             _submit(testConnection: false);
           }
+        },
+        if (_obscureApiKey && _apiKeyFocusNode.hasFocus) ...{
+          const SingleActivator(LogicalKeyboardKey.keyV, control: true):
+              _pasteFocusedApiKey,
+          const SingleActivator(LogicalKeyboardKey.insert, shift: true):
+              _pasteFocusedApiKey,
         },
       },
       child: Focus(
@@ -289,19 +297,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                                   ))
                                           : _apiKeyController.text,
                                       onTap: _apiKeyFocusNode.requestFocus,
-                                      customSemanticsActions: {
-                                        CustomSemanticsAction(
-                                          label: _obscureApiKey
-                                              ? l10n.text(
-                                                  zh: '显示密钥',
-                                                  en: 'Show API key',
-                                                )
-                                              : l10n.text(
-                                                  zh: '隐藏密钥',
-                                                  en: 'Hide API key',
-                                                ),
-                                        ): _toggleApiKeyVisibility,
-                                      },
+                                      customSemanticsActions:
+                                          _apiKeySemanticsActions(l10n),
                                       onSetText: (value) {
                                         setState(() {
                                           _apiKeyController
@@ -329,23 +326,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                           decoration: InputDecoration(
                                             labelText: 'API Key',
                                             prefixIcon: const Icon(Icons.key),
-                                            suffixIcon: IconButton(
-                                              tooltip: _obscureApiKey
-                                                  ? l10n.text(
-                                                      zh: '显示密钥',
-                                                      en: 'Show API key',
-                                                    )
-                                                  : l10n.text(
-                                                      zh: '隐藏密钥',
-                                                      en: 'Hide API key',
-                                                    ),
-                                              onPressed:
-                                                  _toggleApiKeyVisibility,
-                                              icon: Icon(
-                                                _obscureApiKey
-                                                    ? Icons.visibility
-                                                    : Icons.visibility_off,
-                                              ),
+                                            suffixIcon: _buildApiKeySuffix(
+                                              l10n,
                                             ),
                                           ),
                                           validator: (value) =>
@@ -1730,6 +1712,44 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
+  Map<CustomSemanticsAction, VoidCallback> _apiKeySemanticsActions(
+    AppLocalizations l10n,
+  ) {
+    return {
+      CustomSemanticsAction(
+        label: _obscureApiKey
+            ? l10n.text(zh: '显示密钥', en: 'Show API key')
+            : l10n.text(zh: '隐藏密钥', en: 'Hide API key'),
+      ): _toggleApiKeyVisibility,
+      if (_obscureApiKey)
+        CustomSemanticsAction(
+          label: l10n.text(zh: '粘贴 API Key', en: 'Paste API key'),
+        ): _pasteApiKey,
+    };
+  }
+
+  Widget _buildApiKeySuffix(AppLocalizations l10n) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (_obscureApiKey)
+          IconButton(
+            key: const Key('pasteApiKeyButton'),
+            tooltip: l10n.text(zh: '粘贴 API Key', en: 'Paste API key'),
+            onPressed: _pasteApiKey,
+            icon: const Icon(Icons.content_paste_outlined),
+          ),
+        IconButton(
+          tooltip: _obscureApiKey
+              ? l10n.text(zh: '显示密钥', en: 'Show API key')
+              : l10n.text(zh: '隐藏密钥', en: 'Hide API key'),
+          onPressed: _toggleApiKeyVisibility,
+          icon: Icon(_obscureApiKey ? Icons.visibility : Icons.visibility_off),
+        ),
+      ],
+    );
+  }
+
   Widget _buildMobileApiKeyField(AppLocalizations l10n) {
     return Semantics(
       key: const Key('apiKeySemantics'),
@@ -1747,13 +1767,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 : l10n.text(zh: '已填写', en: 'Entered'))
           : _apiKeyController.text,
       onTap: _apiKeyFocusNode.requestFocus,
-      customSemanticsActions: {
-        CustomSemanticsAction(
-          label: _obscureApiKey
-              ? l10n.text(zh: '显示密钥', en: 'Show API key')
-              : l10n.text(zh: '隐藏密钥', en: 'Hide API key'),
-        ): _toggleApiKeyVisibility,
-      },
+      customSemanticsActions: _apiKeySemanticsActions(l10n),
       onSetText: (value) {
         setState(() {
           _apiKeyController.value = TextEditingValue(
@@ -1777,15 +1791,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           decoration: InputDecoration(
             hintText: 'sk-…',
             prefixIcon: const Icon(Icons.key),
-            suffixIcon: IconButton(
-              tooltip: _obscureApiKey
-                  ? l10n.text(zh: '显示密钥', en: 'Show API key')
-                  : l10n.text(zh: '隐藏密钥', en: 'Hide API key'),
-              onPressed: _toggleApiKeyVisibility,
-              icon: Icon(
-                _obscureApiKey ? Icons.visibility : Icons.visibility_off,
-              ),
-            ),
+            suffixIcon: _buildApiKeySuffix(l10n),
           ),
           validator: (value) => value == null || value.trim().isEmpty
               ? l10n.text(zh: '请填写 API Key', en: 'Enter an API key')
@@ -1814,13 +1820,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   : l10n.text(zh: '已填写', en: 'Entered'))
             : _apiKeyController.text,
         onTap: _apiKeyFocusNode.requestFocus,
-        customSemanticsActions: {
-          CustomSemanticsAction(
-            label: _obscureApiKey
-                ? l10n.text(zh: '显示密钥', en: 'Show API key')
-                : l10n.text(zh: '隐藏密钥', en: 'Hide API key'),
-          ): _toggleApiKeyVisibility,
-        },
+        customSemanticsActions: _apiKeySemanticsActions(l10n),
         onSetText: (value) {
           setState(() {
             _apiKeyController.value = TextEditingValue(
@@ -1847,15 +1847,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             decoration: InputDecoration(
               hintText: 'sk-…',
               prefixIcon: const Icon(Icons.key),
-              suffixIcon: IconButton(
-                tooltip: _obscureApiKey
-                    ? l10n.text(zh: '显示密钥', en: 'Show API key')
-                    : l10n.text(zh: '隐藏密钥', en: 'Hide API key'),
-                onPressed: _toggleApiKeyVisibility,
-                icon: Icon(
-                  _obscureApiKey ? Icons.visibility : Icons.visibility_off,
-                ),
-              ),
+              suffixIcon: _buildApiKeySuffix(l10n),
             ),
             validator: (value) => value == null || value.trim().isEmpty
                 ? l10n.text(zh: '请填写 API Key', en: 'Enter an API key')
@@ -2032,6 +2024,53 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     });
   }
 
+  void _pasteFocusedApiKey() {
+    unawaited(_pasteApiKeyFromClipboard());
+  }
+
+  void _pasteApiKey() {
+    _apiKeyFocusNode.requestFocus();
+    unawaited(_pasteApiKeyFromClipboard(requireFocus: false));
+  }
+
+  Future<void> _pasteApiKeyFromClipboard({bool requireFocus = true}) async {
+    ClipboardData? clipboard;
+    try {
+      clipboard = await Clipboard.getData(Clipboard.kTextPlain);
+    } catch (_) {
+      return;
+    }
+    if (!mounted ||
+        !_obscureApiKey ||
+        (requireFocus && !_apiKeyFocusNode.hasFocus) ||
+        clipboard?.text == null) {
+      return;
+    }
+
+    final current = _apiKeyController.value;
+    final currentSelection = current.selection;
+    final selection =
+        currentSelection.isValid &&
+            currentSelection.start <= current.text.length &&
+            currentSelection.end <= current.text.length
+        ? currentSelection
+        : TextSelection.collapsed(offset: current.text.length);
+    final pastedText = clipboard!.text!;
+    final nextText = current.text.replaceRange(
+      selection.start,
+      selection.end,
+      pastedText,
+    );
+    setState(() {
+      _apiKeyController.value = TextEditingValue(
+        text: nextText,
+        selection: TextSelection.collapsed(
+          offset: selection.start + pastedText.length,
+        ),
+      );
+    });
+  }
+
   Future<void> _showLogs() async {
     try {
       final contents = await ref.read(appLoggerProvider).readAll();
@@ -2152,7 +2191,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     _showError(context.l10n.appError(error));
   }
 
-  Future<void> _fetchModels() async {
   Future<void> _openApiKeyPage() async {
     try {
       await ref
@@ -2163,6 +2201,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
   }
 
+  Future<void> _fetchModels() async {
     if (!_formKey.currentState!.validate()) {
       return;
     }
