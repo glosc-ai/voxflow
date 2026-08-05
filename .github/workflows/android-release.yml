@@ -115,6 +115,7 @@ jobs:
             "$apk_dir/app-arm64-v8a-release.apk"
             "$apk_dir/app-x86_64-release.apk"
           )
+          abis=(armeabi-v7a arm64-v8a x86_64)
           apksigner="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
           if [[ -z "$apksigner" || ! -x "$apksigner" ]]; then
             echo "::error::apksigner was not found in the Android SDK."
@@ -131,9 +132,21 @@ jobs:
             -file "$certificate_path" >/dev/null
           expected="$(sha256sum "$certificate_path" | awk '{print $1}' | normalize_digest)"
           rm -f -- "$certificate_path"
-          for apk in "${apks[@]}"; do
+          for index in "${!apks[@]}"; do
+            apk="${apks[$index]}"
+            abi="${abis[$index]}"
             if [[ ! -f "$apk" ]]; then
               echo "::error::Missing expected artifact: $(basename "$apk")"
+              exit 1
+            fi
+            if ! unzip -Z1 "$apk" | grep -Fx "lib/$abi/libffmpegkit.so" \
+              >/dev/null; then
+              echo "::error::Missing bundled FFmpeg runtime for $abi in $(basename "$apk")."
+              exit 1
+            fi
+            if ! unzip -Z1 "$apk" | grep -Fx \
+              "assets/flutter_assets/THIRD_PARTY_NOTICES.md" >/dev/null; then
+              echo "::error::Missing third-party notices in $(basename "$apk")."
               exit 1
             fi
             verification="$($apksigner verify --print-certs "$apk")"
