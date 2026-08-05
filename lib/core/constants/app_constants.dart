@@ -2,7 +2,8 @@ class AppConstants {
   AppConstants._();
 
   static const appName = '声流 VoxFlow';
-  static const defaultBaseUrl = 'https://api.openai.com/v1';
+  static const defaultBaseUrl = 'https://one.gloscai.com/v1';
+  static const apiKeyPageUrl = 'https://www.glosc.ai/keys';
   static const defaultSttModel = 'whisper-1';
   static const defaultTtsModel = 'tts-1';
   static const seedTtsModel = 'bytedance/seed-tts-2.0';

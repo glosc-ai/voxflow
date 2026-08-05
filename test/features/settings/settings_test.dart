@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:voxflow/core/constants/app_constants.dart';
 import 'package:voxflow/core/errors/app_exception.dart';
 import 'package:voxflow/core/logging/app_logger.dart';
 import 'package:voxflow/core/network/dio_client.dart';
@@ -20,6 +21,11 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('SettingsState', () {
+    test('默认使用 Glosc API Root 和密钥页面', () {
+      expect(const SettingsState().baseUrl, 'https://one.gloscai.com/v1');
+      expect(AppConstants.apiKeyPageUrl, 'https://www.glosc.ai/keys');
+    });
+
     test('规范化 HTTPS API Root', () {
       expect(
         SettingsState.normalizeBaseUrl(' https://proxy.example/v1/// '),

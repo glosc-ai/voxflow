@@ -7,6 +7,7 @@ project(runner LANGUAGES CXX)
 #
 # Any new source files that you add to the application should be added here.
 add_executable(${BINARY_NAME} WIN32
+  "external_link_handler.cpp"
   "flutter_window.cpp"
   "main.cpp"
   "secure_credential_store.cpp"
@@ -39,6 +40,7 @@ target_link_libraries(${BINARY_NAME} PRIVATE
   "comctl32.lib"
   "crypt32.lib"
   "dwmapi.lib"
+  "shell32.lib"
 )
 target_include_directories(${BINARY_NAME} PRIVATE "${CMAKE_SOURCE_DIR}")
 

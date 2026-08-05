@@ -6,6 +6,7 @@ import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
     private var secureCredentialsChannel: MethodChannel? = null
+    private var externalLinkHandler: ExternalLinkHandler? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -49,9 +50,15 @@ class MainActivity : FlutterActivity() {
                 }
             }
         }
+        externalLinkHandler = ExternalLinkHandler(
+            this,
+            flutterEngine.dartExecutor.binaryMessenger,
+        )
     }
 
     override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
+        externalLinkHandler?.dispose()
+        externalLinkHandler = null
         secureCredentialsChannel?.setMethodCallHandler(null)
         secureCredentialsChannel = null
         super.cleanUpFlutterEngine(flutterEngine)

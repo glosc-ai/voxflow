@@ -133,7 +133,8 @@ Windows 发布时必须分发 `build/windows/x64/runner/Release` 完整目录，
 ## API 配置
 
 首次运行后打开“设置”，填写 API Key。默认 API Root 为
-`https://api.openai.com/v1`，STT/TTS 模型分别为 `whisper-1` 与 `tts-1`。
+`https://one.gloscai.com/v1`，可从 [Glosc 密钥页面](https://www.glosc.ai/keys)
+获取 API Key；STT/TTS 模型分别为 `whisper-1` 与 `tts-1`。
 自定义代理必须使用 HTTPS，并兼容 `/models`、`/audio/transcriptions` 和
 `/audio/speech`。
 

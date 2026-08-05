@@ -10,6 +10,7 @@
 #include "flutter/generated_plugin_registrant.h"
 #include <flutter/standard_method_codec.h>
 
+#include "external_link_handler.h"
 #include "secure_credential_store.h"
 
 namespace {
@@ -71,6 +72,8 @@ bool FlutterWindow::OnCreate() {
   flutter_view_subclass_installed_ = true;
 
   secure_credential_store_ = std::make_unique<SecureCredentialStore>(
+      flutter_controller_->engine()->messenger());
+  external_link_handler_ = std::make_unique<ExternalLinkHandler>(
       flutter_controller_->engine()->messenger());
 
   window_channel_ = std::make_unique<
@@ -192,6 +195,7 @@ void FlutterWindow::OnDestroy() {
     ::KillTimer(GetHandle(), kStartupResizeTimerId);
   }
   startup_resize_pending_ = false;
+  external_link_handler_.reset();
   secure_credential_store_.reset();
   window_channel_.reset();
   if (flutter_view_subclass_installed_ && flutter_view_handle_) {

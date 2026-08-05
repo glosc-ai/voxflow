@@ -10,6 +10,7 @@
 
 #include "win32_window.h"
 
+class ExternalLinkHandler;
 class SecureCredentialStore;
 
 // A window that does nothing but host a Flutter view.
@@ -44,6 +45,8 @@ class FlutterWindow : public Win32Window {
       window_channel_;
 
   std::unique_ptr<SecureCredentialStore> secure_credential_store_;
+
+  std::unique_ptr<ExternalLinkHandler> external_link_handler_;
 
   HWND flutter_view_handle_ = nullptr;
   bool flutter_view_subclass_installed_ = false;

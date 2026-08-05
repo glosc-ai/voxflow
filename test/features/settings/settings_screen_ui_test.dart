@@ -2,14 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:voxflow/core/services/external_link_service.dart';
 import 'package:voxflow/core/theme/app_theme.dart';
 import 'package:voxflow/features/settings/models/settings_state.dart';
 import 'package:voxflow/features/settings/providers/settings_provider.dart';
 import 'package:voxflow/features/settings/services/settings_repository.dart';
 import 'package:voxflow/features/settings/views/settings_screen.dart';
+import 'package:voxflow/l10n/app_localizations.dart';
 
 import '../../support/memory_api_key_store.dart';
-import 'package:voxflow/l10n/app_localizations.dart';
 
 void main() {
   for (final (name, platform, size) in [
@@ -42,6 +43,12 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Protected credential storage'), findsNothing);
+      final getApiKeyButton = find.byKey(const Key('getApiKeyButton'));
+      expect(getApiKeyButton, findsOneWidget);
+      await tester.ensureVisible(getApiKeyButton);
+      await tester.pumpAndSettle();
+      expect(getApiKeyButton.hitTestable(), findsOneWidget);
+
       final resetButton = find.byKey(const Key('resetAllDataButton'));
       expect(resetButton, findsOneWidget);
       await tester.ensureVisible(resetButton);
@@ -103,6 +110,44 @@ void main() {
       expect(find.text('API credential recovery required'), findsOneWidget);
     });
   }
+
+  testWidgets('get API key opens the configured credential page', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    final preferences = await SharedPreferences.getInstance();
+    final notifier = SettingsNotifier(
+      SettingsRepository(preferences, MemoryApiKeyStore()),
+    );
+    final externalLinks = _RecordingExternalLinkService();
+    await tester.binding.setSurfaceSize(const Size(1200, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          settingsProvider.overrideWith((ref) => notifier),
+          externalLinkServiceProvider.overrideWithValue(externalLinks),
+        ],
+        child: MaterialApp(
+          locale: AppLocalizations.englishLocale,
+          supportedLocales: AppLocalizations.supportedLocales,
+          localizationsDelegates: AppLocalizations.delegates,
+          theme: AppTheme.lightFor(TargetPlatform.windows),
+          home: const SettingsScreen(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final button = find.byKey(const Key('getApiKeyButton'));
+    await tester.ensureVisible(button);
+    await tester.pumpAndSettle();
+    await tester.tap(button);
+    await tester.pump();
+
+    expect(externalLinks.openedUrls, ['https://www.glosc.ai/keys']);
+  });
 
   testWidgets('save loading state keeps button size and visible progress', (
     tester,
@@ -440,5 +485,14 @@ class _TestSettingsNotifier extends SettingsNotifier {
       availableTtsModels: const ['tts-1', 'gpt-4o-mini-tts'],
       hasFetchedModels: true,
     );
+  }
+}
+
+class _RecordingExternalLinkService extends ExternalLinkService {
+  final openedUrls = <String>[];
+
+  @override
+  Future<void> open(String url) async {
+    openedUrls.add(url);
   }
 }

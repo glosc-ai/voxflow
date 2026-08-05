@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/errors/app_exception.dart';
 import '../../../core/logging/diagnostic_log_exporter.dart';
+import '../../../core/services/external_link_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_theme.dart';
@@ -358,7 +359,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                         ),
                                       ),
                                     ),
-                                    const SizedBox(height: AppSpacing.md),
+                                    Align(
+                                      alignment: AlignmentDirectional.centerEnd,
+                                      child: _buildGetApiKeyButton(
+                                        l10n,
+                                        enabled: !interactionsDisabled,
+                                      ),
+                                    ),
+                                    const SizedBox(height: AppSpacing.xs),
                                     Align(
                                       alignment: Alignment.centerRight,
                                       child: OutlinedButton.icon(
@@ -972,7 +980,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           en: 'The service credential is hidden by default and stored only on this device.',
                         ),
                         controlFullWidth: true,
-                        control: _buildMobileApiKeyField(l10n),
+                        control: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            _buildMobileApiKeyField(l10n),
+                            Align(
+                              alignment: AlignmentDirectional.centerEnd,
+                              child: _buildGetApiKeyButton(
+                                l10n,
+                                enabled: !interactionsDisabled,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                       _MobileSettingsRow(
                         name: l10n.text(zh: '连接检查', en: 'Connection check'),
@@ -1415,7 +1435,22 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           zh: '服务访问凭证默认隐藏，仅保存在本机。',
                           en: 'The service credential is hidden by default and stored only on this device.',
                         ),
-                        control: _buildDesktopApiKeyField(l10n),
+                        control: SizedBox(
+                          width: 360,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              _buildDesktopApiKeyField(l10n),
+                              Align(
+                                alignment: AlignmentDirectional.centerEnd,
+                                child: _buildGetApiKeyButton(
+                                  l10n,
+                                  enabled: !interactionsDisabled,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                       _DesktopSettingsRow(
                         name: l10n.text(zh: '连接检查', en: 'Connection check'),
@@ -1683,6 +1718,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               zh: r'为防止密钥发送到错误服务，原凭据已停用。请重新输入 API Root 和 API Key 后保存；若仍失败，请关闭 VoxFlow，并删除 HKCU\Software\Glosc AI\VoxFlow 下的 ApiKeyV1 注册表值。',
               en: r'The saved credential is disabled to prevent it from reaching the wrong service. Enter the API Root and API key again. If saving still fails, close VoxFlow and delete the ApiKeyV1 registry value under HKCU\Software\Glosc AI\VoxFlow.',
             ),
+    );
+  }
+
+  Widget _buildGetApiKeyButton(AppLocalizations l10n, {required bool enabled}) {
+    return TextButton.icon(
+      key: const Key('getApiKeyButton'),
+      onPressed: enabled ? _openApiKeyPage : null,
+      icon: const Icon(Icons.open_in_new, size: 18),
+      label: Text(l10n.text(zh: '获取 API Key', en: 'Get API key')),
     );
   }
 
@@ -2109,6 +2153,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   Future<void> _fetchModels() async {
+  Future<void> _openApiKeyPage() async {
+    try {
+      await ref
+          .read(externalLinkServiceProvider)
+          .open(AppConstants.apiKeyPageUrl);
+    } on AppException catch (error) {
+      _showException(error);
+    }
+  }
+
     if (!_formKey.currentState!.validate()) {
       return;
     }
