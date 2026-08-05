@@ -31,10 +31,12 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tool\verify_android_signin
 
 ## GitHub Actions 发布环境
 
-发布工作流绑定 `android-release` Environment。它有两个入口：
+跨平台发布工作流的 Android 构建作业绑定 `android-release` Environment。它有两个入口：
 
-- 发布 GitHub Release 时自动构建 Release 标签对应的代码；标签必须指向 `main` 可达的提交。构建及验签成功后，三种 ABI APK 和 SHA-256 清单会附加到该 GitHub Release。
-- 从 `main` 分支手工触发时执行同样的构建及验签，但只上传 Actions 构建制品，不会查找或修改 GitHub Release。
+- 向 `main` 推送 `pubspec.yaml` 变更后，工作流比较推送前后的顶层 `version:`。只有完整版本真正变化时才执行质量门禁，并行构建 Android 与 Windows；两端全部通过后自动创建标签和 GitHub Release。
+- 从 `main` 手工触发时执行相同的质量门禁和双平台构建，但只上传 Actions 构建制品，不创建标签或 GitHub Release。
+
+发布标签保留 Flutter 完整版本，例如 `version: 1.0.0+2` 对应 `v1.0.0+2`。构建制品文件名会将该版本规范化为 `1.0.0-build.2`，避免只提升 Android build number 时复用旧标签或覆盖旧文件。
 
 组织管理员需要在 `glosc-ai` 组织中配置以下 Actions Secret，并授权 `glosc-ai/voxflow` 仓库访问：
 
@@ -44,6 +46,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tool\verify_android_signin
 
 工作流会自动读取这三个组织 Secret，并映射为 Gradle 的内部签名输入；它还会从 keystore 导出公开证书并推导预期 SHA-256 指纹，不需要额外配置证书指纹变量。Secret 不会写入日志或构建制品。
 
-建议为 `android-release` Environment 设置必要审核人，并将部署来源限制为 `main` 和正式 Release 使用的标签模式（例如 `v*`）。如果 Environment 只允许 `main`，Release 标签触发的构建会在读取签名材料前被环境保护规则阻止。
+建议为 `android-release` Environment 设置必要审核人，并将部署来源限制为 `main`。如果保留 required reviewers，版本变化推送仍会在 Android 构建读取签名材料前等待批准；完全无人值守发布需要由组织管理员明确调整该保护规则。
 
-构建作业始终生成三种 ABI APK 和只含文件名的 SHA-256 校验清单，逐个验证签名证书后上传为 Actions 构建制品。只有 GitHub Release 发布事件会启动具有 `contents: write` 权限的独立发布作业，并把这些文件附加到对应标签的 Release；手工运行的构建作业保持 `contents: read`。正式运行链接、Release 附件名称和证书指纹构成 #5 的发布验收证据。
+Android 构建作业始终生成三种 ABI APK 和只含文件名的 SHA-256 校验清单，逐个验证签名证书后上传为 Actions 构建制品。Windows 作业独立生成并验证包含完整运行时的 x64 ZIP。只有版本变化推送会启动具有 `contents: write` 权限的发布作业，汇总四个二进制文件和统一 SHA-256 清单；其余作业保持 `contents: read`。
+
+仓库的 Actions Workflow permissions 必须允许 `GITHUB_TOKEN` 写入仓库内容，标签规则也必须允许工作流创建 `v*` 标签。正式运行链接、Release 附件名称、统一校验清单和 Android 证书指纹构成发布验收证据。Windows ZIP 仍是未签名受限测试包，不包含 `.wsb` 沙盒配置。

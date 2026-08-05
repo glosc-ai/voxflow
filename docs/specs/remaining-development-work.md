@@ -79,7 +79,7 @@ VoxFlow 的完成基线已经稳定，但当前产物尚不能作为可持续升
 
 ## Further Notes
 
-- 当前 Android Release 配置仍引用 Debug 签名，且仓库尚无 GitHub Actions 发布工作流，这两项是现有事实而非新架构设计。
+- Android Release 已采用缺少正式签名即失败的配置，并具备版本变化触发的跨平台 GitHub Actions 工作流；剩余门槛是组织环境、正式 Secrets 与真实发布运行证据。
 - API Key 已从 `SharedPreferences` 迁移到 Windows 当前用户级 DPAPI 或 Android Keystore；旧版明文仅在安全写入并回读验证后删除。
 - Windows 未签名压缩包和静态 Seed-TTS 2.0 常规音色目录均为已接受限制，不得在实现过程中扩展为新的发布子项目。
 - 最近一次快速反馈循环中，格式检查和静态分析通过，35 项自动测试全部通过；当前没有已复现的核心功能失败。

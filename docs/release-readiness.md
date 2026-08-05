@@ -16,8 +16,8 @@
 
 ## 2. 尚未完成的功能与工作
 
-- Android Release 签名尚未落地：当前 Release 构建仍引用 Debug 签名，仓库也没有 GitHub Actions 发布工作流。
-- 需要由 `glosc-ai` 组织持有唯一 Release keystore，并通过 GitHub Actions 组织级 Secrets 完成签名构建；密钥材料不得进入仓库。
+- Android Release 已配置为缺少正式签名输入即失败，跨平台 GitHub Actions 发布工作流也已实现；仍需由组织配置受保护环境与 Secrets，并取得一次成功正式运行的证据。
+- `glosc-ai` 组织必须持续持有唯一 Release keystore，并通过组织级 Secrets 完成签名构建；密钥材料不得进入仓库。
 - Android 尚缺至少一台真机上的完整核心流程验收。
 - Windows 最终压缩包尚需在不含 Flutter 开发环境的全新沙盒中完成成品验收。
 - 尚缺用户可见的数据与隐私说明，需在用户提供 API Key、文本或音频前说明本地保存、外发、日志和删除行为。
@@ -29,7 +29,7 @@
 
 ### 已确认的发布阻断项
 
-- Android Release 使用 Debug 签名，不能作为组织正式维护的首个可升级测试版本。
+- 尚未取得组织受保护工作流生成并验证证书的 Android 候选 APK，不能仅凭本地测试签名产物宣告可升级发布链路通过。
 - 双平台成品验收和数据与隐私说明尚未完成。
 
 ### 待验证的代码风险

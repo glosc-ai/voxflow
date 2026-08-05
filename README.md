@@ -130,6 +130,18 @@ flutter build apk --split-per-abi
 Windows 发布时必须分发 `build/windows/x64/runner/Release` 完整目录，不能只复制
 `voxflow.exe`；内置 FFmpeg DLL、Flutter 数据与许可文件都位于该目录中。
 
+## 自动发布
+
+向 `main` 推送包含 `pubspec.yaml` 完整版本变化的提交时，GitHub Actions 会自动
+执行静态分析和全部测试，并行构建组织签名的 Android 三 ABI APK 与未签名的
+Windows x64 Release ZIP。两端产物全部验证通过后，工作流使用完整版本创建标签
+和 GitHub Release，例如 `version: 1.0.0+2` 对应标签 `v1.0.0+2`。
+
+只修改依赖而没有改变 `version:` 不会触发发布。手工运行该工作流只生成 Actions
+构建制品，不会创建标签或 GitHub Release。Android 签名配置及仓库权限要求见
+[`docs/release/android-signing.md`](docs/release/android-signing.md)。Windows ZIP
+仍是未签名的受限测试包，发布时会与三个 APK 一同提供统一 SHA-256 清单。
+
 ## API 配置
 
 首次运行后打开“设置”，填写 API Key。默认 API Root 为
