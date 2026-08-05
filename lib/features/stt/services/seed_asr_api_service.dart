@@ -64,8 +64,9 @@ class SeedAsrApiService implements TranscriptionService {
   Future<TranscriptionResult> transcribe(
     File file, {
     UploadProgressCallback? onUploadProgress,
+    SettingsState? requestSettings,
   }) async {
-    final settings = _client.settings.validated();
+    final settings = (requestSettings ?? _client.settings).validated();
     await _validator.validate(file);
     return _normalizer.withSeedAsrAudio(
       file,

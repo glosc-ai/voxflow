@@ -8,6 +8,7 @@ import '../../../core/constants/app_constants.dart';
 import '../../../core/errors/app_exception.dart';
 import '../../history/models/history_record.dart';
 import '../../history/providers/history_provider.dart';
+import '../../settings/models/settings_state.dart';
 import '../../settings/providers/settings_provider.dart';
 import '../models/tts_request.dart';
 import '../models/tts_state.dart';
@@ -16,6 +17,7 @@ import '../services/tts_api_service.dart';
 
 typedef TtsHistoryWriter =
     Future<void> Function({required String text, required String audioPath});
+typedef TtsSettingsReader = SettingsState Function();
 
 final ttsApiServiceProvider = Provider<TtsApiService>((ref) {
   return TtsApiService(ref.watch(dioClientProvider));
@@ -41,6 +43,7 @@ final ttsProvider = StateNotifierProvider<TtsNotifier, TtsState>((ref) {
     playback: ref.watch(ttsPlaybackManagerProvider),
     historyWriter: ref.watch(ttsHistoryWriterProvider),
     model: ref.read(settingsProvider).ttsModel,
+    settingsReader: () => ref.read(settingsProvider),
   );
   ref.listen<String>(
     settingsProvider.select((settings) => settings.ttsModel),
@@ -67,10 +70,12 @@ class TtsNotifier extends StateNotifier<TtsState> {
     required PlaybackController playback,
     required TtsHistoryWriter historyWriter,
     required String model,
+    TtsSettingsReader? settingsReader,
   }) : _apiService = apiService,
        _playback = playback,
        _historyWriter = historyWriter,
        _model = model,
+       _settingsReader = settingsReader,
        super(TtsState(voice: AppConstants.defaultTtsVoiceForModel(model))) {
     _positionSubscription = _playback.positionChanges.listen((position) {
       if (_resettingPlayback || state.isGenerating || !state.hasAudio) {
@@ -98,6 +103,7 @@ class TtsNotifier extends StateNotifier<TtsState> {
   final TtsApiService _apiService;
   final PlaybackController _playback;
   final TtsHistoryWriter _historyWriter;
+  final TtsSettingsReader? _settingsReader;
   String _model;
   late final StreamSubscription<Duration> _positionSubscription;
   late final StreamSubscription<Duration> _durationSubscription;
@@ -185,6 +191,13 @@ class TtsNotifier extends StateNotifier<TtsState> {
       return;
     }
     final previousState = state;
+    final settingsSnapshot = _settingsReader?.call();
+    final request = TtsRequest(
+      text: text,
+      model: settingsSnapshot?.ttsModel ?? _model,
+      voice: previousState.voice,
+      speed: previousState.speed,
+    );
     _playbackEpoch += 1;
     state = state.copyWith(
       phase: TtsPhase.generating,
@@ -197,17 +210,17 @@ class TtsNotifier extends StateNotifier<TtsState> {
       if (previousState.hasAudio) {
         await _enqueuePlaybackCommand(_playback.stop);
       }
-      final request = TtsRequest(
-        text: text,
-        model: _model,
-        voice: previousState.voice,
-        speed: previousState.speed,
-      ).validated();
-      output = await _apiService.synthesize(request);
+      final validRequest = request.validated();
+      output = settingsSnapshot == null
+          ? await _apiService.synthesize(validRequest)
+          : await _apiService.synthesizeWithSettings(
+              validRequest,
+              settingsSnapshot,
+            );
       await _playback.load(output.path);
       await _playback.setVolume(previousState.volume);
       await _playback.setPlaybackRate(previousState.playbackRate);
-      await _historyWriter(text: request.text, audioPath: output.path);
+      await _historyWriter(text: validRequest.text, audioPath: output.path);
       state = state.copyWith(
         phase: TtsPhase.ready,
         audioPath: output.path,
@@ -230,8 +243,12 @@ class TtsNotifier extends StateNotifier<TtsState> {
         zh: '语音合成失败，请稍后重试。',
         en: 'Speech synthesis failed. Try again later.',
       );
+      final restoredVoice = availableVoices.contains(previousState.voice)
+          ? previousState.voice
+          : AppConstants.defaultTtsVoiceForModel(_model);
       state = previousState.copyWith(
         phase: TtsPhase.failure,
+        voice: restoredVoice,
         error: error is AppException ? error.localizedMessage : fallback,
       );
     }

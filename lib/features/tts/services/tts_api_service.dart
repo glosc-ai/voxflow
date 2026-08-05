@@ -6,6 +6,7 @@ import 'package:dio/dio.dart';
 import '../../../core/errors/app_exception.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/utils/path_utils.dart';
+import '../../settings/models/settings_state.dart';
 import '../models/tts_request.dart';
 
 typedef AudioBytesWriter = Future<File> Function(Uint8List bytes);
@@ -23,8 +24,15 @@ class TtsApiService {
   final DioClient _client;
   final AudioBytesWriter _writer;
 
-  Future<File> synthesize(TtsRequest request) async {
-    final settings = _client.settings.validated();
+  Future<File> synthesize(TtsRequest request) {
+    return synthesizeWithSettings(request, _client.settings);
+  }
+
+  Future<File> synthesizeWithSettings(
+    TtsRequest request,
+    SettingsState requestSettings,
+  ) async {
+    final settings = requestSettings.validated();
     final validRequest = request.validated();
     try {
       final response = await _client.dio.post<List<int>>(

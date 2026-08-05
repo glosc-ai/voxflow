@@ -153,6 +153,7 @@ class _FakeTranscriptionService implements TranscriptionService {
   Future<TranscriptionResult> transcribe(
     File file, {
     UploadProgressCallback? onUploadProgress,
+    SettingsState? requestSettings,
   }) async {
     calls++;
     onUploadProgress?.call(1);

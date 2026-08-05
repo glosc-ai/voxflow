@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 
 import '../../../core/errors/app_exception.dart';
 import '../../../core/network/dio_client.dart';
+import '../../settings/models/settings_state.dart';
 import '../models/transcription_result.dart';
 import 'audio_file_validator.dart';
 import 'seed_asr_api_service.dart';
@@ -23,16 +24,20 @@ class WhisperApiService implements TranscriptionService {
   final AudioFileValidator _validator;
   final TranscriptionService _seedAsrService;
 
+  SettingsState get currentSettings => _client.settings;
+
   @override
   Future<TranscriptionResult> transcribe(
     File file, {
     UploadProgressCallback? onUploadProgress,
+    SettingsState? requestSettings,
   }) async {
-    final settings = _client.settings.validated();
+    final settings = (requestSettings ?? currentSettings).validated();
     if (SeedAsrApiService.supportsModel(settings.sttModel)) {
       return _seedAsrService.transcribe(
         file,
         onUploadProgress: onUploadProgress,
+        requestSettings: settings,
       );
     }
     await _validator.validate(file);

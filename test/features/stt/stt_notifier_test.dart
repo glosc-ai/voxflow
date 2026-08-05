@@ -226,6 +226,7 @@ class _FailingWhisperService extends WhisperApiService {
   Future<TranscriptionResult> transcribe(
     File file, {
     UploadProgressCallback? onUploadProgress,
+    SettingsState? requestSettings,
   }) async {
     throw StateError('internal failure');
   }
@@ -240,6 +241,7 @@ class _FailOnceWhisperService extends WhisperApiService {
   Future<TranscriptionResult> transcribe(
     File file, {
     UploadProgressCallback? onUploadProgress,
+    SettingsState? requestSettings,
   }) async {
     calls++;
     if (calls == 1) {

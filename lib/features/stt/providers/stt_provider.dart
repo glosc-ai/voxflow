@@ -12,6 +12,7 @@ import '../../../core/utils/path_utils.dart';
 import '../../../core/utils/transcript_exporter.dart';
 import '../../history/models/history_record.dart';
 import '../../history/providers/history_provider.dart';
+import '../../settings/models/settings_state.dart';
 import '../../settings/providers/settings_provider.dart';
 import '../models/stt_state.dart';
 import '../services/audio_record_manager.dart';
@@ -25,6 +26,7 @@ typedef HistoryWriter =
     });
 
 typedef UtcNow = Future<DateTime> Function();
+typedef SttSettingsReader = SettingsState Function();
 typedef ManagedAudioPersister =
     Future<File> Function(File source, {required String category});
 
@@ -44,6 +46,8 @@ final whisperApiServiceProvider = Provider<WhisperApiService>((ref) {
   return WhisperApiService(ref.watch(dioClientProvider));
 });
 
+final sttUtcNowProvider = Provider<UtcNow>((ref) => PlatformClock.nowUtc);
+
 final historyWriterProvider = Provider<HistoryWriter>((ref) {
   return ({required type, required text, required audioPath}) async {
     await ref
@@ -57,6 +61,8 @@ final sttProvider = StateNotifierProvider<SttNotifier, SttState>((ref) {
     recorder: ref.watch(audioRecordManagerProvider),
     apiService: ref.watch(whisperApiServiceProvider),
     historyWriter: ref.watch(historyWriterProvider),
+    settingsReader: () => ref.read(settingsProvider),
+    nowUtc: ref.watch(sttUtcNowProvider),
   );
 });
 
@@ -65,11 +71,13 @@ class SttNotifier extends StateNotifier<SttState> {
     required AudioRecordManager recorder,
     required WhisperApiService apiService,
     required HistoryWriter historyWriter,
+    SttSettingsReader? settingsReader,
     UtcNow? nowUtc,
     ManagedAudioPersister? persistManagedAudio,
   }) : _recorder = recorder,
        _apiService = apiService,
        _historyWriter = historyWriter,
+       _settingsReader = settingsReader ?? (() => apiService.currentSettings),
        _nowUtc = nowUtc ?? PlatformClock.nowUtc,
        _persistManagedAudio =
            persistManagedAudio ?? PathUtils.persistManagedAudio,
@@ -78,8 +86,10 @@ class SttNotifier extends StateNotifier<SttState> {
   final AudioRecordManager _recorder;
   final WhisperApiService _apiService;
   final HistoryWriter _historyWriter;
+  final SttSettingsReader _settingsReader;
   final UtcNow _nowUtc;
   final ManagedAudioPersister _persistManagedAudio;
+  SettingsState? _recordingSettingsSnapshot;
   DateTime? _recordingSegmentStartedAt;
   Duration _recordedElapsed = Duration.zero;
   Timer? _elapsedTimer;
@@ -90,9 +100,10 @@ class SttNotifier extends StateNotifier<SttState> {
     if (!state.canStart) {
       return;
     }
-    await _discardRetainedTemporarySource();
-    state = const SttState(phase: SttPhase.countdown, countdown: 3);
+    _recordingSettingsSnapshot = _settingsReader();
     try {
+      await _discardRetainedTemporarySource();
+      state = const SttState(phase: SttPhase.countdown, countdown: 3);
       for (var value = 3; value > 0; value--) {
         state = state.copyWith(phase: SttPhase.countdown, countdown: value);
         await _delayUsingClock(const Duration(seconds: 1));
@@ -114,6 +125,7 @@ class SttNotifier extends StateNotifier<SttState> {
       );
       _startElapsedTimer();
     } catch (error) {
+      _recordingSettingsSnapshot = null;
       _setFailure(
         error,
         const AppMessage(zh: '无法开始录音。', en: 'Unable to start recording.'),
@@ -167,14 +179,21 @@ class SttNotifier extends StateNotifier<SttState> {
     await _accumulateElapsed();
     state = state.copyWith(elapsed: _roundedRecordedElapsed);
     try {
+      final requestSettings = _recordingSettingsSnapshot ?? _settingsReader();
       final file = await _recorder.stop();
-      await transcribeFile(file, removeSourceAfterSuccess: true);
+      await _transcribeFile(
+        file,
+        removeSourceAfterSuccess: true,
+        requestSettings: requestSettings,
+      );
     } catch (error) {
       await _recorder.cancel();
       _setFailure(
         error,
         const AppMessage(zh: '停止录音失败。', en: 'Unable to stop recording.'),
       );
+    } finally {
+      _recordingSettingsSnapshot = null;
     }
   }
 
@@ -183,6 +202,7 @@ class SttNotifier extends StateNotifier<SttState> {
       _elapsedTimer?.cancel();
       _recordingSegmentStartedAt = null;
       _recordedElapsed = Duration.zero;
+      _recordingSettingsSnapshot = null;
       state = const SttState();
       return true;
     }
@@ -194,6 +214,7 @@ class SttNotifier extends StateNotifier<SttState> {
       _elapsedTimer?.cancel();
       _recordingSegmentStartedAt = null;
       _recordedElapsed = Duration.zero;
+      _recordingSettingsSnapshot = null;
       state = const SttState();
       return true;
     } catch (error) {
@@ -242,6 +263,19 @@ class SttNotifier extends StateNotifier<SttState> {
   Future<void> transcribeFile(
     File file, {
     bool removeSourceAfterSuccess = false,
+  }) {
+    _recordingSettingsSnapshot = null;
+    return _transcribeFile(
+      file,
+      removeSourceAfterSuccess: removeSourceAfterSuccess,
+      requestSettings: _settingsReader(),
+    );
+  }
+
+  Future<void> _transcribeFile(
+    File file, {
+    required bool removeSourceAfterSuccess,
+    required SettingsState requestSettings,
   }) async {
     File? managedFile;
     await _discardRetainedTemporarySource(exceptPath: file.path);
@@ -254,6 +288,7 @@ class SttNotifier extends StateNotifier<SttState> {
     try {
       final result = await _apiService.transcribe(
         file,
+        requestSettings: requestSettings,
         onUploadProgress: (progress) {
           state = state.copyWith(
             phase: progress >= 1 ? SttPhase.transcribing : SttPhase.uploading,
@@ -305,6 +340,7 @@ class SttNotifier extends StateNotifier<SttState> {
     if (!state.canRetrySelectedSource) {
       return;
     }
+    final requestSettings = _settingsReader();
     final source = File(state.selectedFilePath!);
     if (!await source.exists()) {
       _setFailure(
@@ -317,9 +353,11 @@ class SttNotifier extends StateNotifier<SttState> {
       );
       return;
     }
-    await transcribeFile(
+    final temporaryRecording = state.selectedSourceIsTemporaryRecording;
+    await _transcribeFile(
       source,
-      removeSourceAfterSuccess: state.selectedSourceIsTemporaryRecording,
+      removeSourceAfterSuccess: temporaryRecording,
+      requestSettings: requestSettings,
     );
   }
 
@@ -354,6 +392,7 @@ class SttNotifier extends StateNotifier<SttState> {
     _elapsedTimer?.cancel();
     _recordingSegmentStartedAt = null;
     _recordedElapsed = Duration.zero;
+    _recordingSettingsSnapshot = null;
     final retainedTemporaryPath = state.selectedSourceIsTemporaryRecording
         ? state.selectedFilePath
         : null;
