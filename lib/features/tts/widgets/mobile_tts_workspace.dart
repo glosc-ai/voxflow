@@ -275,7 +275,7 @@ class _MobileTextEditor extends StatelessWidget {
   }
 }
 
-class _MobileVoiceList extends ConsumerWidget {
+class _MobileVoiceList extends ConsumerStatefulWidget {
   const _MobileVoiceList({
     required this.state,
     required this.voices,
@@ -287,34 +287,56 @@ class _MobileVoiceList extends ConsumerWidget {
   final bool usesSeedTtsSpeakerIds;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_MobileVoiceList> createState() => _MobileVoiceListState();
+}
+
+class _MobileVoiceListState extends ConsumerState<_MobileVoiceList> {
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final state = widget.state;
+    final voices = widget.voices;
+    final usesSeedTtsSpeakerIds = widget.usesSeedTtsSpeakerIds;
+    final largeText = MediaQuery.textScalerOf(context).scale(1) >= 1.8;
     return Semantics(
       container: true,
       label: context.l10n.text(
         zh: '音色列表，可横向滑动',
         en: 'Voice list, scroll horizontally',
       ),
-      child: SingleChildScrollView(
-        key: const Key('mobileVoiceList'),
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-        child: IntrinsicHeight(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              for (var index = 0; index < voices.length; index++) ...[
-                _MobileVoiceCard(
-                  voice: voices[index],
-                  selected: voices[index] == state.voice,
-                  enabled: !state.isGenerating,
-                  modelSpecific: usesSeedTtsSpeakerIds,
-                  onTap: () =>
-                      ref.read(ttsProvider.notifier).setVoice(voices[index]),
-                ),
-                if (index != voices.length - 1)
-                  const SizedBox(width: AppSpacing.sm),
-              ],
-            ],
+      child: SizedBox(
+        height: largeText
+            ? (usesSeedTtsSpeakerIds ? 420 : 340)
+            : (usesSeedTtsSpeakerIds ? 168 : 160),
+        child: Scrollbar(
+          key: const Key('mobileTtsVoiceScrollbar'),
+          controller: _scrollController,
+          thumbVisibility: true,
+          interactive: true,
+          child: ListView.separated(
+            key: const Key('mobileVoiceList'),
+            controller: _scrollController,
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+            itemCount: voices.length,
+            separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.sm),
+            itemBuilder: (context, index) {
+              final voice = voices[index];
+              return _MobileVoiceCard(
+                voice: voice,
+                selected: voice == state.voice,
+                enabled: !state.isGenerating,
+                modelSpecific: usesSeedTtsSpeakerIds,
+                onTap: () => ref.read(ttsProvider.notifier).setVoice(voice),
+              );
+            },
           ),
         ),
       ),

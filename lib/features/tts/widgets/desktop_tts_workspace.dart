@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:ui' show PointerDeviceKind;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -349,7 +350,7 @@ class _VoiceHeading extends StatelessWidget {
   }
 }
 
-class _VoiceCards extends ConsumerWidget {
+class _VoiceCards extends ConsumerStatefulWidget {
   const _VoiceCards({
     required this.state,
     required this.voices,
@@ -361,27 +362,60 @@ class _VoiceCards extends ConsumerWidget {
   final bool usesSeedTtsSpeakerIds;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return SingleChildScrollView(
-      key: ValueKey('ttsVoice:${state.voice}'),
-      scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.fromLTRB(2, 2, 2, AppSpacing.sm),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          for (var index = 0; index < voices.length; index++) ...[
-            _VoiceCard(
-              voice: voices[index],
-              selected: state.voice == voices[index],
-              enabled: !state.isGenerating,
-              usesSeedTtsSpeakerIds: usesSeedTtsSpeakerIds,
-              onSelected: () =>
-                  ref.read(ttsProvider.notifier).setVoice(voices[index]),
-            ),
-            if (index != voices.length - 1)
-              const SizedBox(width: AppSpacing.sm),
-          ],
-        ],
+  ConsumerState<_VoiceCards> createState() => _VoiceCardsState();
+}
+
+class _VoiceCardsState extends ConsumerState<_VoiceCards> {
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final state = widget.state;
+    final voices = widget.voices;
+    final usesSeedTtsSpeakerIds = widget.usesSeedTtsSpeakerIds;
+    final inheritedBehavior = ScrollConfiguration.of(context);
+    final largeText = MediaQuery.textScalerOf(context).scale(1) >= 1.6;
+    return SizedBox(
+      height: largeText ? (usesSeedTtsSpeakerIds ? 420 : 340) : 172,
+      child: ScrollConfiguration(
+        behavior: inheritedBehavior.copyWith(
+          dragDevices: {
+            ...inheritedBehavior.dragDevices,
+            PointerDeviceKind.mouse,
+          },
+        ),
+        child: Scrollbar(
+          key: const Key('desktopTtsVoiceScrollbar'),
+          controller: _scrollController,
+          thumbVisibility: true,
+          trackVisibility: true,
+          interactive: true,
+          child: ListView.separated(
+            key: const Key('desktopTtsVoiceList'),
+            controller: _scrollController,
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.fromLTRB(2, 2, 2, AppSpacing.sm),
+            itemCount: voices.length,
+            separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.sm),
+            itemBuilder: (context, index) {
+              final voice = voices[index];
+              return _VoiceCard(
+                voice: voice,
+                selected: state.voice == voice,
+                enabled: !state.isGenerating,
+                usesSeedTtsSpeakerIds: usesSeedTtsSpeakerIds,
+                onSelected: () =>
+                    ref.read(ttsProvider.notifier).setVoice(voice),
+              );
+            },
+          ),
+        ),
       ),
     );
   }
