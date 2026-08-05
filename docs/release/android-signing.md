@@ -44,10 +44,16 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tool\verify_android_signin
 - `ANDROID_KEY_ALIAS`：keystore 中的 Release 密钥别名。
 - `ANDROID_KEY_PASSWORD`：keystore 与 Release 密钥共用的密码。
 
-工作流会自动读取这三个组织 Secret，并映射为 Gradle 的内部签名输入；它还会从 keystore 导出公开证书并推导预期 SHA-256 指纹，不需要额外配置证书指纹变量。Secret 不会写入日志或构建制品。
+仓库还必须配置一个非敏感 Actions Variable：
 
-建议为 `android-release` Environment 设置必要审核人，并将部署来源限制为 `main`。如果保留 required reviewers，版本变化推送仍会在 Android 构建读取签名材料前等待批准；完全无人值守发布需要由组织管理员明确调整该保护规则。
+- `ANDROID_CERT_SHA256`：组织 Release 证书的固定 SHA-256 指纹，使用 64 个十六进制字符；允许输入冒号和空格，工作流会在比较前规范化。
 
-Android 构建作业始终生成三种 ABI APK 和只含文件名的 SHA-256 校验清单，逐个验证签名证书后上传为 Actions 构建制品。Windows 作业独立生成并验证包含完整运行时的 x64 ZIP。只有版本变化推送会启动具有 `contents: write` 权限的发布作业，汇总四个二进制文件和统一 SHA-256 清单；其余作业保持 `contents: read`。
+首次在受保护环境中手工运行时，如果 `ANDROID_CERT_SHA256` 尚未配置，Android 作业会从 keystore 导出公开证书、把实际 SHA-256 写入运行摘要，然后在构建 APK 前失败。组织管理员应从独立保管的 keystore 再次核对该指纹，确认后写入仓库 Actions Variable 并重新运行。后续任何错误 keystore 都会因与固定指纹不一致而失败。
+
+工作流会自动读取三个组织 Secret 并映射为 Gradle 的内部签名输入。Secret 不会写入日志或构建制品；公开证书指纹会写入运行摘要，作为发布验收证据。
+
+`android-release` Environment 必须将部署来源限制为 `main`。建议同时设置必要审核人；如果保留 required reviewers，版本变化推送会在 Android 构建读取签名材料前等待批准，完全无人值守发布需要由组织管理员明确接受取消人工审批后的保护边界。
+
+Android 构建作业始终生成三种 ABI APK 和只含文件名的 SHA-256 校验清单，逐个验证签名证书后上传为 Actions 构建制品。所有第三方 Action 都固定到完整提交 SHA，避免可变标签在读取签名材料的作业中被替换。Windows 作业独立生成并验证包含完整运行时的 x64 ZIP。只有版本变化推送会启动具有 `contents: write` 权限的发布作业，汇总四个二进制文件和统一 SHA-256 清单；其余作业保持 `contents: read`。
 
 仓库的 Actions Workflow permissions 必须允许 `GITHUB_TOKEN` 写入仓库内容，标签规则也必须允许工作流创建 `v*` 标签。正式运行链接、Release 附件名称、统一校验清单和 Android 证书指纹构成发布验收证据。Windows ZIP 仍是未签名受限测试包，不包含 `.wsb` 沙盒配置。
