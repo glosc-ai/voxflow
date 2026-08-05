@@ -353,9 +353,9 @@ void main() {
       size: const Size(1200, 800),
     );
 
-    expect(find.text('v1.0.0+1 · Windows'), findsOneWidget);
     expect(find.text('声流'), findsOneWidget);
     expect(find.text('声流 · 语音转文字'), findsOneWidget);
+    expect(find.text('v1.0.0 · Windows'), findsOneWidget);
     for (final key in const [
       Key('windowMinimizeButton'),
       Key('windowMaximizeButton'),

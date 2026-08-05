@@ -4,8 +4,9 @@ import 'package:flutter/services.dart';
 class WindowsWindowService {
   WindowsWindowService._();
 
-  static const MethodChannel _channel =
-      MethodChannel('ai.glosc.voxflow/window');
+  static const MethodChannel _channel = MethodChannel(
+    'ai.glosc.voxflow/window',
+  );
 
   static bool get isSupported =>
       defaultTargetPlatform == TargetPlatform.windows;
@@ -20,10 +21,8 @@ class WindowsWindowService {
 
   static Future<void> startDrag() => _invokeVoid('startDrag');
 
-  static Future<void> setBrightness(Brightness brightness) => _invokeVoid(
-        'setBrightness',
-        brightness.name,
-      );
+  static Future<void> setBrightness(Brightness brightness) =>
+      _invokeVoid('setBrightness', brightness.name);
 
   static Future<bool> isMaximized() async {
     if (!isSupported) {
@@ -43,7 +42,12 @@ class WindowsWindowService {
       return null;
     }
     try {
-      return await _channel.invokeMethod<String>('getVersion');
+      final version = await _channel.invokeMethod<String>('getVersion');
+      final normalized = version?.trim();
+      if (normalized == null || normalized.isEmpty) {
+        return null;
+      }
+      return normalized.split('+').first;
     } on MissingPluginException {
       return null;
     } on PlatformException {
@@ -51,10 +55,7 @@ class WindowsWindowService {
     }
   }
 
-  static Future<void> _invokeVoid(
-    String method, [
-    Object? arguments,
-  ]) async {
+  static Future<void> _invokeVoid(String method, [Object? arguments]) async {
     if (!isSupported) {
       return;
     }
