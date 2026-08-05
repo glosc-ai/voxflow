@@ -5,7 +5,7 @@
 
 ## 功能
 
-- 麦克风录音、暂停/继续，以及本地音频或视频文件转录
+- 麦克风录音、暂停/继续，以及本地音频或视频文件转录；SeedASR 输入自动规范化
 - Whisper `verbose_json` 片段解析和 TXT/SRT 导出
 - `tts-1` 六种音色、0.25–4.0 倍语速、播放控制和 MP3 另存
 - Windows/Android 本地 SQLite 历史、搜索、复制、重播和安全删除
@@ -72,14 +72,15 @@ flowchart LR
     View["Views / AppShell"] --> State["Riverpod Providers / StateNotifier"]
     State --> Service["Feature Services / Repositories"]
     Service --> Core["DioClient / 路径 / 日志 / 错误"]
-    Service --> Platform["录音 / 播放 / SharedPreferences / SQLite"]
+    Service --> Platform["录音 / 播放 / FFmpeg / SharedPreferences / SQLite"]
     Core --> Remote["OpenAI 兼容 HTTP / SeedASR WebSocket"]
 ```
 
 - 设置模块通过 SharedPreferences 保存 API、模型、主题和语言配置；网络请求在发起时
   动态读取当前配置。
 - STT 根据模型选择 Whisper/OpenAI 兼容的 HTTP multipart，或 SeedASR 二进制
-  WebSocket；TTS 通过 `/audio/speech` 获取 MP3 字节。
+  WebSocket。SeedASR 模块会在内部检测输入，并通过 FFmpeg 将不兼容音频临时转换为
+  16 kHz、16-bit、单声道 PCM WAV；TTS 通过 `/audio/speech` 获取 MP3 字节。
 - STT/TTS 仅在成功后写入历史。SQLite 保存类型、文字、音频路径和创建时间，
   实际音频文件保存在 `path_provider` 返回的应用管理目录。
 - 页面主要通过 `ref.watch`/`ref.read` 驱动 Provider；焦点、输入控制器和启动重试等
@@ -92,14 +93,16 @@ flowchart LR
   MethodChannel 适配；录音插件仍负责检查麦克风是否可用。
 - 两个平台的临时文件、数据库和受管音频路径都由 `path_provider` 解析，不硬编码
   系统目录。
-- 网络适配器、WebSocket 连接器、数据库工厂、时钟、录音器和播放器均保留可注入
-  接缝，自动测试可以使用伪服务和临时数据库而不调用真实 API。
+- 音频规范化模块隐藏 FFmpeg 参数、输出复验和临时文件清理；原始导入文件不会被
+  修改或删除，转换文件在请求结束后清理。
+- 网络适配器、WebSocket 连接器、音频转码执行器、数据库工厂、时钟、录音器和
+  播放器均保留可注入接缝，自动测试可以使用伪服务和临时数据库而不调用真实 API。
 
 ## 环境
 
-- Flutter 3.x / Dart 3.x
+- Flutter 3.44+ / Dart 3.12+
 - Windows 10/11 与 Visual Studio 2022 Windows 桌面工具链
-- Android SDK 与 JDK 17
+- Android 8.0（API 26）或更高版本、Android SDK 与 JDK 17
 
 安装依赖：
 
@@ -121,6 +124,9 @@ flutter build windows
 flutter build apk --split-per-abi
 ```
 
+Windows 发布时必须分发 `build/windows/x64/runner/Release` 完整目录，不能只复制
+`voxflow.exe`；内置 FFmpeg DLL、Flutter 数据与许可文件都位于该目录中。
+
 ## API 配置
 
 首次运行后打开“设置”，填写 API Key。默认 API Root 为
@@ -131,8 +137,15 @@ flutter build apk --split-per-abi
 API Key 按项目约束保存在本机 SharedPreferences 中，不具备操作系统密钥库级加密；
 应用不会把密钥写入调试日志或错误提示。
 
-转录文件限制为 25 MB，支持 MP3、MP4、MPEG、MPGA、M4A、WAV 和 WEBM。
+转录源文件限制为 25 MB，支持 MP3、MP4、MPEG、MPGA、M4A、WAV 和 WEBM。
+选择 SeedASR 时，应用会自动把非目标格式转换为 16 kHz、16-bit、单声道 PCM
+WAV；转换后的文件同样不得超过 25 MB。中间文件仅保存在临时目录并会自动清理，
+历史记录仍保存原始来源的受管副本。
 录音与生成音频均保存在 `path_provider` 返回的应用目录中，不使用硬编码系统路径。
+
+自动转换使用固定版本的最小 LGPL FFmpeg 动态库，未启用 GPL 组件。第三方许可与
+对应源码信息见 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)；发布前仍需核对
+最终原生资产的完整许可清单。
 
 ## 验证
 
