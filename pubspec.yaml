@@ -1,7 +1,7 @@
 name: voxflow
 description: "A cross-platform AI STT and TTS application for Windows & Android."
 publish_to: 'none'
-version: 1.0.0+1
+version: 1.0.1+2
 
 environment:
   sdk: '>=3.12.0 <4.0.0'
